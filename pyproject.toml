@@ -1,0 +1,71 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "convertcad"
+dynamic = ["version"]
+description = "Convert 2D PDF drawings into editable DXF and DWG files built with real CAD entities"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "AGPL-3.0-only"
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
+authors = [{ name = "abdelhaouari" }]
+keywords = ["pdf", "dxf", "dwg", "cad", "autocad", "vectorization", "ocr", "engineering"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Topic :: Scientific/Engineering",
+    "Environment :: X11 Applications :: Qt",
+]
+dependencies = [
+    "PySide6-Essentials>=6.6",
+    "PyMuPDF>=1.24.3",
+    "ezdxf>=1.3",
+    "numpy>=1.26",
+    "opencv-python-headless>=4.8",
+    "pytesseract>=0.3.10",
+    "rapidocr[rtl]>=3.10,<4",
+    "onnxruntime>=1.20",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pyinstaller>=6.6", "ruff>=0.5"]
+paddle = ["paddlepaddle>=3.0", "paddleocr>=3.0"]
+
+[project.scripts]
+convertcad-cli = "convertcad.cli:main"
+
+[project.gui-scripts]
+convertcad = "convertcad.__main__:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "convertcad.APP_VERSION" }
+
+[tool.setuptools.packages.find]
+include = ["convertcad*"]
+
+[tool.setuptools.package-data]
+convertcad = ["resources/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["ignore::FutureWarning", "ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+extend-exclude = ["build", "dist"]
+
+[tool.ruff.lint]
+# pycodestyle errors/warnings, pyflakes, bugbear (likely bugs)
+select = ["E", "W", "F", "B"]
+ignore = ["B905"]                       # zip(strict=...) not wanted here
+
+[tool.ruff.lint.per-file-ignores]
+"convertcad/i18n.py" = ["E501"]         # translation keys are whole sentences
+"convertcad/ui/icons.py" = ["E501"]     # SVG path data
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["PySide6.QtCore.QModelIndex"]

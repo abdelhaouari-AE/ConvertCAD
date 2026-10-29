@@ -1,0 +1,19 @@
+GNU LibreDWG - the DWG converter bundled with ConvertCAD
+=========================================================
+
+dxf2dwg / dwg2dxf are built from GNU LibreDWG 0.13.4, free software
+licensed under the GNU General Public License version 3 or later (COPYING).
+
+Corresponding source code:
+  * upstream source (unmodified):
+      https://github.com/LibreDWG/libredwg/releases/tag/0.13.4
+      https://ftp.gnu.org/gnu/libredwg/libredwg-0.13.4.tar.xz
+  * a copy of that source, the two ConvertCAD patches and the build script,
+    in the ConvertCAD source repository:
+      vendor/libredwg/libredwg-0.13.4.tar.xz
+      vendor/libredwg/patches/*.patch
+      scripts/build_libredwg.sh
+
+The patches fix two bugs in the DXF reader (src/in_dxf.c): every linetype
+was listed twice in the DWG linetype table, and reading a large DXF was
+very slow. Nothing else is changed.

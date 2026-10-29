@@ -1,0 +1,206 @@
+# Builds every download of a ConvertCAD release:
+#   Windows : portable zip + installer (setup.exe)
+#   Linux   : portable tar.gz + AppImage + .deb
+# Each one includes the DWG converter (GNU LibreDWG) and the OCR engines and
+# models: users install nothing else.
+#
+#  - manually: Actions tab > build > Run workflow
+#  - automatically when a version tag is pushed:  git tag v1.0.0 && git push --tags
+#    (the files are then attached to the GitHub release of that tag)
+#
+# Optional code signing (Windows): add the repository secrets
+#   SIGN_PFX_BASE64    the .pfx certificate, base64-encoded
+#   SIGN_PFX_PASSWORD  its password
+# Without them the programs are built unsigned.
+name: build
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write                       # needed to attach files to a release
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
+      SIGN_PFX_BASE64: ${{ secrets.SIGN_PFX_BASE64 }}
+      SIGN_PFX_PASSWORD: ${{ secrets.SIGN_PFX_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements-dev.txt
+
+      - name: Tests
+        run: python -m pytest -q
+
+      - name: OCR models (cache)
+        uses: actions/cache@v4
+        with:
+          path: vendor/ocr_models
+          key: ocr-models-${{ hashFiles('scripts/get_ocr_models.py') }}
+
+      - name: OCR models (download and check)
+        run: python scripts/get_ocr_models.py --check
+
+      - name: Build with PyInstaller
+        run: |
+          python scripts/make_icon.py
+          python -m PyInstaller --noconfirm --clean ConvertCAD.spec
+
+      - name: Bundle Tesseract OCR (English, French, Arabic)
+        shell: pwsh
+        run: |
+          choco install tesseract -y --no-progress
+          $src = "$env:ProgramFiles\Tesseract-OCR"
+          foreach ($lang in "fra", "ara") {
+            Invoke-WebRequest -Uri "https://github.com/tesseract-ocr/tessdata_fast/raw/main/$lang.traineddata" `
+                              -OutFile "$src\tessdata\$lang.traineddata"
+          }
+          Copy-Item $src dist/ConvertCAD/tesseract -Recurse
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/tesseract-ocr/tesseract/main/LICENSE" `
+                            -OutFile dist/ConvertCAD/tesseract/LICENSE-Tesseract.txt
+          dist/ConvertCAD/tesseract/tesseract.exe --list-langs
+
+      - name: Smoke test of the built program (PDF -> DWG with the bundled converter)
+        shell: pwsh
+        run: |
+          python scripts/make_samples.py
+          dist/ConvertCAD/ConvertCAD-cli.exe samples/sample_plan.pdf -o dist/check/sample.dwg -q
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          $head = [System.Text.Encoding]::ASCII.GetString([System.IO.File]::ReadAllBytes("dist/check/sample.dwg")[0..5])
+          if ($head -ne "AC1015") { Write-Error "not a DWG 2000 file: $head"; exit 1 }
+          dist/ConvertCAD/ConvertCAD-cli.exe --list-ocr
+          # the OCR engine really runs inside the built program (DLLs, models)
+          dist/ConvertCAD/ConvertCAD-cli.exe samples/sample_scan.pdf -o dist/check/scan.dxf -q --ocr-engine rapidocr
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          if (-not (Select-String -Path dist/check/scan_log.txt -Pattern "(RapidOCR)" -SimpleMatch -Quiet)) {
+            Write-Error "RapidOCR did not run in the built program"; exit 1 }
+          Remove-Item dist/check -Recurse
+
+      - name: Code signing (only when the secrets are set)
+        if: env.SIGN_PFX_BASE64 != ''
+        shell: pwsh
+        run: |
+          $pfx = Join-Path $env:RUNNER_TEMP "convertcad.pfx"
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:SIGN_PFX_BASE64))
+          "CONVERTCAD_SIGN_PFX=$pfx" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "CONVERTCAD_SIGN_PASSWORD=$env:SIGN_PFX_PASSWORD" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Sign the programs
+        if: env.SIGN_PFX_BASE64 != ''
+        shell: cmd
+        run: call scripts\sign_windows.bat dist\ConvertCAD\ConvertCAD.exe dist\ConvertCAD\ConvertCAD-cli.exe dist\ConvertCAD\_internal\libredwg\dxf2dwg.exe dist\ConvertCAD\_internal\libredwg\dwg2dxf.exe
+
+      - name: Portable zip
+        shell: pwsh
+        run: |
+          $v = python -c "import convertcad; print(convertcad.APP_VERSION)"
+          Copy-Item README.md, LICENSE, THIRD_PARTY_NOTICES.md, CHANGELOG.md dist/ConvertCAD/
+          Compress-Archive -Path dist/ConvertCAD -DestinationPath "dist/ConvertCAD-$v-win64-portable.zip"
+
+      - name: Installer (Inno Setup)
+        shell: cmd
+        run: |
+          choco install innosetup -y --no-progress
+          set CONVERTCAD_NOPAUSE=1
+          call scripts\build_installer.bat
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: ConvertCAD-windows
+          path: |
+            dist/ConvertCAD-*-win64-portable.zip
+            dist/ConvertCAD-*-win64-setup.exe
+          retention-days: 30
+
+      - name: Attach to the GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/ConvertCAD-*-win64-portable.zip
+            dist/ConvertCAD-*-win64-setup.exe
+
+  linux:
+    # Built on the oldest supported Ubuntu: the programs then run on newer
+    # distributions too (glibc is backward compatible only).
+    runs-on: ubuntu-22.04
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+
+      - name: System libraries (Qt runtime, Tesseract for the tests, build tools)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libegl1 libgl1 \
+            libxkbcommon0 libxkbcommon-x11-0 libxcb-cursor0 libfontconfig1 libdbus-1-3 \
+            tesseract-ocr tesseract-ocr-fra build-essential xz-utils
+
+      - name: DWG converter (cache)
+        uses: actions/cache@v4
+        with:
+          path: vendor/libredwg/linux-x86_64
+          key: libredwg-ubuntu22-${{ hashFiles('vendor/libredwg/patches/*', 'scripts/build_libredwg.sh') }}
+
+      - name: OCR models (cache)
+        uses: actions/cache@v4
+        with:
+          path: vendor/ocr_models
+          key: ocr-models-${{ hashFiles('scripts/get_ocr_models.py') }}
+
+      - name: Portable program (tests included)
+        run: bash scripts/build_linux.sh
+
+      - name: AppImage
+        run: bash scripts/build_appimage.sh
+
+      - name: Debian package
+        run: bash scripts/build_deb.sh
+
+      - name: Smoke test (AppImage -> DWG, package contents)
+        run: |
+          python scripts/make_samples.py
+          ./dist/ConvertCAD-*-x86_64.AppImage --appimage-extract-and-run --cli \
+              samples/sample_plan.pdf -o /tmp/check/sample.dwg -q
+          test "$(head -c 6 /tmp/check/sample.dwg)" = "AC1015"
+          ./dist/ConvertCAD-*-x86_64.AppImage --appimage-extract-and-run --cli \
+              samples/sample_scan.pdf -o /tmp/check/scan.dxf -q --ocr-engine rapidocr
+          grep -qF "(RapidOCR)" /tmp/check/scan_log.txt
+          dpkg-deb --info dist/convertcad_*_amd64.deb
+          dpkg-deb --contents dist/convertcad_*_amd64.deb | grep -q libredwg/dxf2dwg
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: ConvertCAD-linux
+          path: |
+            dist/ConvertCAD-*-linux-x86_64.tar.gz
+            dist/ConvertCAD-*-x86_64.AppImage
+            dist/convertcad_*_amd64.deb
+          retention-days: 30
+
+      - name: Attach to the GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/ConvertCAD-*-linux-x86_64.tar.gz
+            dist/ConvertCAD-*-x86_64.AppImage
+            dist/convertcad_*_amd64.deb

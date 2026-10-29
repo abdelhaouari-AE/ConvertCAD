@@ -1,0 +1,79 @@
+{
+  // Terminal > Run Task...   (Ctrl+Shift+B runs the default build task)
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Set up the virtual environment",
+      "type": "shell",
+      "windows": { "command": "scripts\\setup_venv.bat" },
+      "linux": { "command": "./scripts/setup_venv.sh" },
+      "osx": { "command": "./scripts/setup_venv.sh" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Run the tests",
+      "type": "shell",
+      "command": "${command:python.interpreterPath}",
+      "args": ["-m", "pytest", "-q"],
+      "options": { "env": { "QT_QPA_PLATFORM": "offscreen" } },
+      "group": { "kind": "test", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "Lint (ruff)",
+      "type": "shell",
+      "command": "${command:python.interpreterPath}",
+      "args": ["-m", "ruff", "check", "."],
+      "problemMatcher": []
+    },
+    {
+      "label": "Make the sample PDFs",
+      "type": "shell",
+      "command": "${command:python.interpreterPath}",
+      "args": ["scripts/make_samples.py"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Regenerate the icon",
+      "type": "shell",
+      "command": "${command:python.interpreterPath}",
+      "args": ["scripts/make_icon.py"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Build the portable exe (folder)",
+      "type": "shell",
+      "windows": { "command": "scripts\\build_exe.bat" },
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "Build the portable exe (single file)",
+      "type": "shell",
+      "windows": { "command": "scripts\\build_exe.bat onefile" },
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Build the Windows installer (Inno Setup)",
+      "type": "shell",
+      "windows": { "command": "scripts\\build_installer.bat" },
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Build the Linux program, AppImage and .deb",
+      "type": "shell",
+      "linux": { "command": "bash scripts/build_linux.sh && bash scripts/build_appimage.sh && bash scripts/build_deb.sh" },
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Download the OCR models (Maximum + Arabic)",
+      "type": "shell",
+      "command": "${command:python.interpreterPath}",
+      "args": ["scripts/get_ocr_models.py", "--check"],
+      "problemMatcher": []
+    }
+  ]
+}

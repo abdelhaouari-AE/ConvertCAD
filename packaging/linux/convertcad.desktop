@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=ConvertCAD
+GenericName=PDF to DXF/DWG converter
+GenericName[fr]=Convertisseur PDF vers DXF/DWG
+Comment=Convert PDF drawings into editable DXF and DWG files
+Comment[fr]=Convertir des plans PDF en fichiers DXF et DWG modifiables
+Exec=ConvertCAD %F
+Icon=convertcad
+Terminal=false
+Categories=Graphics;2DGraphics;VectorGraphics;
+MimeType=application/pdf;
+Keywords=PDF;DXF;DWG;CAD;AutoCAD;drawing;plan;

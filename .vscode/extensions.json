@@ -1,0 +1,12 @@
+{
+  // VS Code proposes these extensions when the folder is opened.
+  "recommendations": [
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "ms-python.debugpy",
+    "charliermarsh.ruff",
+    "editorconfig.editorconfig",
+    "tamasfe.even-better-toml",
+    "yzhang.markdown-all-in-one"
+  ]
+}

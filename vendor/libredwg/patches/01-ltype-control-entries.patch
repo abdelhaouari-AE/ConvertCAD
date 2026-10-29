@@ -1,0 +1,18 @@
+--- a/src/in_dxf.c
++++ b/src/in_dxf.c
+@@ -13046,12 +13046,12 @@
+                              && obj->handle.value
+                                     == _lctrl->byblock->absolute_ref)
+                       ;
+-                    // already exists?
++                    // add it only when it is not listed yet
++                    // (ConvertCAD patch: the test was inverted and listed
++                    // every linetype twice in LTYPE_CONTROL.entries)
+                     else if (find_hv (_lctrl->entries, _lctrl->num_entries,
+                                       obj->handle.value)
+                              < 0)
+-                      ;
+-                    else
+                       {
+                         ref = dwg_add_handleref (dwg, 2, obj->handle.value,
+                                                  NULL);

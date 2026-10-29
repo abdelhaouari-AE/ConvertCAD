@@ -1,0 +1,5 @@
+# Development and build tools (on top of requirements.txt)
+-r requirements.txt
+pytest>=8.0                    # test-suite:   python -m pytest
+pyinstaller>=6.6               # portable .exe: scripts\build_exe.bat
+ruff>=0.5                      # optional linter: ruff check convertcad

@@ -1,0 +1,16 @@
+--- a/src/in_dxf.c
++++ b/src/in_dxf.c
+@@ -12019,6 +12019,13 @@
+                           // pt.x = 0.0;
+                           // if (pair->value.d == 0.0) // ignore defaults
+                           //  goto next_pair;
++                          // ConvertCAD patch: start from the field's own
++                          // value, not from the previous point. A point
++                          // given without .y / .z (e.g. INSERT scale 41
++                          // without 42/43) got the .y / .z of the point
++                          // read before it (the insertion point).
++                          dwg_dynapi_entity_value (_obj, obj->name, f->name,
++                                                   &pt, NULL);
+                           pt.x = pair->value.d;
+                           dwg_dynapi_entity_set_value (_obj, obj->name,
+                                                        f->name, &pt, 1);

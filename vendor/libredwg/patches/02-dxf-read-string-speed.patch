@@ -1,0 +1,15 @@
+--- a/src/in_dxf.c
++++ b/src/in_dxf.c
+@@ -685,7 +685,11 @@
+            dat->byte++)
+         {
+           char *s = (char *)&dat->chain[dat->byte];
+-          if (memBEGINc (s, "\\M+") && s[3] >= '1' && s[3] <= '5')
++          // ConvertCAD patch: bounded test. memBEGINc () called strlen () on
++          // the whole rest of the file for every character read, which made
++          // reading a big DXF quadratic (minutes instead of seconds).
++          if (dat->byte + 3 < dat->size && s[0] == '\\' && s[1] == 'M'
++              && s[2] == '+' && s[3] >= '1' && s[3] <= '5')
+             {
+               const Dwg_Codepage mif_tbl[]
+                   = { CP_UNDEFINED, CP_ANSI_932,  CP_ANSI_950,

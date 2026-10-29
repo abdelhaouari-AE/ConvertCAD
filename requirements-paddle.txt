@@ -1,0 +1,8 @@
+# Optional: the full PaddleOCR library for "Maximum — PaddleOCR" when running
+# ConvertCAD FROM SOURCE (about 1 GB with PaddlePaddle).
+#   python -m pip install -r requirements-paddle.txt
+# The portable program and the installers do not need it: they run the same
+# large PP-OCR models with RapidOCR (scripts/get_ocr_models.py).
+-r requirements.txt
+paddlepaddle>=3.0
+paddleocr>=3.0

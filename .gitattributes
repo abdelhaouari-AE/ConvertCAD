@@ -1,0 +1,23 @@
+# Normalise line endings in the repository; check out with the right ones.
+* text=auto
+*.py   text eol=lf
+*.md   text eol=lf
+*.sh   text eol=lf
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+*.iss  text eol=crlf
+*.spec text eol=lf
+*.patch text eol=lf
+*.desktop text eol=lf
+*.yml  text eol=lf
+packaging/linux/AppRun text eol=lf
+# Binary files
+*.ico  binary
+*.png  binary
+*.pdf  binary
+*.dxf  binary
+*.dwg  binary
+*.exe  binary
+*.dll  binary
+*.xz   binary
+*.onnx binary

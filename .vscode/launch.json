@@ -1,0 +1,63 @@
+{
+  // Run / debug configurations: press F5 or pick one in "Run and Debug".
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "ConvertCAD (application)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      // child processes = the background conversion: debug them too
+      "subProcess": true
+    },
+    {
+      "name": "ConvertCAD with the sample plan",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": ["${workspaceFolder}/samples/sample_plan.pdf"],
+      "console": "integratedTerminal",
+      "subProcess": true
+    },
+    {
+      "name": "CLI: convert the sample plan",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "convertcad",
+      "args": ["--cli", "samples/sample_plan.pdf", "-o", "out/sample_plan.dxf"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "CLI: convert the scanned sample (OCR)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "convertcad",
+      "args": ["--cli", "samples/sample_scan.pdf", "-o", "out/sample_scan.dxf",
+               "--preset", "scanned"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "CLI: convert the PDF open in the editor",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "convertcad",
+      "args": ["--cli", "${file}"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Tests: current file",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["${file}", "-q"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "env": { "QT_QPA_PLATFORM": "offscreen" }
+    }
+  ]
+}

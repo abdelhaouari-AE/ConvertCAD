@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# PyInstaller output
+build/
+dist/
+
+# Conversion outputs produced while testing
+*.dxf
+*.dwg
+*_log.txt
+*_img*.png
+out/
+output/
+
+# Portable OCR bundle (large, add it to the release zip instead)
+tesseract/
+
+# Editors / OS
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# LibreDWG Linux build (made by scripts/build_libredwg.sh linux)
+vendor/libredwg/linux-x86_64/
+
+# Optional large OCR models (made by scripts/get_ocr_models.py)
+vendor/ocr_models/
