@@ -88,21 +88,21 @@ PACKS: Tuple[OcrPack, ...] = (
     OcrPack(
         "latin_max", "Maximum accuracy",
         "The same languages as the built-in model, with larger models: "
-        "better on poor scans and small text, about 3 times slower",
+        "slightly better on poor scans, but about 20 times slower",
         "base", files=(
             ModelFile("PP-OCRv6_det_medium.onnx",
                       "PP-OCRv6/det/PP-OCRv6_det_medium.onnx",
                       "92078b7355007ccfffcd4c8cd441a3afd4538904d06881b29a155e"
-                      "1e679907c2", 0, "det"),
+                      "1e679907c2", 62_119_454, "det"),
             ModelFile("PP-OCRv6_rec_medium.onnx",
                       "PP-OCRv6/rec/PP-OCRv6_rec_medium.onnx",
                       "eef444829dbbe18d7fea59a3f6eb75647518d2b3a9568d27c92e42"
-                      "940204894b", 0, "rec"))),
+                      "940204894b", 76_629_984, "rec"))),
     OcrPack(
         "arabic", "Arabic", "Arabic, Persian, Urdu (Arabic script)",
         "script", files=(_rec("arabic_PP-OCRv5_rec_mobile.onnx",
                               "c1192e632d0baa9146ae5b756a0e635e3dc63c1733737e"
-                              "bfd1629e87144e9295"),),
+                              "bfd1629e87144e9295", 8_023_828),),
         lang_type="ARABIC", rtl=True,
         script=((0x0600, 0x06FF), (0x0750, 0x077F), (0x08A0, 0x08FF),
                 (0xFB50, 0xFDFF), (0xFE70, 0xFEFF))),
@@ -112,44 +112,44 @@ PACKS: Tuple[OcrPack, ...] = (
         "Kazakh, Mongolian (Cyrillic script)",
         "script", files=(_rec("cyrillic_PP-OCRv5_rec_mobile.onnx",
                               "90f761b4bfcce0c8c561c0cb5c887b0971d3ec01c32164"
-                              "bdf7374a35b0982711"),),
+                              "bdf7374a35b0982711", 8_074_092),),
         lang_type="CYRILLIC", script=((0x0400, 0x052F),)),
     OcrPack(
         "greek", "Greek", "Greek",
         "script", files=(_rec("el_PP-OCRv5_rec_mobile.onnx",
                               "b4368bccd557123c702b7549fee6cd1e94b581337d1c9b"
-                              "65310f109131542b7f"),),
+                              "65310f109131542b7f", 7_832_350),),
         lang_type="EL", script=((0x0370, 0x03FF), (0x1F00, 0x1FFF))),
     OcrPack(
         "korean", "Korean", "Korean (Hangul)",
         "script", files=(_rec("korean_PP-OCRv5_rec_mobile.onnx",
                               "cd6e2ea50f6943ca7271eb8c56a877a5a90720b7047fe9"
-                              "c41a2e541a25773c9b"),),
+                              "c41a2e541a25773c9b", 13_488_748),),
         lang_type="KOREAN",
         script=((0xAC00, 0xD7AF), (0x1100, 0x11FF), (0x3130, 0x318F))),
     OcrPack(
         "devanagari", "Devanagari", "Hindi, Marathi, Nepali (Devanagari)",
         "script", files=(_rec("devanagari_PP-OCRv5_rec_mobile.onnx",
                               "d6f0a906580e3fa6b324a318718f1f31f268b6ea8ef985"
-                              "f91c2012a37f52c91e"),),
+                              "f91c2012a37f52c91e", 7_940_361),),
         lang_type="DEVANAGARI", script=((0x0900, 0x097F),)),
     OcrPack(
         "thai", "Thai", "Thai",
         "script", files=(_rec("th_PP-OCRv5_rec_mobile.onnx",
                               "de541dd83161c241ff426f7ecfd602a0ba77d686cf3ab9"
-                              "a6c255ea82fd08006e"),),
+                              "a6c255ea82fd08006e", 7_915_294),),
         lang_type="TH", script=((0x0E00, 0x0E7F),)),
     OcrPack(
         "tamil", "Tamil", "Tamil",
         "script", files=(_rec("ta_PP-OCRv5_rec_mobile.onnx",
                               "a42448808b7dea87597336f12438935f40353f1949e836"
-                              "0acd9e06b4da21bfe1"),),
+                              "0acd9e06b4da21bfe1", 7_909_926),),
         lang_type="TA", script=((0x0B80, 0x0BFF),)),
     OcrPack(
         "telugu", "Telugu", "Telugu",
         "script", files=(_rec("te_PP-OCRv5_rec_mobile.onnx",
                               "a3690451b50028a09a3316a1274f7c05728151ea3f8fd3"
-                              "92696397a7fefcbd92"),),
+                              "92696397a7fefcbd92", 7_923_102),),
         lang_type="TE", script=((0x0C00, 0x0C7F),)),
 )
 

@@ -16,8 +16,8 @@ Seules les langues installées sont proposées. Un choix dont le modèle manque 
 
 ## Précision
 
-- **Standard** (par défaut) — le modèle intégré : rapide, très bon sur les scans nets.
-- **Maximale** — des modèles plus grands (à télécharger) : meilleurs sur les scans médiocres, les petits textes ou les cartouches denses, mais environ 3 fois plus lents. Elle concerne les langues en alphabet latin ; les autres alphabets ont un seul modèle chacun.
+- **Standard** (par défaut) — le modèle intégré : rapide, et le bon choix pour presque tous les plans.
+- **Maximale** — des modèles plus grands (à télécharger, 132 Mo) : un peu meilleurs sur les scans médiocres, mais environ 20 fois plus lents (mesuré : 83 % des textes d'une feuille d'essai lus au lieu de 81 %). Elle concerne les langues en alphabet latin ; les autres alphabets ont un seul modèle chacun.
 
 ## Télécharger des langues et des modèles
 

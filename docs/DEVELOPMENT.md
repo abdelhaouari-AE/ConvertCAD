@@ -139,7 +139,7 @@ automatically).
   PaddleOCR library were removed in 1.1.
 - **One OCR model built in, the others downloaded** (1.1): the built-in model covers
   English, French and 45 other Latin-script languages (plus Chinese and Japanese) in about
-  30 MB; bundling every script and the larger models would add about 180 MB to every
+  30 MB; bundling every script and the larger models would add about 200 MB to every
   download for the few users who need them.
 
 ---
@@ -408,7 +408,7 @@ folder is bundled into the exe by `ConvertCAD.spec`.
 | `test_blocks.py` | Repeated symbols become blocks; walls do not glue symbols; sample plan: doors ×3, columns ×20; rotated and mirrored copies (all 8 orientations) give exactly the drawn lines once the INSERTs are exploded. |
 | `test_writer.py` | Every DXF version, scale and units, ACI mapping, ByLayer, dimension angles, R12 fallbacks. |
 | `test_pipeline.py` | End-to-end counts on the sample plan, options switched off, multi-page and split output, invalid pages, cancel, password, batch folder, per-sheet automatic scale. |
-| `test_raster.py` | Scan tracing (OpenCV), OCR of the sample scan with the built-in model (skipped without RapidOCR), fallback to the built-in model when a model is missing, no OCR engine, mixed-script merge (Latin + Arabic). |
+| `test_raster.py` | Scan tracing (OpenCV), OCR of the sample scan with the built-in model (skipped without RapidOCR), fallback to the built-in model when a model is missing, no OCR engine, mixed-script merge (Latin + Arabic), large sheets read at 150 dpi with boxes mapped back, engine settings (no orientation classifier for scripts, no 2000-px limit), ONNX Runtime telemetry off. |
 | `test_ocr_store.py` | OCR catalogue consistency, language keys (including the 1.0 codes), models folder (environment variable, portable mode, Linux), download from a local web server: progress, checksum, fallback address, failure and cancel leave nothing behind; wrong-size files ignored; install from file and remove. |
 | `test_postprocess.py` | Layer edits at save time (remove, rename-merge, recolour), images, log. |
 | `test_cli_and_jobs.py` | Page ranges, CLI single / batch / errors, option mapping (including `--format`, `--area`, `--ocr-lang`, `--ocr-quality`), invalid OCR languages, presets keep the scale, background job runner (convert and cancel), `--scale auto`, `--list-ocr`, `--get-ocr-model`, options of version 1.0. |
@@ -508,8 +508,10 @@ print(report.status_word(), report.stats.total_entities(), report.outputs)
 
 1. Render the page in grayscale at `raster_dpi` (capped by `MAX_RASTER_PIXELS` for huge
    sheets).
-2. OCR (when enabled) with the models chosen by `ocr.make_plan()` (§5.14): whole text
-   lines with their boxes (a line much taller than wide is vertical text, written with a
+2. OCR (when enabled) with the models chosen by `ocr.make_plan()` (§5.14), on the page
+   reduced to `RTol.OCR_DPI` (150 dpi, the resolution PP-OCR reads drawing text best at;
+   at least 2000 pixels on the long side):
+   whole text lines with their boxes (a line much taller than wide is vertical text, written with a
    90° rotation); results kept above a confidence threshold and with enough alphanumeric
    characters (noise filter); recognised boxes are erased from the image so letters are
    not traced. The models used are written in the report ("N OCR text(s) (PP-OCR: …)").
@@ -709,13 +711,13 @@ offline — and models in *packs* (`ocr_catalog.PACKS`):
 | Pack | Models | Reads | Where it comes from |
 |---|---|---|---|
 | `latin` (built in) | PP-OCRv6 *small* detection + recognition (in the `rapidocr` package) | English, French and 45 other Latin-script languages, Chinese, Japanese | bundled (≈ 30 MB) |
-| `latin_max` | PP-OCRv6 *medium* detection + recognition | the same, maximum accuracy (slower) | download |
-| `arabic`, `cyrillic`, `greek`, `korean`, `devanagari`, `thai`, `tamil`, `telugu` | one PP-OCRv5 *mobile* recognition model each (the detection model is shared) | that script | download |
+| `latin_max` | PP-OCRv6 *medium* detection + recognition (132 MB) | the same, slightly better on poor scans, about 20 times slower (A1 test sheet: 83 % of the labels instead of 81 %) | download |
+| `arabic`, `cyrillic`, `greek`, `korean`, `devanagari`, `thai`, `tamil`, `telugu` | one PP-OCRv5 *mobile* recognition model each, 8 MB (Korean 13 MB); the detection model is shared | that script | download |
 
 Why PP-OCR, and why one built-in model: on drawings PP-OCR detects text *lines* anywhere,
 small, rotated or vertical, even crossed by lines — far better than Tesseract (removed in
 1.1). The built-in model covers the users' main languages; the others are one click away
-instead of making every download about 180 MB larger.
+instead of making every download about 200 MB larger.
 
 - **The user's choice** is a *language key* (`Options.ocr_lang`): `latin`, a script
   (`arabic`), or `latin+<script>` for mixed drawings, plus an accuracy
@@ -729,7 +731,15 @@ instead of making every download about 180 MB larger.
   pack) and removes the Latin reading of the same place. RapidOCR puts Arabic back in
   reading order with python-bidi.
 - RapidOCR instances are cached per model set; models given by path are never downloaded
-  by RapidOCR itself.
+  by RapidOCR itself. The script models run **without** RapidOCR's "upside-down text"
+  classifier: it was trained on Chinese and Latin text and turns Thai, Devanagari and
+  Arabic lines over (measured: unreadable with it, correct without it).
+- **Resolution**: `raster._run_ocr` hands the OCR the page at `RTol.OCR_DPI` (150 dpi;
+  small sheets keep at least `OCR_MIN_SIDE` = 2000 pixels on their long side) and
+  RapidOCR's own size limit is raised to 8000 pixels. RapidOCR shrinks every image to
+  2000 pixels by default and crops the text from that reduced image, so large sheets lost
+  their small text (measured on an A1 sheet with 260 labels of 1.8–3.5 mm: 31–44 % read at
+  2000 pixels, about 80 % at 120–150 dpi, no gain above).
 - **No telemetry**: ONNX Runtime records usage data (program path, operating system,
   processor, a device identifier) in `~/.cache/Microsoft/DeveloperTools/.onnxruntime` and
   uploads it to Microsoft — on Linux too (seen with version 1.31). `convertcad/__init__.py` sets
@@ -1344,7 +1354,8 @@ cannot hold must be written differently for `Options.writer_dxf_version() == "R2
 | A0 stress sheet, 35 000 primitives | ≈ 5 s |
 | Dense A0 AutoCAD plot (DPP, 39 000 entities written) | ≈ 18 s to DXF, + ≈ 9 s to DWG (LibreDWG + read-back) |
 | DXF preview of that plot | ≈ 650 scene items, repaint 20–30 ms |
-| Scanned A3 at 300 dpi with OCR | ≈ 5–8 s (≈ 1 300 lines, 7 circles, 30 texts with RapidOCR) |
+| Scanned A3 at 300 dpi with OCR | ≈ 6–8 s with the command line (≈ 1 270 lines, 8 circles, 30 OCR texts) |
+| Scanned A1 at 200 dpi, 260 labels (2 CPU cores) | OCR ≈ 20 s (80 % of the labels; 1.0: 31–44 %); maximum accuracy ≈ 5 min (83 %); **circle tracing ≈ 4–5 min** (see §19) |
 
 Where the speed comes from:
 
@@ -1377,6 +1388,10 @@ Where the speed comes from:
   (§17.3).
 - Dimensions: linear (horizontal, vertical, aligned/rotated) only; angular, radial and
   diameter dimensions remain geometry + text.
+- Large scanned sheets: the circle search (`cv2.HoughCircles` on the full-resolution
+  image, radii 8–400 px) takes minutes on A1 / A0 sheets with dense line grids (≈ 4–5 min
+  for an A1 at 200 dpi on 2 cores); to be optimised (search at reduced resolution, then
+  check each circle at full resolution).
 - Scanned drawings: tracing is approximate by nature (lines and circles, no arcs or
   splines); always compare with the locked scan layer.
 - Hatch patterns are rebuilt when they are made of straight parallel lines (single

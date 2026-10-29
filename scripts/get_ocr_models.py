@@ -13,7 +13,7 @@ USERS DO NOT NEED THIS SCRIPT: they download models from the program
 
     python scripts/get_ocr_models.py --all --dest vendor/ocr_models
         OFFLINE BUILD: every pack into vendor/ocr_models, which the build
-        bundles with the program (adds about 180 MB to it)
+        bundles with the program (adds about 200 MB to it)
 
     python scripts/get_ocr_models.py --all --dest release --mirror-only
         the files of the GitHub release "ocr-models-v1", from RapidOCR's

@@ -183,7 +183,7 @@ def test_ocr_languages_and_models(qapp, tmp_path, monkeypatch):
     dlg = omd.OcrModelsDialog()
     try:
         ids = [dlg.available.itemData(i) for i in range(dlg.available.count())]
-        assert ids[0] == "latin_max" and "arabic" in ids
+        assert ids[0] == "arabic" and ids[-1] == "latin_max"
         assert "latin" not in ids                        # built in
         if ocr_store.builtin_available():
             assert dlg.table.rowCount() == 1             # the built-in model

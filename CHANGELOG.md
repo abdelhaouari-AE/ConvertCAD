@@ -34,8 +34,14 @@ built in and the others downloaded from the program when needed.
   *Maximum — PaddleOCR* → *Maximum* accuracy).
 - The only network connection of the program: downloading an OCR model when the user asks
   (terms of use updated).
+- **Large sheets are read much better**: the OCR reads the page at 150 dpi (at least 2000
+  pixels on the long side) instead of shrinking every page to 2000 pixels. On an A1 test
+  sheet with 260 labels of 1.8–3.5 mm, about 80 % are read instead of 31–44 %; large
+  sheets take longer.
 
 ### Fixed
+- Arabic lines (and the new Thai and Devanagari models) are no longer turned upside down
+  by the text-orientation classifier, which is not used with the script models any more.
 - **Privacy:** ONNX Runtime (the OCR runtime) recorded usage data — program path,
   system, processor, a device identifier — and uploaded it to Microsoft (seen on Linux
   with ONNX Runtime 1.31); 1.0 switched off only its events, too late. It is now switched

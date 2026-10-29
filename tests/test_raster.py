@@ -110,3 +110,47 @@ def test_onnx_runtime_telemetry_is_off():
     import os
     import convertcad  # noqa: F401
     assert os.environ.get("ORT_DISABLE_TELEMETRY") == "1"
+
+
+def test_ocr_reads_large_sheets_at_150_dpi(monkeypatch):
+    """The OCR gets the page at 150 dpi (small sheets: at least 2000 px)
+    and its boxes come back in page-image pixels. Before 1.1 every page was
+    shrunk to 2000 px, which lost the small text of large sheets."""
+    import numpy as np
+
+    from convertcad.core import raster
+    seen = {}
+
+    def fake_recognize(img, plan):
+        seen["shape"] = img.shape
+        return [OcrWord("NGF +12.50", (100, 200, 300, 40), 99.0)]
+    monkeypatch.setattr(raster.ocr_engines, "recognize", fake_recognize)
+    zoom = 300 / 72.0
+    a1 = np.full((7016, 9933), 255, np.uint8)            # A1 at 300 dpi
+    texts, boxes, warn = raster._run_ocr(a1, zoom, plan=None)
+    assert warn is None and abs(seen["shape"][1] - 9933 / 2) <= 1
+    assert boxes == [(200, 400, 600, 80)]
+    assert abs(texts[0].origin[0] - 200 / zoom) < 0.01
+    assert abs(texts[0].origin[1] - 480 / zoom) < 0.01
+    a4 = np.full((2480, 3508), 255, np.uint8)            # A4 at 300 dpi
+    raster._run_ocr(a4, zoom, plan=None)
+    assert seen["shape"][1] == 2000
+
+
+@pytest.mark.skipif(not HAS_RAPIDOCR, reason="RapidOCR not installed")
+def test_engine_settings(monkeypatch):
+    """Script models run without the upside-down text classifier (it turns
+    Thai, Devanagari and Arabic lines over); no engine shrinks the page."""
+    import rapidocr
+    made = []
+
+    class FakeRapidOCR:
+        def __init__(self, params):
+            made.append(params)
+    monkeypatch.setattr(rapidocr, "RapidOCR", FakeRapidOCR)
+    monkeypatch.setattr(ocr, "_ENGINES", {})
+    ocr._engine("", ocr._Pass(BY_ID["thai"], "/models/th.onnx"))
+    ocr._engine("", ocr._Pass(BY_ID["latin"]))
+    assert made[0]["Global.use_cls"] is False
+    assert "Global.use_cls" not in made[1]
+    assert all(p["Global.max_side_len"] >= 8000 for p in made)

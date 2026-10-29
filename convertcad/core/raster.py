@@ -50,6 +50,12 @@ class RTol:
     CIRCLE_COVER = 0.70      # fraction of the perimeter that must carry ink
     OCR_MIN_CONF = 55        # OCR confidence threshold (0-100)
     OCR_MIN_H = 6            # min text box height (px)
+    OCR_DPI = 150            # resolution the OCR reads the page at: PP-OCR
+                             # reads 1.8-3.5 mm drawing text best at about
+                             # 120-150 dpi (measured on an A1 sheet: same
+                             # result at 200 dpi, twice as slow)...
+    OCR_MIN_SIDE = 2000      # ...but small sheets keep at least 2000 px on
+                             # their long side (finer for tiny A4/A3 text)
     MERGE_ANGLE = 1.5        # collinear merge: max angle difference (deg)
     MERGE_OFFSET = 0.6       # ...max perpendicular offset (page points)
     MERGE_GAP = 1.5          # ...max gap between pieces (page points)
@@ -221,15 +227,28 @@ def vectorize_page(doc, page_index: int, dpi: int = 300, ocr: bool = True,
 def _run_ocr(img: np.ndarray, zoom: float, plan):
     """OCR an image -> (texts, boxes in image px, warning or None). The
     PP-OCR models return whole text lines; a line found vertical (reading
-    bottom-to-top) becomes a text rotated by 90 degrees."""
+    bottom-to-top) becomes a text rotated by 90 degrees.
+
+    The page is read at RTol.OCR_DPI (small sheets: at least OCR_MIN_SIDE
+    pixels): a finer image is reduced first, for speed. Before 1.1 the OCR
+    shrank every page to 2000 pixels, so the small text of large sheets was
+    lost (an A1 sheet now reads about twice as many labels)."""
+    scale = min(1.0, max(RTol.OCR_DPI / (zoom * 72.0),
+                         RTol.OCR_MIN_SIDE / max(img.shape[:2])))
+    if scale > 0.99:
+        small, scale = img, 1.0
+    else:
+        small = cv2.resize(img, None, fx=scale, fy=scale,
+                           interpolation=cv2.INTER_AREA)
+        scale = small.shape[1] / img.shape[1]          # exact factor
     try:
-        words = ocr_engines.recognize(img, plan)
+        words = ocr_engines.recognize(small, plan)
     except Exception as exc:
         return [], [], f"OCR failed: {exc}"
     texts, boxes = [], []
     for wd in words:
         word, conf = wd.text, wd.conf
-        x, y, w, h = wd.box
+        x, y, w, h = (int(round(v / scale)) for v in wd.box)  # image px
         thickness = w if wd.vertical else h
         if not word or conf < RTol.OCR_MIN_CONF or thickness < RTol.OCR_MIN_H:
             continue

@@ -170,7 +170,10 @@ def _engine(det: str, ps: _Pass):
         return eng
     _no_telemetry()
     from rapidocr import LangRec, ModelType, OCRVersion, RapidOCR
-    params = {"Global.log_level": "error"}
+    # the page arrives at the resolution to read (raster.RTol.OCR_DPI):
+    # RapidOCR must not shrink it again (its default limit, 2000 pixels,
+    # loses the small text of large sheets); 8000 covers an A0 at 150 dpi
+    params = {"Global.log_level": "error", "Global.max_side_len": 8000}
     if det:
         params["Det.model_path"] = det
         params["Det.model_type"] = ModelType.MEDIUM
@@ -184,6 +187,11 @@ def _engine(det: str, ps: _Pass):
             params.update({"Rec.lang_type": LangRec[ps.pack.lang_type],
                            "Rec.ocr_version": OCRVersion.PPOCRV5,
                            "Rec.model_type": ModelType.MOBILE})
+    if ps.pack.kind == "script":
+        # no "upside-down text" classifier: it was trained on Chinese and
+        # Latin text and turns Thai, Devanagari and Arabic lines over, which
+        # makes them unreadable (measured); drawings keep text upright
+        params["Global.use_cls"] = False
     eng = RapidOCR(params=params)
     _ENGINES[key] = eng
     return eng

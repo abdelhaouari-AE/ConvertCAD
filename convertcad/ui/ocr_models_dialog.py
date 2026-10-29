@@ -217,7 +217,10 @@ class OcrModelsDialog(QDialog):
         self.table.resizeRowsToContents()
         self.available.blockSignals(True)
         self.available.clear()
-        for p in PACKS:
+        # languages first (the common need), the larger models last
+        order = [p for p in PACKS if p.kind == "script"] + \
+            [p for p in PACKS if p.kind != "script"]
+        for p in order:
             if pack_state(p) == "missing" and not p.builtin:
                 self.available.addItem(
                     f"{tr(p.label)}  ({ocr_store.human_size(p.size)})", p.id)
@@ -296,6 +299,8 @@ class OcrModelsDialog(QDialog):
 
     def _on_finished(self) -> None:
         w = self.sender()
+        if w is not None:
+            w.wait(2000)       # really ended before the last reference goes
         if w in _RUNNING:
             _RUNNING.remove(w)
         if w is self.worker:

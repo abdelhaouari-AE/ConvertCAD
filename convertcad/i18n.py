@@ -602,10 +602,10 @@ _fr({
         "néerlandais, polonais, turc, vietnamien et 37 autres langues en "
         "alphabet latin ; chinois ; japonais",
     "Maximum accuracy": "Précision maximale",
-    "The same languages as the built-in model, with larger models: better on poor scans and small text, about 3 times slower":
+    "The same languages as the built-in model, with larger models: slightly better on poor scans, but about 20 times slower":
         "Les mêmes langues que le modèle intégré, avec des modèles plus "
-        "grands : meilleurs sur les scans médiocres et les petits textes, "
-        "environ 3 fois plus lents",
+        "grands : un peu meilleurs sur les scans médiocres, mais environ 20 "
+        "fois plus lents",
     "Arabic": "Arabe",
     "Arabic, Persian, Urdu (Arabic script)":
         "Arabe, persan, ourdou (alphabet arabe)",
@@ -632,10 +632,10 @@ _fr({
         "alphabets (par ex. français et arabe), choisissez « Anglais, "
         "français… + Arabe ». Autres langues : « Langues et modèles OCR… ».",
     "OCR accuracy": "Précision de l'OCR",
-    "Standard: the built-in model, fast. Maximum: larger models, better on poor scans and small text, but slower (download them first).":
-        "Standard : le modèle intégré, rapide. Maximale : des modèles plus "
-        "grands, meilleurs sur les scans médiocres et les petits textes, mais "
-        "plus lents (à télécharger d'abord).",
+    "Standard: the built-in model, fast, right for most drawings. Maximum: larger models, slightly better on poor scans but about 20 times slower (download them first).":
+        "Standard : le modèle intégré, rapide, adapté à la plupart des plans. "
+        "Maximale : des modèles plus grands, un peu meilleurs sur les scans "
+        "médiocres mais environ 20 fois plus lents (à télécharger d'abord).",
     "OCR languages and models…": "Langues et modèles OCR…",
     "Download other OCR languages (Arabic, Cyrillic, Greek…) or the maximum accuracy models, or install them from files.":
         "Télécharger d'autres langues OCR (arabe, cyrillique, grec…) ou les "

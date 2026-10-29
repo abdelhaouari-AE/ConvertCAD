@@ -16,8 +16,8 @@ Only the installed languages are listed. A choice whose model is missing (settin
 
 ## Accuracy
 
-- **Standard** (default) — the built-in model: fast, very good on clean scans.
-- **Maximum** — larger models (download): better on poor scans, small or dense text, but about 3 times slower. It applies to the Latin-script languages; the other scripts have one model each.
+- **Standard** (default) — the built-in model: fast, and the right choice for almost every drawing.
+- **Maximum** — larger models (download, 132 MB): slightly better on poor scans, but about 20 times slower (measured: 83 % of the labels of a test sheet read instead of 81 %). It applies to the Latin-script languages; the other scripts have one model each.
 
 ## Downloading languages and models
 

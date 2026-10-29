@@ -421,9 +421,9 @@ class OptionsPanel(QScrollArea):
         self._row(sec, tr("OCR languages"), self.ocr_lang, stacked=True)
         self.ocr_quality = self._combo(
             [(tr(OCR_QUALITIES[k]), k) for k in OCR_QUALITIES],
-            tr("Standard: the built-in model, fast. Maximum: larger models, "
-               "better on poor scans and small text, but slower (download "
-               "them first)."))
+            tr("Standard: the built-in model, fast, right for most drawings. "
+               "Maximum: larger models, slightly better on poor scans but "
+               "about 20 times slower (download them first)."))
         self._row(sec, tr("OCR accuracy"), self.ocr_quality, stacked=True)
         self.btn_ocr_models = QPushButton(icon("save"),
                                           tr("OCR languages and models…"))

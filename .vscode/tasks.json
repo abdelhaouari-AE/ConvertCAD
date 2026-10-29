@@ -69,10 +69,10 @@
       "problemMatcher": []
     },
     {
-      "label": "Download the OCR models (Maximum + Arabic)",
+      "label": "OCR models: list the catalogue and what is installed",
       "type": "shell",
       "command": "${command:python.interpreterPath}",
-      "args": ["scripts/get_ocr_models.py", "--check"],
+      "args": ["scripts/get_ocr_models.py", "--list"],
       "problemMatcher": []
     }
   ]

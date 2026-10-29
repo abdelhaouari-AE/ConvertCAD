@@ -2,7 +2,7 @@
 # ConvertCAD — create the development environment on Linux / macOS.
 #   ./scripts/setup_venv.sh
 # Linux also needs the Qt runtime libraries, e.g. on Ubuntu:
-#   sudo apt install libegl1 libxkbcommon-x11-0 libxcb-cursor0 tesseract-ocr
+#   sudo apt install libegl1 libxkbcommon-x11-0 libxcb-cursor0
 set -euo pipefail
 cd "$(dirname "$0")/.."
 PY="${PYTHON:-python3}"

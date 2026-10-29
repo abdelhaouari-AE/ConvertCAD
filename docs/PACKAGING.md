@@ -93,14 +93,15 @@ file is checked against its SHA-256 before it is kept.
 - **Publishing the release** — *Actions → OCR models release → Run workflow*
   (`.github/workflows/ocr-models.yml`): downloads every model from the mirror, checks it,
   test-runs it, and creates or updates the release (not marked *latest*, so the program
-  releases stay first). Run it once, then after any catalogue change.
+  releases stay first — until the first program release exists, GitHub still shows it as
+  the latest). Run it once, then after any catalogue change.
 - **Private repository** — release files of a private repository cannot be downloaded
   without signing in to GitHub, so users get the models from the mirror. Make the
   repository public (or host the files elsewhere and change `RELEASE_BASE`) to serve them
   from GitHub.
 - **Offline build** (computers that must never go online):
   `python scripts/get_ocr_models.py --all --dest vendor/ocr_models` before building — the
-  spec bundles that folder (about 180 MB more) and the program finds the models there.
+  spec bundles that folder (about 200 MB more) and the program finds the models there.
 - **Maintenance:** `python scripts/get_ocr_models.py --list` (catalogue),
   `--check DIR --load` (checksums + test run of every pack).
 
