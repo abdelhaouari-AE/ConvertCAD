@@ -516,8 +516,12 @@ print(report.status_word(), report.stats.total_entities(), report.outputs)
    characters (noise filter); recognised boxes are erased from the image so letters are
    not traced. The models used are written in the report ("N OCR text(s) (PP-OCR: …)").
 3. Adaptive threshold + small-component removal.
-4. `HoughCircles`, each candidate validated by measuring the fraction of its perimeter lying
-   on ink (`CIRCLE_COVER` = 70 %).
+4. `find_circles()`: `HoughCircles` on the lightly smoothed image in two radius bands —
+   up to `CIRCLE_SPLIT_R` (100 px) at full resolution, larger circles on a copy reduced to
+   1/3 (strokes thickened first), then moved to their best full-resolution position — and
+   each candidate kept only when ink covers `CIRCLE_COVER` (70 %) of its perimeter
+   (vectorised check). A single full-resolution search over 8–400 px took 4–5 min on an A1
+   sheet; this takes seconds.
 5. `HoughLinesP`, then `merge_collinear()` joins overlapping / touching collinear pieces.
 6. `merge_into_page()` adds the results to `PageData` on layers `TRACE_LINES` /
    `TRACE_TEXT`, so the rest of the pipeline (polylines, dimensions, blocks) works unchanged.
@@ -1355,7 +1359,7 @@ cannot hold must be written differently for `Options.writer_dxf_version() == "R2
 | Dense A0 AutoCAD plot (DPP, 39 000 entities written) | ≈ 18 s to DXF, + ≈ 9 s to DWG (LibreDWG + read-back) |
 | DXF preview of that plot | ≈ 650 scene items, repaint 20–30 ms |
 | Scanned A3 at 300 dpi with OCR | ≈ 6–8 s with the command line (≈ 1 270 lines, 8 circles, 30 OCR texts) |
-| Scanned A1 at 200 dpi, 260 labels (2 CPU cores) | OCR ≈ 20 s (80 % of the labels; 1.0: 31–44 %); maximum accuracy ≈ 5 min (83 %); **circle tracing ≈ 4–5 min** (see §19) |
+| Scanned A1 at 200 dpi, 260 labels (2 CPU cores) | OCR ≈ 20 s (80 % of the labels; 1.0: 31–44 %); maximum accuracy ≈ 5 min (83 %); tracing ≈ 9–13 s (1.1.0: ≈ 4–5 min, circle search) |
 
 Where the speed comes from:
 
@@ -1388,10 +1392,6 @@ Where the speed comes from:
   (§17.3).
 - Dimensions: linear (horizontal, vertical, aligned/rotated) only; angular, radial and
   diameter dimensions remain geometry + text.
-- Large scanned sheets: the circle search (`cv2.HoughCircles` on the full-resolution
-  image, radii 8–400 px) takes minutes on A1 / A0 sheets with dense line grids (≈ 4–5 min
-  for an A1 at 200 dpi on 2 cores); to be optimised (search at reduced resolution, then
-  check each circle at full resolution).
 - Scanned drawings: tracing is approximate by nature (lines and circles, no arcs or
   splines); always compare with the locked scan layer.
 - Hatch patterns are rebuilt when they are made of straight parallel lines (single
@@ -1434,6 +1434,7 @@ All third-party licences: [`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md).
 | Version | Date | Highlights |
 |---|---|---|
 | 1.0.0 | 2026-10-29 | First public release: Qt 6 interface (dark/light, EN/FR, review before saving), vector engine (arcs, splines, polylines, dimensions, leaders, blocks with rotations, dashed lines and hatch patterns rebuilt, SHX texts), scanned drawings with three OCR engines, selected-area conversion, overlay check, native DWG output, command line, Windows portable + installer, Linux tar.gz + AppImage + .deb |
+| 1.1.1 | 2026-10-29 | Circle search of scanned pages about 30 times faster on large sheets (two radius bands, reduced copy for large circles, vectorised checks) |
 | 1.1.0 | 2026-10-29 | OCR: one built-in PP-OCR model (English, French, Latin-script languages), other scripts and maximum accuracy downloaded from the program (*OCR languages and models…*, `--get-ocr-model`), mixed-script drawings, offline installation from files; Tesseract and the PaddleOCR library removed; smaller downloads |
 
 The program was developed privately before this release (internal versions 1.x–3.x);

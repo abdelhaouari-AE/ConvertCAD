@@ -3,7 +3,7 @@
 ;
 ;  Build it with scripts\build_installer.bat (recommended): the script builds
 ;  the program first, reads the version and calls the Inno Setup compiler.
-;  By hand:  ISCC.exe /DAppVersion=1.1.0 installer\ConvertCAD.iss
+;  By hand:  ISCC.exe /DAppVersion=1.1.1 installer\ConvertCAD.iss
 ;
 ;  Needs Inno Setup 6.3 or later (free): https://jrsoftware.org/isinfo.php
 ;  Input:   dist\ConvertCAD\           (the portable folder, build_exe.bat)
@@ -18,7 +18,7 @@
 ; ===========================================================================
 
 #ifndef AppVersion
-  #define AppVersion "1.1.0"
+  #define AppVersion "1.1.1"
 #endif
 #ifndef SourceDir
   #define SourceDir "..\dist\ConvertCAD"

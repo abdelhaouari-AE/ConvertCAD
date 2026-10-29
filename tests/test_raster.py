@@ -154,3 +154,32 @@ def test_engine_settings(monkeypatch):
     assert made[0]["Global.use_cls"] is False
     assert "Global.use_cls" not in made[1]
     assert all(p["Global.max_side_len"] >= 8000 for p in made)
+
+
+def test_circles_found_quickly_on_a_large_sheet():
+    """A1-size image with grid lines and circles of 20-190 px radius: every
+    circle is found, at its place, in seconds (1.1.0: minutes)."""
+    import math
+    import time
+
+    import cv2
+    import numpy as np
+
+    from convertcad.core.raster import find_circles
+    img = np.full((4677, 6622), 255, np.uint8)
+    for x in range(0, 6622, 400):
+        cv2.line(img, (x, 0), (x, 4676), 0, 2)
+    for y in range(0, 4677, 400):
+        cv2.line(img, (0, y), (6621, y), 0, 2)
+    truth = [(600 + 700 * i, 900 + 900 * (i % 4), r)
+             for i, r in enumerate((20, 25, 40, 80, 120, 160, 190, 60, 30))]
+    for cx, cy, r in truth:
+        cv2.circle(img, (cx, cy), r, 0, 2)
+    binary = cv2.adaptiveThreshold(img, 255, cv2.ADAPTIVE_THRESH_MEAN_C,
+                                   cv2.THRESH_BINARY_INV, 35, 11)
+    t = time.time()
+    found = find_circles(img, binary)
+    assert time.time() - t < 60
+    for cx, cy, r in truth:
+        assert any(math.hypot(cx - a, cy - b) <= 3 and abs(r - c) <= 3
+                   for a, b, c in found), (cx, cy, r)

@@ -47,6 +47,8 @@ class RTol:
     HOUGH_MAX_GAP = 4        # max gap bridged inside a line (px)
     CIRCLE_MIN_R = 8         # Hough circle radius range (px)
     CIRCLE_MAX_R = 400
+    CIRCLE_SPLIT_R = 100     # larger circles are searched on a reduced copy
+    CIRCLE_LOW_SCALE = 1 / 3 # ...of this scale (search time, see find_circles)
     CIRCLE_COVER = 0.70      # fraction of the perimeter that must carry ink
     OCR_MIN_CONF = 55        # OCR confidence threshold (0-100)
     OCR_MIN_H = 6            # min text box height (px)
@@ -78,19 +80,86 @@ class RasterResult:
     warnings: List[str] = field(default_factory=list)
 
 
+_ANGLES = np.linspace(0.0, 2.0 * np.pi, 72, endpoint=False)
+
+
+def _coverage(mask: np.ndarray, circles: np.ndarray) -> np.ndarray:
+    """For each circle (N x 3: cx, cy, r in px), the fraction of 72 points
+    of its perimeter that fall on ink of `mask` (all circles at once)."""
+    h, w = mask.shape
+    x = np.rint(circles[:, :1] + circles[:, 2:3] * np.cos(_ANGLES)).astype(int)
+    y = np.rint(circles[:, 1:2] + circles[:, 2:3] * np.sin(_ANGLES)).astype(int)
+    inside = (x >= 0) & (x < w) & (y >= 0) & (y < h)
+    hit = np.zeros(x.shape, dtype=bool)
+    hit[inside] = mask[y[inside], x[inside]] > 0
+    return hit.mean(axis=1)
+
+
 def _perimeter_coverage(binary: np.ndarray, cx: float, cy: float,
                         r: float, samples: int = 72) -> float:
     """Fraction of circle points that fall on ink (1-px neighbourhood)."""
-    h, w = binary.shape
-    hits = 0
-    for k in range(samples):
-        a = 2.0 * math.pi * k / samples
-        x = int(round(cx + r * math.cos(a)))
-        y = int(round(cy + r * math.sin(a)))
-        if 1 <= x < w - 1 and 1 <= y < h - 1 and \
-                binary[y - 1:y + 2, x - 1:x + 2].any():
-            hits += 1
-    return hits / samples
+    near = cv2.dilate(binary, np.ones((3, 3), np.uint8))
+    return float(_coverage(near, np.array([[cx, cy, r]], dtype=float))[0])
+
+
+def find_circles(work: np.ndarray, binary: np.ndarray
+                 ) -> List[Tuple[float, float, float]]:
+    """Circles (cx, cy, r in image px) of a scanned page.
+
+    OpenCV's Hough circle search costs grow with the radius range and with
+    noise: on an A1 sheet the single full-resolution search took 4-5 min.
+    It now runs in two bands on a lightly smoothed image (speckles of a poor
+    scan no longer vote): small circles at full resolution, large ones on a
+    reduced copy (strokes thickened first so thin lines survive), each found
+    circle moved to its best full-resolution position, and kept only when
+    ink covers RTol.CIRCLE_COVER of its perimeter (same rule as before).
+    Measured on that A1 sheet: ~7 s, the same circles found."""
+    smooth = cv2.GaussianBlur(work, (5, 5), 1.5)
+    near = cv2.dilate(binary, np.ones((3, 3), np.uint8))  # 1-px tolerance
+    found: List[Tuple[float, float, float]] = []
+    lo, split, hi = RTol.CIRCLE_MIN_R, RTol.CIRCLE_SPLIT_R, RTol.CIRCLE_MAX_R
+    for r0, r1, sc in ((lo, split, 1.0), (split, hi, RTol.CIRCLE_LOW_SCALE)):
+        if sc < 1.0:
+            k = int(round(1.0 / sc))
+            src = cv2.resize(cv2.erode(smooth, np.ones((k, k), np.uint8)),
+                             None, fx=sc, fy=sc, interpolation=cv2.INTER_AREA)
+        else:
+            src = smooth
+        c = cv2.HoughCircles(src, cv2.HOUGH_GRADIENT, dp=1.2,
+                             minDist=max(4.0, 2 * lo * sc), param1=120,
+                             param2=60 if sc == 1.0 else 50,
+                             minRadius=max(3, int(r0 * sc)),
+                             maxRadius=int(r1 * sc))
+        if c is None:
+            continue
+        # OpenCV 4 returns (1, N, 3), OpenCV 5 may return (N, 3): normalise
+        c = np.asarray(c, dtype=float).reshape(-1, 3) / sc
+        if sc == 1.0:
+            found.extend((float(x), float(y), float(r)) for x, y, r in
+                         c[_coverage(near, c) >= RTol.CIRCLE_COVER])
+            continue
+        # reduced copy: position known to +-1/sc px, so check loosely, then
+        # move each candidate to its best full-resolution position
+        t = int(math.ceil(1.0 / sc)) + 1
+        loose = cv2.dilate(binary, np.ones((2 * t + 1,) * 2, np.uint8))
+        c = c[_coverage(loose, c) >= RTol.CIRCLE_COVER]
+        d = np.arange(-t, t + 1)
+        grid = np.stack(np.meshgrid(d, d, d, indexing="ij"), -1).reshape(-1, 3)
+        best = []
+        for cc in c:
+            cand = cc + grid
+            cov = _coverage(near, cand)
+            i = int(np.argmax(cov))
+            if cov[i] >= RTol.CIRCLE_COVER:
+                best.append(cand[i])
+        c = np.array(best, dtype=float).reshape(-1, 3)
+        found.extend((float(x), float(y), float(r)) for x, y, r in c)
+    out: List[Tuple[float, float, float]] = []    # one circle found twice
+    for cx, cy, r in sorted(found, key=lambda q: -q[2]):
+        if all(math.hypot(cx - a, cy - b) > 0.2 * r or abs(r - rr) > 0.2 * r
+               for a, b, rr in out):
+            out.append((cx, cy, r))
+    return out
 
 
 def merge_collinear(segs: List[Tuple[float, float, float, float]]
@@ -189,22 +258,16 @@ def vectorize_page(doc, page_index: int, dpi: int = 300, ocr: bool = True,
     binary = cv2.medianBlur(binary, 3)
 
     # ---- 3. Circles before lines (holes/bolts must not become polygons) -----
-    circles = cv2.HoughCircles(work, cv2.HOUGH_GRADIENT, dp=1.2,
-                               minDist=RTol.CIRCLE_MIN_R * 2,
-                               param1=120, param2=60,
-                               minRadius=RTol.CIRCLE_MIN_R,
-                               maxRadius=RTol.CIRCLE_MAX_R)
-    if circles is not None:
+    for cx, cy, r in find_circles(work, binary):
+        res.circles.append(RasterCircle(center=(cx / zoom, cy / zoom),
+                                        radius=r / zoom))
+    if res.circles:
         mask = np.zeros_like(binary)
-        # OpenCV 4 returns (1, N, 3), OpenCV 5 may return (N, 3): normalise
-        for cx, cy, r in np.asarray(circles, dtype=float).reshape(-1, 3):
-            if _perimeter_coverage(binary, cx, cy, r) < RTol.CIRCLE_COVER:
-                continue
-            res.circles.append(RasterCircle(center=(cx / zoom, cy / zoom),
-                                            radius=r / zoom))
-            cv2.circle(mask, (int(cx), int(cy)), int(r), 255, thickness=7)
-        if res.circles:
-            binary = cv2.bitwise_and(binary, cv2.bitwise_not(mask))
+        for c in res.circles:
+            cv2.circle(mask, (int(round(c.center[0] * zoom)),
+                              int(round(c.center[1] * zoom))),
+                       int(round(c.radius * zoom)), 255, thickness=7)
+        binary = cv2.bitwise_and(binary, cv2.bitwise_not(mask))
 
     # ---- 4. Straight lines, then merge the fragments ------------------------
     lines = cv2.HoughLinesP(binary, rho=1, theta=math.pi / 360.0,

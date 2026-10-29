@@ -2,6 +2,16 @@
 
 All notable changes to ConvertCAD. Versions follow *major.minor.patch*.
 
+## [1.1.1] — 2026-10-29
+
+### Fixed
+- **Large scanned sheets are traced about 30 times faster**: the circle search took 4–5
+  minutes on an A1 sheet (200 dpi); it now takes seconds. Small circles are searched at
+  full resolution, large ones on a reduced copy and then placed exactly at full
+  resolution; the speckles of poor scans are smoothed out first. The same circles are
+  found (sample scan: the same 13 circles; A1 test sheet with 40 circles: 33–36 found in
+  6–9 s, 35 before in about 4 min).
+
 ## [1.1.0] — 2026-10-29
 
 OCR rebuilt around one engine: PaddleOCR's PP-OCR models run by RapidOCR, with one model
