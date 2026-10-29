@@ -519,8 +519,9 @@ print(report.status_word(), report.stats.total_entities(), report.outputs)
 4. `find_circles()`: `HoughCircles` on the lightly smoothed image in two radius bands —
    up to `CIRCLE_SPLIT_R` (100 px) at full resolution, larger circles on a copy reduced to
    1/3 (strokes thickened first), then moved to their best full-resolution position — and
-   each candidate kept only when ink covers `CIRCLE_COVER` (70 %) of its perimeter
-   (vectorised check). A single full-resolution search over 8–400 px took 4–5 min on an A1
+   each candidate kept only when ink covers `CIRCLE_COVER` (70 %) of its perimeter within
+   1 px and `CIRCLE_EXACT` (50 %) exactly (vectorised checks; the exact check rejects the
+   false circles that the speckles of poor scans would make). A single full-resolution search over 8–400 px took 4–5 min on an A1
    sheet; this takes seconds.
 5. `HoughLinesP`, then `merge_collinear()` joins overlapping / touching collinear pieces.
 6. `merge_into_page()` adds the results to `PageData` on layers `TRACE_LINES` /

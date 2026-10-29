@@ -47,6 +47,7 @@ class RTol:
     HOUGH_MAX_GAP = 4        # max gap bridged inside a line (px)
     CIRCLE_MIN_R = 8         # Hough circle radius range (px)
     CIRCLE_MAX_R = 400
+    CIRCLE_EXACT = 0.50      # ...of which on the exact perimeter pixels
     CIRCLE_SPLIT_R = 100     # larger circles are searched on a reduced copy
     CIRCLE_LOW_SCALE = 1 / 3 # ...of this scale (search time, see find_circles)
     CIRCLE_COVER = 0.70      # fraction of the perimeter that must carry ink
@@ -134,23 +135,24 @@ def find_circles(work: np.ndarray, binary: np.ndarray
             continue
         # OpenCV 4 returns (1, N, 3), OpenCV 5 may return (N, 3): normalise
         c = np.asarray(c, dtype=float).reshape(-1, 3) / sc
-        if sc == 1.0:
-            found.extend((float(x), float(y), float(r)) for x, y, r in
-                         c[_coverage(near, c) >= RTol.CIRCLE_COVER])
-            continue
-        # reduced copy: position known to +-1/sc px, so check loosely, then
-        # move each candidate to its best full-resolution position
-        t = int(math.ceil(1.0 / sc)) + 1
-        loose = cv2.dilate(binary, np.ones((2 * t + 1,) * 2, np.uint8))
+        # the smoothing moves edges by about 1 px, and the reduced copy only
+        # gives the position to +-1/sc px: check loosely, then move each
+        # candidate to its best full-resolution position
+        t = int(math.ceil(1.0 / sc)) + 1      # centre tolerance (px)
+        tr = t if sc < 1.0 else 3               # radius: blur shrinks it
+        loose = cv2.dilate(binary, np.ones((2 * tr + 1,) * 2, np.uint8))
         c = c[_coverage(loose, c) >= RTol.CIRCLE_COVER]
-        d = np.arange(-t, t + 1)
-        grid = np.stack(np.meshgrid(d, d, d, indexing="ij"), -1).reshape(-1, 3)
+        d, dr = np.arange(-t, t + 1), np.arange(-tr, tr + 1)
+        grid = np.stack(np.meshgrid(d, d, dr, indexing="ij"), -1).reshape(-1, 3)
         best = []
         for cc in c:
             cand = cc + grid
             cov = _coverage(near, cand)
             i = int(np.argmax(cov))
-            if cov[i] >= RTol.CIRCLE_COVER:
+            # ...and the ink must really follow it, not just lie near it
+            # (the speckles of a poor scan are near everything)
+            if cov[i] >= RTol.CIRCLE_COVER and _coverage(
+                    binary, cand[i:i + 1])[0] >= RTol.CIRCLE_EXACT:
                 best.append(cand[i])
         c = np.array(best, dtype=float).reshape(-1, 3)
         found.extend((float(x), float(y), float(r)) for x, y, r in c)
