@@ -5,8 +5,9 @@ PyMuPDF>=1.24.3                # PDF reading: vectors, text, images, rendering
 ezdxf>=1.3                     # DXF writing + DXF preview rendering
 numpy>=1.26                    # geometry maths (circle fitting)
 opencv-python-headless>=4.8    # scanned pages: line/circle tracing
-pytesseract>=0.3.10            # "Fast" OCR bridge (needs the Tesseract program)
-rapidocr[rtl]>=3.10,<4         # "Accurate" OCR: PP-OCR models + Arabic order
+rapidocr[rtl]>=3.10,<4         # OCR: built-in PP-OCR model + Arabic order
 onnxruntime>=1.20              # runs the PP-OCR models (CPU, offline)
 # DWG output: GNU LibreDWG programs, see vendor/libredwg/ (not a Python package)
-# "Maximum" OCR with the full PaddleOCR library (optional): requirements-paddle.txt
+# Other OCR languages / maximum accuracy: downloaded from the program
+#   (Settings > Scanned pages > OCR languages and models…, or
+#    python -m convertcad.cli --get-ocr-model ID)

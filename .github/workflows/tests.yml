@@ -30,13 +30,13 @@ jobs:
           cache: pip
           cache-dependency-path: requirements*.txt
 
-      - name: Linux system libraries (Qt runtime, Tesseract OCR, build tools)
+      - name: Linux system libraries (Qt runtime, build tools)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3 \
-            tesseract-ocr tesseract-ocr-fra build-essential xz-utils
+            build-essential xz-utils
 
       # DWG tests: Windows uses vendor/libredwg/win64 (in the repository);
       # Linux builds the converter once, then reuses it from the cache.

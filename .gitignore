@@ -23,9 +23,6 @@ dist/
 out/
 output/
 
-# Portable OCR bundle (large, add it to the release zip instead)
-tesseract/
-
 # Editors / OS
 .idea/
 *.swp
@@ -36,5 +33,7 @@ desktop.ini
 # LibreDWG Linux build (made by scripts/build_libredwg.sh linux)
 vendor/libredwg/linux-x86_64/
 
-# Optional large OCR models (made by scripts/get_ocr_models.py)
+# OCR models: offline build (vendor/ocr_models) and release files
+# (scripts/get_ocr_models.py)
 vendor/ocr_models/
+/release/

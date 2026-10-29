@@ -60,7 +60,7 @@ class MarkdownDialog(QDialog):
 class GuideDialog(MarkdownDialog):
     def __init__(self, parent=None, stem: str = "guide"):
         super().__init__(tr("User guide") if stem == "guide"
-                         else tr("OCR setup (scanned PDFs)"), stem, parent)
+                         else tr("OCR guide (scanned PDFs)"), stem, parent)
         close = self.buttons.addButton(tr("Close"),
                                        QDialogButtonBox.ButtonRole.RejectRole)
         close.clicked.connect(self.reject)
@@ -115,18 +115,18 @@ class AboutDialog(QDialog):
 
         from ..core.compat import library_versions
         from ..core.dwg import dwg_status
+        from ..core import ocr_store
         from ..core.licensing import license_summary
-        from ..core.ocr import engine_status
+        from ..core.ocr_catalog import BY_ID
         versions = library_versions()
         versions["Qt / PySide6"] = PySide6.__version__
-        st = engine_status(probe_versions=True)
-        versions["Tesseract OCR"] = (st["tesseract"]["detail"].replace(
-            "Tesseract", "").strip() or "✓") if st["tesseract"]["available"] \
-            else "—"
-        versions["RapidOCR"] = _module_version("rapidocr") \
-            if st["rapidocr"]["available"] else "—"
-        versions["PaddleOCR"] = (st["paddleocr"]["detail"]
-                                 if st["paddleocr"]["available"] else "—")
+        if ocr_store.builtin_available():
+            versions["RapidOCR (PP-OCR)"] = _module_version("rapidocr")
+            versions["ONNX Runtime"] = _module_version("onnxruntime")
+            versions[tr("OCR models")] = ", ".join(
+                tr(BY_ID[i].label) for i in ocr_store.installed_ids())
+        else:
+            versions["RapidOCR (PP-OCR)"] = "—"
         dw = dwg_status()
         versions["GNU LibreDWG (DWG)"] = (dw["version"] or "✓") \
             if dw["available"] else "—"

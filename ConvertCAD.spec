@@ -19,9 +19,13 @@ exe) anywhere — USB stick included — and run it. No admin rights needed.
 
 Bundled with the program (no separate installation for the user):
   * GNU LibreDWG (DWG output)     vendor/libredwg/win64 or linux-x86_64
-  * RapidOCR + its PP-OCR models  the rapidocr / onnxruntime packages
-  * larger OCR models (optional)  vendor/ocr_models (scripts/get_ocr_models.py)
-  * Tesseract OCR (optional)      copied by scripts/build_exe.bat
+  * OCR: RapidOCR + the built-in  the rapidocr / onnxruntime packages
+    PP-OCR model (English,
+    French, Latin languages)
+  * other OCR models: NOT bundled  downloaded from the program by the users
+    (offline build: put them in    who need them (core/ocr_store.py)
+    vendor/ocr_models, see
+    scripts/get_ocr_models.py)
 """
 
 import os
@@ -61,7 +65,8 @@ else:
     print(f"WARNING: {_LDWG} not found - DWG output will be UNAVAILABLE in "
           f"this build (run scripts/build_libredwg.sh first).")
 
-# Larger OCR models for "Maximum" + the Arabic model (optional download)
+# Downloadable OCR models placed in vendor/ocr_models are bundled too (only
+# for an offline build: normally users download the ones they need)
 _MODELS = os.path.join(ROOT, "vendor", "ocr_models")
 if os.path.isdir(_MODELS):
     for name in sorted(os.listdir(_MODELS)):
@@ -72,22 +77,23 @@ if os.path.isdir(_MODELS):
 _ocr_modules = (
     collect_submodules("rapidocr",
                        filter=lambda n: not any(k in n for k in _RAPID_SKIP))
-    + ["onnxruntime", "bidi", "bidi.algorithm", "pytesseract"])
+    + ["onnxruntime", "bidi", "bidi.algorithm",
+       "certifi"])                  # HTTPS certificates (model downloads)
 hiddenimports = (collect_submodules("ezdxf.addons.drawing")
                  + _ocr_modules + ["PySide6.QtSvg"])
 
 # ---- things ConvertCAD never uses -----------------------------------------
-# Some libraries import these *optionally* (pytesseract -> pandas, ...): if
+# Some libraries import these *optionally* (e.g. pandas): if
 # they happen to be installed on the build machine they would be bundled
 # for nothing (hundreds of MB). Build from a clean .venv anyway.
 excludes = [
     "tkinter", "matplotlib", "IPython", "jedi", "pytest", "setuptools", "pip",
     "pandas", "scipy", "sklearn", "sympy", "torch", "torchvision",
     "tensorflow", "lxml", "chardet", "notebook", "jupyter_client",
-    # optional HTTPS add-ons of requests / urllib3 (ConvertCAD never downloads)
+    # optional HTTPS add-ons of requests / urllib3 (model downloads use
+    # Python's own ssl module)
     "cryptography", "OpenSSL",
-    # other OCR back-ends: the .exe runs PP-OCR models with ONNX Runtime
-    # (the PaddleOCR library itself is only used when running from source)
+    # other OCR back-ends: ConvertCAD runs PP-OCR models with ONNX Runtime
     "paddle", "paddleocr", "paddlex", "openvino", "tensorrt", "MNN",
     # PyMuPDF 2.x optional add-ons (blocked in convertcad/core/compat.py)
     "pymupdf.layout", "pymupdf4llm", "networkx", "tabulate",

@@ -1,0 +1,53 @@
+# Publishes the downloadable OCR models as the GitHub release "ocr-models-v1"
+# (the name is MODELS_RELEASE in convertcad/core/ocr_catalog.py). ConvertCAD
+# downloads them from there first, from RapidOCR's model repository second.
+#
+# Run it by hand (Actions tab > OCR models release > Run workflow) once, and
+# again whenever the catalogue changes. The files come from RapidOCR's model
+# repository; each one is checked against its SHA-256 before upload.
+# The release is NOT marked "latest", so the program releases stay first.
+#
+# Note: files of a PRIVATE repository's releases cannot be downloaded
+# without signing in - the program then uses RapidOCR's repository.
+name: OCR models release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write                       # create the release, upload files
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Download the models and check their SHA-256
+        run: python scripts/get_ocr_models.py --all --dest release --mirror-only
+
+      - name: Check them again, and test that each one runs
+        run: |
+          python -m pip install --quiet "rapidocr[rtl]>=3.10,<4" "onnxruntime>=1.20"
+          python scripts/get_ocr_models.py --check release --load
+
+      - name: Release description
+        run: python scripts/get_ocr_models.py --notes release/NOTES.md --dest release
+
+      - name: Publish (create the release or replace its files)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG=$(python -c "import sys; sys.path.insert(0, '.'); from convertcad.core.ocr_catalog import MODELS_RELEASE; print(MODELS_RELEASE)")
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release edit "$TAG" --notes-file release/NOTES.md
+          else
+            gh release create "$TAG" --latest=false --target "$GITHUB_SHA" \
+              --title "OCR models ($TAG)" --notes-file release/NOTES.md
+          fi
+          gh release upload "$TAG" release/*.onnx --clobber
+          ls -l release

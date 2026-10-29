@@ -3,7 +3,7 @@
 **ConvertCAD {APP_VERSION}** — à lire avant d'utiliser l'application.
 
 ### 1. Traitement local
-Toutes les conversions s'exécutent sur cet ordinateur. Aucun dessin, fichier ou donnée n'est téléversé ni envoyé. L'application n'établit aucune connexion réseau (seule exception : depuis le code source, avec la bibliothèque facultative PaddleOCR installée, cette bibliothèque télécharge ses modèles à sa première utilisation).
+Toutes les conversions s'exécutent sur cet ordinateur. Aucun dessin, fichier ou donnée n'est téléversé ni envoyé. L'application ne se connecte à internet que lorsque vous lui demandez de télécharger une langue ou un modèle OCR (*Réglages > Pages scannées > Langues et modèles OCR…*) : elle reçoit alors ce fichier et n'envoie rien d'autre.
 
 ### 2. Votre droit de convertir
 Vous êtes responsable de disposer du droit de convertir et de modifier les dessins PDF que vous ouvrez (contrats clients, clauses de confidentialité, propriété intellectuelle de l'auteur d'origine).

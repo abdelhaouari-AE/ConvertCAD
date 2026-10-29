@@ -32,9 +32,8 @@ BUILTIN_PRESETS: Dict[str, Dict] = {
     },
     "scanned": {
         "label": "Scanned archive drawings (OCR)",
-        "options": {"raster_mode": True, "ocr": True, "ocr_vertical": True,
-                    "raster_dpi": 400, "block_detection": False,
-                    "use_pdf_text_layer": True},
+        "options": {"raster_mode": True, "ocr": True, "raster_dpi": 400,
+                    "block_detection": False, "use_pdf_text_layer": True},
     },
     "geometry": {
         "label": "Geometry only (no annotations)",

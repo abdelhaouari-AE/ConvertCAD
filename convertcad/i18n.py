@@ -112,7 +112,6 @@ _fr({
     "Midpoint": "Milieu", "Intersection": "Intersection",
     "Center": "Centre", "User guide": "Guide d'utilisation",
     "Keyboard shortcuts": "Raccourcis clavier",
-    "OCR setup (scanned PDFs)": "Configuration de l'OCR (PDF scannés)",
     "Terms of use": "Conditions d'utilisation",
     "About ConvertCAD": "À propos de ConvertCAD",
     "Open the settings folder": "Ouvrir le dossier des paramètres",
@@ -199,17 +198,10 @@ _fr({
     "Scanned pages": "Pages scannées",
     "Trace lines and circles": "Vectoriser lignes et cercles",
     "Read text with OCR": "Lire le texte par OCR",
-    "OCR language": "Langue de l'OCR",
-    "Also read vertical text (slower)":
-        "Lire aussi le texte vertical (plus lent)",
     "Scan resolution": "Résolution de lecture",
     "Use the PDF's existing text layer": "Utiliser la couche texte du PDF",
     "Keep raster images (locked layer)":
         "Conserver les images (calque verrouillé)",
-    "OCR ready: Tesseract {v}": "OCR prêt : Tesseract {v}",
-    "OCR not available: Tesseract was not found. Tracing still works.":
-        "OCR indisponible : Tesseract introuvable. La vectorisation "
-        "fonctionne quand même.",
     "Output": "Sortie", "DXF version": "Version DXF",
     "Multi-page output": "Sortie multipage",
     "One DXF, sheets side by side": "Un DXF, feuilles côte à côte",
@@ -273,10 +265,6 @@ _fr({
     "Scanned pages are vectorised (lines, circles) on layer TRACE_LINES.":
         "Les pages scannées sont vectorisées (lignes, cercles) sur le calque "
         "TRACE_LINES.",
-    "Text on scanned pages is recognised with Tesseract OCR.":
-        "Le texte des pages scannées est reconnu par l'OCR Tesseract.",
-    "A second OCR pass reads text written bottom-to-top.":
-        "Une seconde passe OCR lit le texte écrit de bas en haut.",
     "Higher resolution traces finer details but takes longer.":
         "Une résolution plus élevée trace plus de détails mais prend plus de "
         "temps.",
@@ -592,22 +580,6 @@ _fr({
     "A symbol turned by 90, 180 or 270 degrees, or mirrored, uses the same block (insertion with rotation / mirroring).":
         "Un symbole tourné de 90, 180 ou 270 degrés, ou en miroir, utilise "
         "le même bloc (insertion avec rotation / miroir).",
-    "Text on scanned pages is recognised by an OCR engine.":
-        "Le texte des pages scannées est reconnu par un moteur OCR.",
-    "Fast: Tesseract. Accurate: RapidOCR (PaddleOCR models, better on drawings). Maximum: PaddleOCR's largest models. Automatic: the best one installed.":
-        "Rapide : Tesseract. Précis : RapidOCR (modèles PaddleOCR, meilleur "
-        "sur les plans). Maximum : les plus grands modèles PaddleOCR. "
-        "Automatique : le meilleur installé.",
-    "OCR engine": "Moteur OCR",
-    "Automatic (best available)": "Automatique (le meilleur disponible)",
-    "Fast — Tesseract": "Rapide — Tesseract",
-    "Accurate — RapidOCR": "Précis — RapidOCR",
-    "Maximum — PaddleOCR": "Maximum — PaddleOCR",
-    "(not installed)": "(non installé)",
-    "OCR ready: {engines}": "OCR prêt : {engines}",
-    "OCR not available: no OCR engine was found. Tracing still works.":
-        "OCR indisponible : aucun moteur OCR trouvé. La vectorisation "
-        "fonctionne quand même.",
     "File format": "Format de fichier",
     "DWG files are written by the free GNU LibreDWG converter included with ConvertCAD, in the AutoCAD 2000 format that every AutoCAD version opens.":
         "Les fichiers DWG sont écrits par le convertisseur libre GNU "
@@ -619,4 +591,105 @@ _fr({
     "Hatch patterns rebuilt": "Motifs de hachure reconstruits",
     "Dashed lines rebuilt": "Lignes pointillées reconstruites",
     "Dash pieces merged": "Tirets fusionnés",
+})
+
+# ---- version 1.1: OCR languages and models (one built in, others downloaded) ----
+_fr({
+    # catalogue (core/ocr_catalog.py) and accuracy (core/constants.py)
+    "English, French… (Latin script)": "Anglais, français… (alphabet latin)",
+    "English, French, Spanish, German, Italian, Portuguese, Dutch, Polish, Turkish, Vietnamese and 37 other Latin-script languages; Chinese; Japanese":
+        "Anglais, français, espagnol, allemand, italien, portugais, "
+        "néerlandais, polonais, turc, vietnamien et 37 autres langues en "
+        "alphabet latin ; chinois ; japonais",
+    "Maximum accuracy": "Précision maximale",
+    "The same languages as the built-in model, with larger models: better on poor scans and small text, about 3 times slower":
+        "Les mêmes langues que le modèle intégré, avec des modèles plus "
+        "grands : meilleurs sur les scans médiocres et les petits textes, "
+        "environ 3 fois plus lents",
+    "Arabic": "Arabe",
+    "Arabic, Persian, Urdu (Arabic script)":
+        "Arabe, persan, ourdou (alphabet arabe)",
+    "Cyrillic": "Cyrillique",
+    "Russian, Ukrainian, Belarusian, Bulgarian, Serbian, Macedonian, Kazakh, Mongolian (Cyrillic script)":
+        "Russe, ukrainien, biélorusse, bulgare, serbe, macédonien, kazakh, "
+        "mongol (alphabet cyrillique)",
+    "Greek": "Grec",
+    "Korean": "Coréen", "Korean (Hangul)": "Coréen (hangeul)",
+    "Devanagari": "Dévanagari",
+    "Hindi, Marathi, Nepali (Devanagari)":
+        "Hindi, marathi, népalais (dévanagari)",
+    "Thai": "Thaï", "Tamil": "Tamoul", "Telugu": "Télougou",
+    "Standard (built-in model)": "Standard (modèle intégré)",
+    "Maximum (larger models)": "Maximale (modèles plus grands)",
+    "English, French…": "Anglais, français…",
+    # Settings > Scanned pages
+    "Text on scanned pages is read by the OCR built into ConvertCAD (PP-OCR models), on this computer, at any angle.":
+        "Le texte des pages scannées est lu par l'OCR intégré à ConvertCAD "
+        "(modèles PP-OCR), sur cet ordinateur, quel que soit son angle.",
+    "OCR languages": "Langues OCR",
+    "Languages read on scanned pages. For a drawing that mixes two scripts (e.g. French and Arabic), choose \"English, French… + Arabic\". Other languages: \"OCR languages and models…\".":
+        "Langues lues sur les pages scannées. Pour un plan qui mélange deux "
+        "alphabets (par ex. français et arabe), choisissez « Anglais, "
+        "français… + Arabe ». Autres langues : « Langues et modèles OCR… ».",
+    "OCR accuracy": "Précision de l'OCR",
+    "Standard: the built-in model, fast. Maximum: larger models, better on poor scans and small text, but slower (download them first).":
+        "Standard : le modèle intégré, rapide. Maximale : des modèles plus "
+        "grands, meilleurs sur les scans médiocres et les petits textes, mais "
+        "plus lents (à télécharger d'abord).",
+    "OCR languages and models…": "Langues et modèles OCR…",
+    "Download other OCR languages (Arabic, Cyrillic, Greek…) or the maximum accuracy models, or install them from files.":
+        "Télécharger d'autres langues OCR (arabe, cyrillique, grec…) ou les "
+        "modèles de précision maximale, ou les installer depuis des fichiers.",
+    "(not downloaded)": "(non téléchargé)",
+    "OCR not available: the OCR engine is not installed. Tracing still works.":
+        "OCR indisponible : le moteur OCR n'est pas installé. La "
+        "vectorisation fonctionne quand même.",
+    "Not downloaded: {names}. The built-in model is used instead.":
+        "Non téléchargé : {names}. Le modèle intégré est utilisé à la place.",
+    "OCR ready, offline.": "OCR prêt, hors ligne.",
+    # menus, About box
+    "OCR guide (scanned PDFs)": "Guide de l'OCR (PDF scannés)",
+    "Download other OCR languages or the maximum accuracy models":
+        "Télécharger d'autres langues OCR ou les modèles de précision "
+        "maximale",
+    "OCR models": "Modèles OCR",
+    # OCR languages and models window
+    "OCR languages and models": "Langues et modèles OCR",
+    "Scanned pages are read on this computer by PP-OCR models. The built-in model reads English, French and the other Latin-script languages. Download the others here: once downloaded, they work offline.":
+        "Les pages scannées sont lues sur cet ordinateur par des modèles "
+        "PP-OCR. Le modèle intégré lit l'anglais, le français et les autres "
+        "langues en alphabet latin. Téléchargez les autres ici : une fois "
+        "téléchargés, ils fonctionnent hors ligne.",
+    "Installed": "Installés", "Model": "Modèle", "Reads": "Lit",
+    "Size": "Taille", "Remove": "Supprimer", "Help": "Aide",
+    "Delete the downloaded files of the selected model (the built-in model cannot be removed).":
+        "Supprime les fichiers téléchargés du modèle sélectionné (le modèle "
+        "intégré ne peut pas être supprimé).",
+    "Add a language or model": "Ajouter une langue ou un modèle",
+    "Download": "Télécharger",
+    "Models folder: {path}": "Dossier des modèles : {path}",
+    "No internet on this computer? Download the .onnx files from the ConvertCAD release \"{tag}\" on another computer, then use \"Install from file…\".":
+        "Pas d'internet sur cet ordinateur ? Téléchargez les fichiers .onnx "
+        "de la publication ConvertCAD « {tag} » sur un autre ordinateur, "
+        "puis utilisez « Installer depuis un fichier… ».",
+    "Install from file…": "Installer depuis un fichier…",
+    "Open the models folder": "Ouvrir le dossier des modèles",
+    "Download page": "Page de téléchargement",
+    "Built in": "Intégré", "Downloaded": "Téléchargé", "Included": "Inclus",
+    "Every model is installed.": "Tous les modèles sont installés.",
+    "Downloading {name}…": "Téléchargement : {name}…",
+    "{name} is installed: choose it in Settings > Scanned pages.":
+        "{name} est installé : choisissez-le dans Réglages > Pages scannées.",
+    "Download failed: {error}. Check the internet connection (or a proxy), or use \"Install from file…\".":
+        "Échec du téléchargement : {error}. Vérifiez la connexion internet "
+        "(ou le proxy), ou utilisez « Installer depuis un fichier… ».",
+    "Download cancelled.": "Téléchargement annulé.",
+    "Remove {name} from this computer? It can be downloaded again later.":
+        "Supprimer {name} de cet ordinateur ? Il pourra être téléchargé de "
+        "nouveau plus tard.",
+    "Not installed: {error}": "Non installé : {error}",
+    "Installed: {names}.": "Installé : {names}.",
+    "Files copied. A model needs all its files: add the missing ones.":
+        "Fichiers copiés. Un modèle a besoin de tous ses fichiers : ajoutez "
+        "ceux qui manquent.",
 })

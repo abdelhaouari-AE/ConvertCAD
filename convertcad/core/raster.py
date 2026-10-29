@@ -8,9 +8,9 @@ on scanned drawings.
 
 Steps:
   1. render the page in grayscale (default 300 dpi, capped for huge sheets)
-  2. OCR with Tesseract (optional): horizontal text, then an optional second
-     pass on the image turned 90 deg to read vertical texts; recognised
-     words are masked so letters are not traced as geometry
+  2. OCR (optional) with the PP-OCR models (see ocr.py): text lines at any
+     angle; recognised lines are masked so letters are not traced as
+     geometry
   3. adaptive binarization + despeckle
   4. circles (Hough, validated against the real ink) -> CIRCLE entities
   5. straight lines (probabilistic Hough) -> merged collinear segments
@@ -36,7 +36,6 @@ except ImportError:                               # pragma: no cover
     HAS_CV2 = False
 
 from . import ocr as ocr_engines
-from .ocr import find_tesseract  # noqa: F401  (kept for older imports)
 
 
 class RTol:
@@ -49,7 +48,7 @@ class RTol:
     CIRCLE_MIN_R = 8         # Hough circle radius range (px)
     CIRCLE_MAX_R = 400
     CIRCLE_COVER = 0.70      # fraction of the perimeter that must carry ink
-    OCR_MIN_CONF = 55        # Tesseract confidence threshold (0-100)
+    OCR_MIN_CONF = 55        # OCR confidence threshold (0-100)
     OCR_MIN_H = 6            # min text box height (px)
     MERGE_ANGLE = 1.5        # collinear merge: max angle difference (deg)
     MERGE_OFFSET = 0.6       # ...max perpendicular offset (page points)
@@ -69,24 +68,10 @@ class RasterResult:
     circles: List[RasterCircle] = field(default_factory=list)
     dpi_used: int = 0
     ocr_used: bool = False
-    ocr_engine: str = ""                 # engine actually used
+    ocr_model: str = ""                  # models actually used (report)
     warnings: List[str] = field(default_factory=list)
 
 
-# ---------------------------------------------------------------------------
-# OCR availability (kept for the interface; see ocr.py)
-# ---------------------------------------------------------------------------
-def tesseract_status() -> Dict[str, object]:
-    """For the interface: is Tesseract available, which version."""
-    st = ocr_engines.engine_status(probe_versions=True)["tesseract"]
-    return {"available": st["available"], "path": find_tesseract() or "",
-            "version": st["detail"].replace("Tesseract", "").strip(),
-            "languages": []}
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 def _perimeter_coverage(binary: np.ndarray, cx: float, cy: float,
                         r: float, samples: int = 72) -> float:
     """Fraction of circle points that fall on ink (1-px neighbourhood)."""
@@ -151,8 +136,8 @@ def merge_collinear(segs: List[Tuple[float, float, float, float]]
 # Main entry
 # ---------------------------------------------------------------------------
 def vectorize_page(doc, page_index: int, dpi: int = 300, ocr: bool = True,
-                   ocr_lang: str = "eng+fra", ocr_vertical: bool = False,
-                   ocr_engine: str = "auto") -> RasterResult:
+                   ocr_lang: str = "latin",
+                   ocr_quality: str = "standard") -> RasterResult:
     """Trace a scanned page. Coordinates returned in page points (y down)."""
     from .compat import pymupdf
     res = RasterResult()
@@ -174,33 +159,19 @@ def vectorize_page(doc, page_index: int, dpi: int = 300, ocr: bool = True,
     img = np.frombuffer(pix.samples, dtype=np.uint8).reshape(
         pix.height, pix.stride)[:, :pix.width].copy()
 
-    # ---- 1. OCR first, then mask the words out of the geometry image -------
+    # ---- 1. OCR first, then mask the text out of the geometry image --------
     work = img.copy()
     if ocr:
-        engine, note = ocr_engines.resolve_engine(ocr_engine, ocr_lang)
+        plan, note = ocr_engines.make_plan(ocr_lang, ocr_quality)
         if note:
             res.warnings.append(f"Page {page_index + 1}: {note}")
-        res.ocr_engine = engine
-        if not engine:
-            warn = ("OCR skipped: no OCR engine found (Tesseract, RapidOCR "
-                    "or PaddleOCR); geometry tracing was still performed.")
-            texts, boxes = [], []
+        if plan is None:
+            texts, boxes, warn = [], [], "OCR skipped."
         else:
-            texts, boxes, warn = _run_ocr(img, zoom, ocr_lang, False,
-                                          engine=engine)
-        if ocr_vertical and not warn and \
-                not ocr_engines.reads_any_orientation(engine):
-            rot = np.ascontiguousarray(np.rot90(img, k=-1))  # 90 deg clockwise
-            for (x, y, w, h) in boxes:                 # hide horizontal words
-                cv2.rectangle(rot, (img.shape[0] - y - h, x),
-                              (img.shape[0] - y, x + w), 255, -1)
-            vtexts, vboxes, _ = _run_ocr(rot, zoom, ocr_lang, vertical=True,
-                                         page_h_px=img.shape[0],
-                                         engine=engine)
-            texts += vtexts
-            boxes += vboxes
+            res.ocr_model = plan.description
+            texts, boxes, warn = _run_ocr(img, zoom, plan)
         res.texts, res.ocr_used = texts, not warn
-        if warn:
+        if warn and plan is not None:
             res.warnings.append(warn)
         for (x, y, w, h) in boxes:
             cv2.rectangle(work, (x - 2, y - 2), (x + w + 2, y + h + 2), 255, -1)
@@ -247,21 +218,19 @@ def vectorize_page(doc, page_index: int, dpi: int = 300, ocr: bool = True,
     return res
 
 
-def _run_ocr(img: np.ndarray, zoom: float, lang: str, vertical: bool,
-             page_h_px: int = 0, engine: str = "tesseract"):
-    """OCR an image -> (texts, boxes in ORIGINAL image px, warning or None).
-    For the vertical pass the image is rotated 90 deg clockwise; boxes are
-    mapped back and texts get a 90 deg rotation (reading bottom-to-top)."""
+def _run_ocr(img: np.ndarray, zoom: float, plan):
+    """OCR an image -> (texts, boxes in image px, warning or None). The
+    PP-OCR models return whole text lines; a line found vertical (reading
+    bottom-to-top) becomes a text rotated by 90 degrees."""
     try:
-        words = ocr_engines.recognize(img, lang, engine)
+        words = ocr_engines.recognize(img, plan)
     except Exception as exc:
-        return [], [], f"OCR failed ({engine}): {exc}"
-    lines = engine != "tesseract"            # PP-OCR returns whole lines
+        return [], [], f"OCR failed: {exc}"
     texts, boxes = [], []
     for wd in words:
         word, conf = wd.text, wd.conf
         x, y, w, h = wd.box
-        thickness = w if (wd.vertical and not vertical) else h
+        thickness = w if wd.vertical else h
         if not word or conf < RTol.OCR_MIN_CONF or thickness < RTol.OCR_MIN_H:
             continue
         # drop symbol noise (crosses, bubbles, hatching read as | / x] ...)
@@ -270,30 +239,16 @@ def _run_ocr(img: np.ndarray, zoom: float, lang: str, vertical: bool,
             continue
         if len(word) <= 2 and conf < 80:
             continue
-        if not vertical and not wd.vertical:
-            size = (h / zoom) / (0.95 if lines else 0.75)  # box -> font size
-            boxes.append((x, y, w, h))
+        boxes.append((x, y, w, h))
+        if not wd.vertical:
             texts.append(RawText(text=word, origin=(x / zoom, (y + h) / zoom),
-                                 height=size, rotation=0.0, font="OCR",
-                                 source="ocr", width=w / zoom))
-        elif not vertical:                     # PP-OCR found a vertical line
-            size = (w / zoom) / 0.95
-            boxes.append((x, y, w, h))
+                                 height=(h / zoom) / 0.95, rotation=0.0,
+                                 font="OCR", source="ocr", width=w / zoom))
+        else:                     # reads bottom-to-top, baseline on the right
             texts.append(RawText(text=word, origin=((x + w) / zoom,
                                                     (y + h) / zoom),
-                                 height=size, rotation=90.0, font="OCR",
-                                 source="ocr", width=h / zoom))
-        else:
-            # rotated image (clockwise 90): (xr, yr) -> original (yr, H-1-xr)
-            size = (h / zoom) / 0.75
-            H = page_h_px
-            ox, oy = y, H - (x + w)                   # original-image box
-            boxes.append((ox, oy, h, w))
-            # text reads bottom->top; baseline is the box's right edge
-            texts.append(RawText(text=word, origin=((ox + h) / zoom,
-                                                    (oy + w) / zoom),
-                                 height=size, rotation=90.0, font="OCR",
-                                 source="ocr", width=w / zoom))
+                                 height=(w / zoom) / 0.95, rotation=90.0,
+                                 font="OCR", source="ocr", width=h / zoom))
     return texts, boxes, None
 
 

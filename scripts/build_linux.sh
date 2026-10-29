@@ -10,9 +10,10 @@
 #   ./scripts/build_deb.sh         .deb for Debian / Ubuntu / Mint
 #
 # Included automatically: GNU LibreDWG (DWG output, built here the first
-# time, about 5 minutes), RapidOCR and its models, the larger OCR models
-# (downloaded once; skip with CONVERTCAD_NO_MODELS=1). Tesseract ("Fast"
-# OCR) comes from the system:  sudo apt install tesseract-ocr-fra
+# time, about 5 minutes), RapidOCR and its built-in OCR model (English,
+# French and the other Latin languages). Other OCR languages and the maximum
+# accuracy models are downloaded by the users from the program (offline
+# build: python scripts/get_ocr_models.py --all --dest vendor/ocr_models).
 #
 # Build on the OLDEST distribution you want to support: programs built
 # against a recent glibc do not start on older systems.
@@ -23,32 +24,24 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 if [ -x .venv/bin/python ]; then PY=.venv/bin/python; else PY=python3; fi
 
-echo "[1/6] Python packages"
+echo "[1/5] Python packages"
 "$PY" -m pip install -r requirements-dev.txt --quiet
 
-echo "[2/6] DWG converter (GNU LibreDWG)"
+echo "[2/5] DWG converter (GNU LibreDWG)"
 if [ ! -x vendor/libredwg/linux-x86_64/dxf2dwg ]; then
     bash scripts/build_libredwg.sh linux
 else
     echo "    already built: vendor/libredwg/linux-x86_64"
 fi
 
-echo "[3/6] Tests"
+echo "[3/5] Tests"
 if [ "${CONVERTCAD_NO_TESTS:-0}" = "1" ]; then
     echo "    skipped (CONVERTCAD_NO_TESTS=1)"
 else
     QT_QPA_PLATFORM=offscreen "$PY" -m pytest -q
 fi
 
-echo "[4/6] OCR models for \"Maximum\" and Arabic"
-if [ "${CONVERTCAD_NO_MODELS:-0}" = "1" ]; then
-    echo "    skipped (CONVERTCAD_NO_MODELS=1)"
-else
-    "$PY" scripts/get_ocr_models.py || \
-        echo "    WARNING: models not downloaded - \"Maximum\" uses the standard models."
-fi
-
-echo "[5/6] Building (2 to 5 minutes)"
+echo "[4/5] Building (2 to 5 minutes)"
 "$PY" scripts/make_icon.py
 CONVERTCAD_ONEFILE=0 "$PY" -m PyInstaller --noconfirm --clean ConvertCAD.spec
 cp README.md LICENSE THIRD_PARTY_NOTICES.md CHANGELOG.md assets/icon.png \
@@ -57,7 +50,7 @@ cp README.md LICENSE THIRD_PARTY_NOTICES.md CHANGELOG.md assets/icon.png \
 chmod +x dist/ConvertCAD/_internal/libredwg/dxf2dwg \
          dist/ConvertCAD/_internal/libredwg/dwg2dxf 2>/dev/null || true
 
-echo "[6/6] Check and archive"
+echo "[5/5] Check and archive"
 dist/ConvertCAD/ConvertCAD-cli --version
 VER=$("$PY" -c "import convertcad; print(convertcad.APP_VERSION)")
 tar -C dist -czf "dist/ConvertCAD-${VER}-linux-x86_64.tar.gz" ConvertCAD

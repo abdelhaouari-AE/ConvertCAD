@@ -165,3 +165,59 @@ def test_area_overlay_and_dwg(qapp, tmp_path, monkeypatch):
         if w.result:
             w.result["saved"] = True
         w.close()
+
+
+def test_ocr_languages_and_models(qapp, tmp_path, monkeypatch):
+    """Settings > Scanned pages: the language list shows the installed
+    models only (a missing choice stays visible, marked); the "OCR
+    languages and models…" window offers the others for download."""
+    from convertcad.config import Settings
+    from convertcad.core import ocr_store
+    from convertcad.ui import main_window as mw
+    from convertcad.ui import ocr_models_dialog as omd
+
+    folder = tmp_path / "models"
+    monkeypatch.setenv("CONVERTCAD_OCR_MODELS", str(folder))
+    monkeypatch.setattr(ocr_store, "search_dirs", lambda: [str(folder)])
+
+    dlg = omd.OcrModelsDialog()
+    try:
+        ids = [dlg.available.itemData(i) for i in range(dlg.available.count())]
+        assert ids[0] == "latin_max" and "arabic" in ids
+        assert "latin" not in ids                        # built in
+        if ocr_store.builtin_available():
+            assert dlg.table.rowCount() == 1             # the built-in model
+        assert not dlg.btn_remove.isEnabled()
+        bad = tmp_path / "photo.onnx"
+        bad.write_bytes(b"not a model")
+        monkeypatch.setattr(omd.QFileDialog, "getOpenFileNames", staticmethod(
+            lambda *a, **k: ([str(bad)], "")))
+        dlg._install_from_file()
+        assert "not a ConvertCAD OCR model" in dlg.info.text()
+    finally:
+        dlg.close()
+
+    s = Settings()
+    s.terms_accepted = True
+    s.options = {"ocr_lang": "latin+arabic", "ocr_quality": "maximum"}
+    w = mw.MainWindow(s)
+    try:
+        panel = w.options_panel
+        keys = [panel.ocr_lang.itemData(i)
+                for i in range(panel.ocr_lang.count())]
+        assert keys == ["latin", "latin+arabic"]
+        assert "(not downloaded)" in panel.ocr_lang.itemText(1)
+        opt = panel.options()
+        assert opt.ocr_lang == "latin+arabic" and opt.ocr_quality == "maximum"
+        assert panel.ocr_status.property("role") == "warn"
+        opened = []
+        monkeypatch.setattr(mw.OcrModelsDialog, "exec",
+                            lambda self: opened.append(self) or 0)
+        panel.ocr_models_requested.emit()
+        assert opened
+        panel.ocr_lang.setCurrentIndex(0)                # back to built in
+        panel.ocr_quality.setCurrentIndex(0)
+        if ocr_store.builtin_available():
+            assert panel.ocr_status.property("role") == "ok"
+    finally:
+        w.close()

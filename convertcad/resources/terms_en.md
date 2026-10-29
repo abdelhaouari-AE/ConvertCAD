@@ -3,7 +3,7 @@
 **ConvertCAD {APP_VERSION}** — please read before using the application.
 
 ### 1. Local processing
-All conversions run on this computer. No drawing, file or data is uploaded or sent anywhere. The application makes no network connection (only when running from the source code with the optional PaddleOCR library installed does that library download its models the first time it is used).
+All conversions run on this computer. No drawing, file or data is uploaded or sent anywhere. The application connects to the internet only when you ask it to download an OCR language or model (*Settings > Scanned pages > OCR languages and models…*): it then receives that file and sends nothing else.
 
 ### 2. Your right to convert
 You are responsible for having the right to convert and edit the PDF drawings you open (client agreements, confidentiality clauses, intellectual property of the original author).

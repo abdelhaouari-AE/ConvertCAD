@@ -479,17 +479,15 @@ def _scanned_page(doc, pd: PageData, opt: Options, rep: ConversionReport,
     try:
         rres = vectorize_page(doc, pd.number - 1, dpi=opt.raster_dpi,
                               ocr=do_ocr, ocr_lang=opt.ocr_lang,
-                              ocr_vertical=opt.ocr_vertical,
-                              ocr_engine=opt.ocr_engine)
+                              ocr_quality=opt.ocr_quality)
     except Exception as exc:
         rep.warnings.append(f"Page {pd.number}: raster tracing failed "
                             f"({exc}); image inserted only.")
         return []
     merge_into_page(pd, rres)
-    engine = {"tesseract": "Tesseract", "rapidocr": "RapidOCR",
-              "paddleocr": "PaddleOCR"}.get(rres.ocr_engine, "")
     src = ("text layer already in the PDF used" if has_text_layer
-           else f"{len(rres.texts)} OCR text(s) ({engine})" if do_ocr
+           else f"{len(rres.texts)} OCR text(s) (PP-OCR: {rres.ocr_model})"
+           if do_ocr and rres.ocr_model else "OCR skipped" if do_ocr
            else "no OCR")
     rep.page_notes.append(
         f"Page {pd.number}: scanned page traced at {rres.dpi_used} dpi — "

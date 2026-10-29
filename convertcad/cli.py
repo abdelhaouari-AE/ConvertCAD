@@ -9,9 +9,10 @@ Examples
     python -m convertcad.cli plan.pdf -o out/plan.dxf --scale 100 --units mm
     python -m convertcad.cli plan.pdf --pages 1-3,5 --split-pages
     python -m convertcad.cli drawings/ -o dxf/ --recursive --preset structural
-    python -m convertcad.cli scan.pdf --ocr-engine rapidocr --ocr-lang fra
+    python -m convertcad.cli scan.pdf --ocr-lang latin+arabic --ocr-quality maximum
     python -m convertcad.cli --list-presets
-    python -m convertcad.cli --list-ocr
+    python -m convertcad.cli --list-ocr                      # OCR models
+    python -m convertcad.cli --get-ocr-model arabic latin_max
 
 Exit code: 0 when every file converted, 1 otherwise, 2 on bad arguments.
 """
@@ -23,8 +24,10 @@ import sys
 from typing import List, Optional
 
 from . import APP_NAME, APP_VERSION
-from .core.constants import (DXF_VERSIONS, LAYER_MODES, OCR_ENGINES,
-                             OCR_LANGUAGES, PT_TO_MM, UNITS)
+from .core.constants import (DXF_VERSIONS, LAYER_MODES, OCR_QUALITIES,
+                             PT_TO_MM, UNITS)
+from .core.ocr_catalog import (BY_ID, PACKS, all_language_keys,
+                               language_error, language_set)
 from .core.options import Options
 from .core.paths import find_pdfs
 from .core.presets import BUILTIN_PRESETS, apply_preset
@@ -79,8 +82,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--list-presets", action="store_true",
                    help="list the built-in option presets and exit")
     p.add_argument("--list-ocr", action="store_true",
-                   help="list the OCR engines and whether they are "
-                        "installed, then exit")
+                   help="list the OCR models (languages) and whether they "
+                        "are installed, then exit")
+    p.add_argument("--get-ocr-model", nargs="+", metavar="ID",
+                   help="download OCR models (see --list-ocr), then exit")
     p.add_argument("--preset", choices=sorted(BUILTIN_PRESETS),
                    help="start from a built-in preset")
     p.add_argument("--options-json", metavar="FILE",
@@ -138,12 +143,13 @@ def build_parser() -> argparse.ArgumentParser:
     f.add_argument("--precision", choices=["fine", "normal", "loose"],
                    help="curve fitting tolerance")
     s = p.add_argument_group("scanned pages")
-    s.add_argument("--ocr-engine", choices=list(OCR_ENGINES),
-                   help="auto (default), tesseract (fast), rapidocr "
-                        "(accurate), paddleocr (maximum)")
-    s.add_argument("--ocr-lang", choices=OCR_LANGUAGES)
-    s.add_argument("--ocr-vertical", action="store_true", default=None,
-                   help="also read vertical text (slower)")
+    s.add_argument("--ocr-lang", metavar="LANGS",
+                   help="OCR languages: " + ", ".join(all_language_keys()[:5])
+                        + "… (default latin: English, French and other "
+                          "Latin languages; see --list-ocr)")
+    s.add_argument("--ocr-quality", choices=list(OCR_QUALITIES),
+                   help="standard (built-in model, default) or maximum "
+                        "(larger models, download them first)")
     s.add_argument("--dpi", type=int, metavar="DPI", help="tracing resolution")
     b = p.add_argument_group("batch")
     b.add_argument("--recursive", action="store_true",
@@ -179,9 +185,8 @@ def options_from_args(args) -> Options:
               "calibrate": "calibrated_units_per_pt",
               "dxf_version": "dxf_version", "layer_mode": "layer_mode",
               "min_repeats": "block_min_repeats",
-              "precision": "curve_precision", "ocr_lang": "ocr_lang",
-              "ocr_vertical": "ocr_vertical", "dpi": "raster_dpi",
-              "ocr_engine": "ocr_engine", "output_format": "output_format"}
+              "precision": "curve_precision", "ocr_quality": "ocr_quality",
+              "dpi": "raster_dpi", "output_format": "output_format"}
     for arg, field_ in simple.items():
         val = getattr(args, arg, None)
         if val is not None:
@@ -195,6 +200,11 @@ def options_from_args(args) -> Options:
         val = getattr(args, dest, None)
         if val is not None:
             setattr(opt, dest, val)
+    if args.ocr_lang:
+        err = language_error(args.ocr_lang)
+        if err:
+            raise ValueError(f"--ocr-lang: {err} (see --list-ocr)")
+        opt.ocr_lang = language_set(args.ocr_lang).key
     if args.area:
         opt.clip_rect = parse_area(args.area)
     if args.split_pages:
@@ -218,6 +228,60 @@ def _printer(quiet: bool):
     return progress
 
 
+def _list_ocr() -> int:
+    from .core import ocr_store
+    from .core.ocr import available
+    print(f"OCR engine (RapidOCR + ONNX Runtime): "
+          f"{'installed' if available() else 'MISSING'}")
+    print(f"Downloaded models folder: {ocr_store.user_models_dir()}")
+    print()
+    for p in PACKS:
+        state = ("built in " if p.builtin else
+                 "installed" if ocr_store.is_installed(p) else "available")
+        size = "" if p.builtin else ocr_store.human_size(p.size)
+        print(f"{p.id:<11} {state}  {size:>6}  {p.label}")
+        print(f"{'':<11} {p.languages}")
+    print()
+    print("Languages for --ocr-lang: " + ", ".join(all_language_keys()))
+    print("Download: ConvertCAD-cli --get-ocr-model ID [ID ...]")
+    return 0
+
+
+def _download_printer(pid: str):
+    """Progress of a download, every 10 %."""
+    last = {"pct": -1}
+
+    def progress(done: int, total: int) -> None:
+        pct = int(done * 100 / total) if total else 0
+        if pct // 10 != last["pct"] // 10:
+            last["pct"] = pct
+            print(f"  {pid}: {pct} %", file=sys.stderr, flush=True)
+    return progress
+
+
+def _get_ocr_models(ids: List[str], quiet: bool) -> int:
+    from .core import ocr_store
+    code = 0
+    for pid in ids:
+        pack = BY_ID.get(pid)
+        if pack is None:
+            print(f"error: unknown OCR model '{pid}' (see --list-ocr)",
+                  file=sys.stderr)
+            code = 2
+            continue
+        if pack.builtin or ocr_store.is_installed(pack):
+            print(f"{pid}: already installed")
+            continue
+        progress = None if quiet else _download_printer(pid)
+        try:
+            folder = ocr_store.download_pack(pid, progress=progress)
+            print(f"{pid}: installed in {folder}")
+        except ocr_store.DownloadError as exc:
+            print(f"error: {pid}: {exc}", file=sys.stderr)
+            code = 1
+    return code
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -226,13 +290,9 @@ def main(argv: Optional[List[str]] = None) -> int:
             print(f"{key:<14} {p['label']}")
         return 0
     if args.list_ocr:
-        from .core.ocr import engine_status
-        st = engine_status(probe_versions=True)
-        for key in ("tesseract", "rapidocr", "paddleocr"):
-            mark = "installed " if st[key]["available"] else "missing   "
-            print(f"{key:<10} {mark} {OCR_ENGINES[key]:<24} "
-                  f"{st[key]['detail']}")
-        return 0
+        return _list_ocr()
+    if args.get_ocr_model:
+        return _get_ocr_models(args.get_ocr_model, args.quiet)
     if not args.input:
         parser.print_usage(sys.stderr)
         return 2

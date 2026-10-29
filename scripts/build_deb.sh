@@ -5,9 +5,9 @@
 #   ./scripts/build_deb.sh   ->  dist/convertcad_<version>_amd64.deb
 #
 # Users install it with:   sudo apt install ./convertcad_<version>_amd64.deb
-# (apt also installs the few system libraries Qt needs, and recommends
-# Tesseract for the "Fast" OCR engine). Menu entry "ConvertCAD"; commands
-# "convertcad" (application) and "convertcad-cli" (command line).
+# (apt also installs the few system libraries Qt needs). Menu entry
+# "ConvertCAD"; commands "convertcad" (application) and "convertcad-cli"
+# (command line).
 #
 # Uses dist/ConvertCAD/ (runs scripts/build_linux.sh first when missing).
 # Needs dpkg-deb (Debian / Ubuntu). Set DEB_MAINTAINER="Name <email>" to
@@ -63,15 +63,15 @@ Architecture: amd64
 Maintainer: ${MAINTAINER}
 Installed-Size: ${SIZE}
 Depends: libc6 (>= ${GLIBC}), libgl1, libegl1, libfontconfig1, libfreetype6, libdbus-1-3, libxkbcommon0, libxkbcommon-x11-0, libxcb-cursor0, libxcb-icccm4, libxcb-keysyms1, libxcb-shape0
-Recommends: tesseract-ocr, tesseract-ocr-fra
-Suggests: tesseract-ocr-ara
 Homepage: https://github.com/abdelhaouari-AE/ConvertCAD
 Description: PDF to DXF/DWG converter for engineering drawings
  ConvertCAD turns vector and scanned PDF drawings into editable DXF and DWG
  files built with real CAD entities: lines, polylines, arcs, circles,
  hatches, texts, dimensions, leaders, blocks and layers. It reads the
  drawing scale, rebuilds dashed lines and hatch patterns, recovers AutoCAD
- SHX texts and runs OCR on scanned sheets. Everything works offline.
+ SHX texts and runs OCR on scanned sheets (English, French and the other
+ Latin languages built in; Arabic, Cyrillic, Greek... downloaded from the
+ program). Everything works offline.
 EOF
 
 mkdir -p dist

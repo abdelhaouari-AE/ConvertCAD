@@ -13,9 +13,9 @@ REM      winget install JRSoftware.InnoSetup
 REM  or  https://jrsoftware.org/isdl.php
 REM
 REM  The installer contains exactly the portable folder: DWG converter,
-REM  OCR engines and models, Tesseract when bundled. Users install nothing
-REM  else and need no administrator rights. Optional code signing: see
-REM  scripts\sign_windows.bat
+REM  OCR with its built-in model (other OCR languages are downloaded from
+REM  the program). Users install nothing else and need no administrator
+REM  rights. Optional code signing: see scripts\sign_windows.bat
 REM ======================================================================
 setlocal
 cd /d "%~dp0\.."

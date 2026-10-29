@@ -79,15 +79,10 @@ DEFAULT_PAGE_MODE = "single"
 # Curve-fitting precision presets (multiplier applied to geometry.Tol)
 CURVE_PRECISION = {"fine": 0.5, "normal": 1.0, "loose": 2.0}
 
-# OCR languages offered (Tesseract codes). Languages need their traineddata.
-OCR_LANGUAGES = ["eng+fra", "fra", "eng", "eng+fra+ara", "ara"]
-
-# OCR engines (see core/ocr.py). "auto" = the best engine available.
-OCR_ENGINES = {
-    "auto": "Automatic (best available)",
-    "tesseract": "Fast — Tesseract",
-    "rapidocr": "Accurate — RapidOCR",
-    "paddleocr": "Maximum — PaddleOCR",
+# OCR accuracy (see core/ocr.py; languages are listed in core/ocr_catalog.py)
+OCR_QUALITIES = {
+    "standard": "Standard (built-in model)",
+    "maximum": "Maximum (larger models)",
 }
 
 # Output file formats. DWG is written by the bundled GNU LibreDWG converter

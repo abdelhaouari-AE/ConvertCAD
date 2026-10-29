@@ -80,7 +80,7 @@ def test_job_runner_convert(sample_plan, tmp_path):
 def test_job_runner_cancel(sample_scan, tmp_path):
     r = JobRunner()
     r.start_convert(sample_scan, str(tmp_path / "scan.dxf"),
-                    Options(ocr_vertical=True, raster_dpi=400).to_dict())
+                    Options(raster_dpi=400).to_dict())
     time.sleep(1.0)
     r.cancel(grace_s=0.5)
     msgs = _wait(r, timeout=20)
@@ -102,9 +102,10 @@ def test_cli_new_options_mapping():
     parse = cli.build_parser().parse_args
     opt = cli.options_from_args(parse(
         ["f.pdf", "--format", "dwg", "--area", "10,20,110,70",
-         "--ocr-engine", "rapidocr", "--no-hatch-patterns", "--no-dashes",
-         "--no-block-rotations"]))
-    assert opt.output_format == "dwg" and opt.ocr_engine == "rapidocr"
+         "--ocr-lang", "eng+fra+ara", "--ocr-quality", "maximum",
+         "--no-hatch-patterns", "--no-dashes", "--no-block-rotations"]))
+    assert opt.output_format == "dwg"
+    assert opt.ocr_lang == "latin+arabic" and opt.ocr_quality == "maximum"
     assert not opt.hatch_patterns and not opt.merge_dashes
     assert not opt.block_rotations
     x0, y0, x1, y1 = opt.clip_rect                  # mm on paper -> points
@@ -118,8 +119,31 @@ def test_cli_area_errors():
     assert cli.parse_area("100,50,0,0")[0] == 0     # corners in any order
 
 
-def test_cli_lists_ocr_engines(capsys):
+def test_cli_ocr_languages():
+    parse = cli.build_parser().parse_args
+    assert cli.options_from_args(parse(["f.pdf"])).ocr_lang == "latin"
+    opt = cli.options_from_args(parse(["f.pdf", "--ocr-lang", "Arabic"]))
+    assert opt.ocr_lang == "arabic"
+    for bad in ("latin_max", "klingon", "arabic+greek"):
+        with pytest.raises(ValueError):
+            cli.options_from_args(parse(["f.pdf", "--ocr-lang", bad]))
+
+
+def test_cli_lists_ocr_models(capsys, tmp_path, monkeypatch):
+    monkeypatch.setenv("CONVERTCAD_OCR_MODELS", str(tmp_path))
     assert cli.main(["--list-ocr"]) == 0
     out = capsys.readouterr().out
-    for engine in ("tesseract", "rapidocr", "paddleocr"):
-        assert engine in out
+    for word in ("latin", "latin_max", "arabic", "cyrillic", "built in",
+                 str(tmp_path), "latin+arabic"):
+        assert word in out
+    assert cli.main(["--get-ocr-model", "no-such-model"]) == 2
+
+
+def test_options_of_version_1_0_still_load():
+    old = {"ocr_engine": "paddleocr", "ocr_lang": "eng+fra+ara",
+           "ocr_vertical": True, "scale_denominator": 100}
+    opt = Options.from_dict(old)
+    assert opt.ocr_lang == "latin+arabic" and opt.ocr_quality == "maximum"
+    assert Options.from_dict({"ocr_lang": None}).ocr_lang == "latin"
+    assert Options.from_dict({"ocr_quality": "ultra"}).ocr_quality == \
+        "standard"

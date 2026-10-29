@@ -64,7 +64,7 @@ Measurement texts that matched no dimension are put on layer **DIM_RAW** (red) s
 
 **Layers and blocks** — keep the PDF's own layers when it has them; *layer naming* when it has none: colour + lineweight + linetype (e.g. GEO_BLACK_050_CENTER), colour only, or a single layer; recognise linetypes; *colours*: AutoCAD Color Index (works with CTB plot styles) or true colour (exact RGB); detect repeated symbols as blocks, with a minimum number of occurrences, and *also match rotated and mirrored copies*.
 
-**Scanned pages** — trace lines and circles; read text with OCR; *OCR engine*: Automatic, Fast — Tesseract, Accurate — RapidOCR (recommended for drawings), Maximum — PaddleOCR (see *Help > OCR setup*); OCR language; also read vertical text (Tesseract, slower); scan resolution (200–600 dpi); use the PDF's own text layer when the scan is already searchable; keep raster images on a locked layer.
+**Scanned pages** — trace lines and circles; read text with OCR (PP-OCR models, on this computer); *OCR languages*: English, French… (Latin script, built in), another script (Arabic, Cyrillic, Greek…) or both for mixed drawings — only the installed ones are listed; *OCR accuracy*: Standard (built-in model) or Maximum (larger models, slower); **OCR languages and models…** downloads the other languages and the maximum accuracy models, or installs them from files on a computer without internet (see *Help > OCR guide*); scan resolution (200–600 dpi); use the PDF's own text layer when the scan is already searchable; keep raster images on a locked layer.
 
 **Output** — *file format*: DXF, or DWG (AutoCAD 2000 format: opens in every AutoCAD since 2000 and every current CAD program; written by the included GNU LibreDWG converter and checked after writing); DXF version (R2018 for current software, R12 for old CNC machines); with several sheets, one DXF with sheets side by side or one DXF per sheet; write a conversion log next to the DXF; open the folder after saving.
 
@@ -87,7 +87,8 @@ The same conversions can be scripted with the console program *ConvertCAD-cli.ex
 
 - **Text arrives as small strokes** — the PDF was produced with SHX fonts without the hidden comments (not an AutoCAD PDF, or exported without them): the strokes stay geometry. For AutoCAD PDFs, keep *Recover text drawn as strokes or outlines* on.
 - **The drawing is hidden by a white area in CAD** — keep *Ignore white masks, white lines and page backgrounds* on.
-- **OCR is skipped or poor** — the engine is not installed or not suited: choose *Accurate — RapidOCR*; see *Help > OCR setup*.
+- **OCR is poor** — check the *OCR languages* (a Cyrillic or Arabic drawing needs its script: *OCR languages and models…*); for poor scans or small text choose *OCR accuracy: Maximum* or a higher scan resolution; see *Help > OCR guide*.
+- **An OCR download fails** — check the internet connection or the company proxy; on a computer without internet use *Install from file…* (see *Help > OCR guide*).
 - **The DWG could not be written** — the report says why, and the drawing is saved as DXF instead; send the PDF with the log if it happens again.
 - **Too many small layers** — choose *Colour only* or *Single geometry layer*, or untick layers before saving.
 - **A repeated symbol was not turned into a block** — copies at angles other than 90°/180°/270° (or mirrored) are different symbols; lower *Minimum occurrences* if it appears only twice.

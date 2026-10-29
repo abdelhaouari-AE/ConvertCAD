@@ -2,6 +2,51 @@
 
 All notable changes to ConvertCAD. Versions follow *major.minor.patch*.
 
+## [1.1.0] — 2026-10-29
+
+OCR rebuilt around one engine: PaddleOCR's PP-OCR models run by RapidOCR, with one model
+built in and the others downloaded from the program when needed.
+
+### Added
+- **OCR languages and models…** (*Settings → Scanned pages*, *Tools* menu): download
+  Arabic, Cyrillic, Greek, Korean, Devanagari, Thai, Tamil, Telugu and the maximum
+  accuracy models from a drop-down list, with a progress bar and *Cancel*; remove them;
+  **Install from file…** for computers without internet (files recognised by their
+  checksum). Every file is checked (SHA-256) before it is kept.
+- Models stored per user (`%LOCALAPPDATA%\ConvertCAD\ocr_models`,
+  `~/.local/share/convertcad/ocr_models`), next to the program in portable mode, or in
+  `CONVERTCAD_OCR_MODELS`; the Windows uninstaller removes them, updates keep them.
+- **Mixed-script drawings**: *English, French… + Arabic* (or another script) reads both,
+  each line keeping the reading of its own script.
+- *OCR accuracy*: Standard (built-in model) or Maximum (larger models).
+- Command line: `--ocr-lang latin|<script>|latin+<script>`, `--ocr-quality
+  standard|maximum`, `--get-ocr-model ID…`; `--list-ocr` lists the models.
+- Workflow *OCR models release* publishes the downloadable models (release
+  `ocr-models-v1`); `scripts/get_ocr_models.py` reworked for maintainers.
+
+### Changed
+- One built-in OCR model (PP-OCRv6 small, about 30 MB): English, French and 45 other
+  Latin-script languages, plus Chinese and Japanese. The language list shows the installed
+  languages only; a missing choice stays visible, marked *(not downloaded)*, and the
+  built-in model is used (the report says so).
+- The downloads no longer bundle the larger OCR models and the Arabic model (smaller
+  downloads); 1.0 settings are converted (`eng+fra+ara` → *English, French… + Arabic*,
+  *Maximum — PaddleOCR* → *Maximum* accuracy).
+- The only network connection of the program: downloading an OCR model when the user asks
+  (terms of use updated).
+
+### Fixed
+- **Privacy:** ONNX Runtime (the OCR runtime) recorded usage data — program path,
+  system, processor, a device identifier — and uploaded it to Microsoft (seen on Linux
+  with ONNX Runtime 1.31); 1.0 switched off only its events, too late. It is now switched
+  off before the library loads (`ORT_DISABLE_TELEMETRY`), so ConvertCAD really sends
+  nothing.
+
+### Removed
+- The Tesseract OCR engine (and pytesseract), the optional PaddleOCR library
+  (`requirements-paddle.txt`), the *OCR engine* setting and *Also read vertical text*
+  (vertical text is always read).
+
 ## [1.0.0] — 2026-10-29
 
 First public release. ConvertCAD converts 2D PDF drawings — vector exports from CAD

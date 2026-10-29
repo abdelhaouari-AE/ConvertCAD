@@ -31,7 +31,9 @@ ENGINE_PACKAGES = {
     "ezdxf": "ezdxf",
     "numpy": "numpy",
     "cv2": "opencv-python-headless",
-    "pytesseract": "pytesseract",
+    "rapidocr": "rapidocr",            # OCR (built-in PP-OCR model)
+    "onnxruntime": "onnxruntime",      # runs the OCR models
+    "bidi": "python-bidi",             # Arabic OCR: right-to-left order
 }
 GUI_PACKAGES = {"PySide6": "PySide6-Essentials"}
 

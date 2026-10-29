@@ -1,34 +1,37 @@
 """
-ocr.py — three OCR engines for scanned drawings, behind one interface.
+ocr.py — reading the text of scanned drawings.
 
-    Fast      Tesseract   classic engine, small, good on clean typed text
-    Accurate  RapidOCR    PaddleOCR's PP-OCR models run with ONNX Runtime:
-                          reads whole text lines, small and rotated text,
-                          much better than Tesseract on drawings; models
-                          included (about 30 MB), fully offline
-    Maximum   PaddleOCR   the largest PP-OCR models: the PaddleOCR library
-                          when it is installed (running from source), else
-                          the same large models through RapidOCR when their
-                          files are in the "ocr_models" folder
+One engine: PaddleOCR's PP-OCR models run by RapidOCR + ONNX Runtime
+(offline, CPU). They detect whole text lines anywhere on the sheet, at any
+angle, small or crossed by lines — far better on drawings than classic OCR.
 
-"Automatic" picks the best engine available. Every engine returns OcrWord
-boxes in image pixels; raster.py turns them into TEXT entities.
+The models come in packs (see ocr_catalog.py):
+  * "latin"      built in: English, French, 45 other Latin-script languages,
+                 Chinese, Japanese;
+  * "latin_max"  the same languages with larger models (download);
+  * one pack per other script (Arabic, Cyrillic, Greek…) (download).
 
-All imports are LAZY: nothing here loads at application start.
+The user chooses
+  * the languages: the Latin model, one script, or Latin + one script for
+    mixed drawings (e.g. a French plan with an Arabic title block): both
+    are read and each line keeps the reading of its own script;
+  * the accuracy: standard (built in) or maximum (download).
+
+make_plan() turns that choice into the models to run, falling back to the
+built-in model (with a note for the report) when a pack is missing;
+recognize() runs the plan on an image and returns OcrWord boxes in pixels.
+
+All imports of RapidOCR / ONNX Runtime are LAZY: nothing loads at start-up.
 """
 
-import os
-import shutil
-import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
-ENGINE_ORDER = ("paddleocr", "rapidocr", "tesseract")   # best first
+from . import ocr_store
+from .ocr_catalog import (BUILTIN, BY_ID, MAXIMUM, SCRIPTS, LanguageSet,
+                          OcrPack, language_set)
 
-# Optional larger models (see scripts/get_ocr_models.py)
-MEDIUM_DET = "PP-OCRv6_det_medium.onnx"
-MEDIUM_REC = "PP-OCRv6_rec_medium.onnx"
-ARABIC_REC = "arabic_PP-OCRv5_rec_mobile.onnx"
+QUALITIES = ("standard", "maximum")
 
 
 @dataclass
@@ -39,171 +42,118 @@ class OcrWord:
     vertical: bool = False               # reads bottom-to-top
 
 
-# ---------------------------------------------------------------------------
-# Locations
-# ---------------------------------------------------------------------------
-def _app_dirs() -> List[str]:
-    exe_dir = os.path.dirname(getattr(sys, "executable", "") or "")
-    project = os.path.dirname(os.path.dirname(os.path.dirname(
-        os.path.abspath(__file__))))
-    bundle = getattr(sys, "_MEIPASS", "")
-    dirs = [exe_dir, project, os.path.join(project, "vendor")]
-    if bundle:
-        dirs.append(bundle)
-    return dirs
+@dataclass
+class _Pass:
+    pack: OcrPack
+    rec: str = ""                        # model path ("" = built in)
+    medium_rec: bool = False
 
 
-def models_dir() -> str:
-    """Folder holding the optional OCR models ('' when absent)."""
-    env = os.environ.get("CONVERTCAD_OCR_MODELS", "")
-    for d in ([env] if env else []) + [os.path.join(x, "ocr_models")
-                                       for x in _app_dirs()]:
-        if d and os.path.isdir(d):
-            return d
-    return ""
-
-
-def _model(name: str) -> str:
-    d = models_dir()
-    p = os.path.join(d, name) if d else ""
-    return p if p and os.path.isfile(p) else ""
-
-
-def find_tesseract() -> Optional[str]:
-    """Locate the Tesseract program without requiring an installation:
-      1. a 'tesseract' folder next to ConvertCAD.exe (portable bundle)
-      2. on PATH
-      3. standard Windows install locations
-    Returns the executable path, or None."""
-    for d in _app_dirs():
-        c = os.path.join(d, "tesseract", "tesseract.exe")
-        if os.path.isfile(c):
-            return c
-    exe = shutil.which("tesseract")
-    if exe:
-        return exe
-    for c in (r"C:\Program Files\Tesseract-OCR\tesseract.exe",
-              r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
-              os.path.expandvars(
-                  r"%LOCALAPPDATA%\Programs\Tesseract-OCR\tesseract.exe"),
-              "/usr/bin/tesseract", "/usr/local/bin/tesseract",
-              "/opt/homebrew/bin/tesseract"):
-        if os.path.isfile(c):
-            return c
-    return None
-
-
-def _has_module(name: str) -> bool:
-    import importlib.util
-    try:
-        return importlib.util.find_spec(name) is not None
-    except (ImportError, ValueError):
-        return False
+@dataclass
+class OcrPlan:
+    det: str = ""                        # detection model ("" = built in)
+    passes: List[_Pass] = field(default_factory=list)
+    description: str = ""                # for the conversion report
 
 
 # ---------------------------------------------------------------------------
-# Availability (for the interface, the CLI and "Automatic")
+# Availability (for the interface, the command line, the report)
 # ---------------------------------------------------------------------------
-def engine_status(probe_versions: bool = False) -> Dict[str, dict]:
-    """{engine: {"available": bool, "detail": str}} — cheap: no model is
-    loaded. probe_versions=True also asks Tesseract its version."""
-    st: Dict[str, dict] = {}
-    tess = find_tesseract() if _has_module("pytesseract") else None
-    detail = ""
-    if tess and probe_versions:
-        try:
-            import pytesseract
-            pytesseract.pytesseract.tesseract_cmd = tess
-            detail = f"Tesseract {pytesseract.get_tesseract_version()}"
-        except Exception:                                  # pragma: no cover
-            detail = "Tesseract"
-    st["tesseract"] = {"available": bool(tess), "detail": detail or
-                       ("Tesseract" if tess else "Tesseract not found")}
-    rapid = _has_module("rapidocr") and _has_module("onnxruntime")
-    st["rapidocr"] = {"available": rapid,
-                      "detail": "RapidOCR (PP-OCR models, ONNX Runtime)"
-                      if rapid else "RapidOCR not installed"}
-    paddle_lib = _has_module("paddleocr") and _has_module("paddle")
-    medium = rapid and bool(_model(MEDIUM_DET) and _model(MEDIUM_REC))
-    st["paddleocr"] = {
-        "available": paddle_lib or medium,
-        "detail": ("PaddleOCR library" if paddle_lib else
-                   "PaddleOCR large models (via RapidOCR)" if medium else
-                   "PaddleOCR / large models not installed")}
-    st["arabic_rapid"] = {"available": rapid and _has_module("bidi")
-                          and bool(_model(ARABIC_REC)),
-                          "detail": "Arabic model for RapidOCR"}
-    return st
+def available() -> bool:
+    """RapidOCR and ONNX Runtime are installed (always true in the
+    downloads; from source: pip install -r requirements.txt)."""
+    return ocr_store.builtin_available()
 
 
-def resolve_engine(requested: str, lang: str = "eng") -> Tuple[str, str]:
-    """(engine actually used, note for the report or '')."""
-    st = engine_status()
-    wants_arabic = "ara" in (lang or "")
-    if requested in ("", "auto"):
-        for name in ENGINE_ORDER:
-            if name == "rapidocr" and wants_arabic and \
-                    not st["arabic_rapid"]["available"]:
-                continue
-            if st[name]["available"]:
-                return name, ""
-        return "", "No OCR engine is available."
-    if st.get(requested, {}).get("available"):
-        if requested == "rapidocr" and wants_arabic and \
-                not st["arabic_rapid"]["available"] and \
-                st["tesseract"]["available"]:
-            return "tesseract", ("Arabic text: the Arabic model for RapidOCR "
-                                 "is not installed, Tesseract was used.")
-        return requested, ""
-    for name in ENGINE_ORDER[ENGINE_ORDER.index(requested) + 1:] \
-            if requested in ENGINE_ORDER else ENGINE_ORDER:
-        if st[name]["available"]:
-            return name, (f"OCR engine '{requested}' is not installed; "
-                          f"'{name}' was used instead.")
-    return "", "No OCR engine is available."
+def _rtl_ok() -> bool:
+    return ocr_store._has_module("bidi")
+
+
+def pack_usable(pack: OcrPack) -> bool:
+    return (ocr_store.is_installed(pack) and available()
+            and (not pack.rtl or _rtl_ok()))
+
+
+def status() -> Dict[str, object]:
+    """Cheap: no model is loaded."""
+    return {"engine": available(),
+            "packs": {p.id: ocr_store.is_installed(p)
+                      for p in (BUILTIN, MAXIMUM) + SCRIPTS},
+            "folder": ocr_store.user_models_dir()}
+
+
+def language_choices(include_missing: bool = False
+                     ) -> List[Tuple[str, str, bool]]:
+    """(key, English label, installed) of the OCR language choices: the
+    Latin model, then for each script "Latin + script" and the script
+    alone. Missing scripts are listed only with include_missing."""
+    out = [("latin", BUILTIN.label, available())]
+    for s in SCRIPTS:
+        ok = pack_usable(s)
+        if ok or include_missing:
+            out.append((f"latin+{s.id}", language_set(f"latin+{s.id}").label,
+                        ok))
+            out.append((s.id, s.label, ok))
+    return out
 
 
 # ---------------------------------------------------------------------------
-# Engines
+# Plan
 # ---------------------------------------------------------------------------
-def _tesseract(img, lang: str) -> List[OcrWord]:
-    import pytesseract
-    exe = find_tesseract()
-    if exe is None:
-        raise RuntimeError("Tesseract not found")
-    pytesseract.pytesseract.tesseract_cmd = exe
-    data, err = None, None
-    for language in (lang, "eng"):
-        try:
-            data = pytesseract.image_to_data(
-                img, lang=language, output_type=pytesseract.Output.DICT,
-                config="--psm 11")
-            break
-        except Exception as exc:                          # missing language
-            err = exc
-    if data is None:
-        raise RuntimeError(f"OCR failed: {err}")
-    words = []
-    for i, word in enumerate(data["text"]):
-        word = (word or "").strip()
-        if not word:
+def make_plan(languages: str = "latin", quality: str = "standard"
+              ) -> Tuple[Optional[OcrPlan], str]:
+    """(plan or None, note for the report or '')."""
+    if not available():
+        return None, ("OCR skipped: the OCR engine (RapidOCR) is not "
+                      "installed; geometry tracing was still performed.")
+    notes = []
+    lset: LanguageSet = language_set(languages)
+    plan = OcrPlan()
+    maximum = quality == "maximum"
+    if maximum and not pack_usable(MAXIMUM):
+        notes.append("Maximum accuracy models are not installed: the "
+                     "standard model was used (download them in Settings > "
+                     "Scanned pages > OCR languages and models).")
+        maximum = False
+    if maximum:
+        det = next(f for f in MAXIMUM.files if f.role == "det")
+        plan.det = ocr_store.find_file(det)
+    for pid in lset.packs:
+        pack = BY_ID[pid]
+        if pack.builtin:
+            if maximum:
+                rec = next(f for f in MAXIMUM.files if f.role == "rec")
+                plan.passes.append(_Pass(pack, ocr_store.find_file(rec),
+                                         medium_rec=True))
+            else:
+                plan.passes.append(_Pass(pack))
             continue
-        try:
-            conf = float(data["conf"][i])
-        except (TypeError, ValueError):
-            conf = -1.0
-        words.append(OcrWord(word, (int(data["left"][i]), int(data["top"][i]),
-                                    int(data["width"][i]),
-                                    int(data["height"][i])), conf))
-    return words
+        if not pack_usable(pack):
+            why = ("python-bidi is missing" if ocr_store.is_installed(pack)
+                   else "it is not installed")
+            notes.append(f"OCR language '{pack.label}' unavailable ({why}): "
+                         f"the built-in model was used for the other "
+                         f"languages.")
+            continue
+        plan.passes.append(_Pass(pack, ocr_store.find_file(pack.files[0])))
+    if not plan.passes:                       # the only script was missing
+        plan.passes.append(_Pass(BUILTIN))
+    used = LanguageSet("", [p.pack.id for p in plan.passes])
+    plan.description = used.label + (", maximum accuracy" if maximum else "")
+    return plan, " ".join(notes)
 
 
-_RAPID_CACHE: Dict[tuple, object] = {}
+# ---------------------------------------------------------------------------
+# Recognition
+# ---------------------------------------------------------------------------
+_ENGINES: Dict[tuple, object] = {}
 
 
 def _no_telemetry() -> None:
-    """ConvertCAD sends nothing anywhere: switch off ONNX Runtime's usage
-    events (Windows builds can log them for Microsoft)."""
+    """ConvertCAD sends nothing anywhere: ONNX Runtime's usage data is
+    switched off by ORT_DISABLE_TELEMETRY (set in convertcad/__init__.py,
+    before the library loads); this also switches off its events (Windows
+    builds can log them for Microsoft)."""
     try:
         import onnxruntime
         onnxruntime.disable_telemetry_events()
@@ -211,33 +161,31 @@ def _no_telemetry() -> None:
         pass
 
 
-def _rapid_engine(det: str = "", rec: str = ""):
-    """RapidOCR with its own small models, or with model files given by
-    path (larger models, Arabic). A model given by path is used as is: no
-    download is ever attempted, so the engine works offline."""
-    key = (det, rec)
-    eng = _RAPID_CACHE.get(key)
-    if eng is None:
-        _no_telemetry()
-        from rapidocr import LangRec, ModelType, OCRVersion, RapidOCR
-        params = {"Global.log_level": "error"}
-        if det:
-            params["Det.model_path"] = det
-            if os.path.basename(det) == MEDIUM_DET:
-                params["Det.model_type"] = ModelType.MEDIUM
-        if rec:
-            params["Rec.model_path"] = rec
-            if os.path.basename(rec) == MEDIUM_REC:
-                params["Rec.model_type"] = ModelType.MEDIUM
-            elif os.path.basename(rec) == ARABIC_REC:
-                # Arabic: RapidOCR puts the letters back in reading order
-                # (right to left, with python-bidi) - DXF text stores them
-                # in that order.
-                params.update({"Rec.lang_type": LangRec.ARABIC,
-                               "Rec.ocr_version": OCRVersion.PPOCRV5,
-                               "Rec.model_type": ModelType.MOBILE})
-        eng = RapidOCR(params=params)
-        _RAPID_CACHE[key] = eng
+def _engine(det: str, ps: _Pass):
+    """A RapidOCR instance for one detection + recognition model pair.
+    Models given by path are used as they are: never downloaded."""
+    key = (det, ps.rec, ps.pack.id)
+    eng = _ENGINES.get(key)
+    if eng is not None:
+        return eng
+    _no_telemetry()
+    from rapidocr import LangRec, ModelType, OCRVersion, RapidOCR
+    params = {"Global.log_level": "error"}
+    if det:
+        params["Det.model_path"] = det
+        params["Det.model_type"] = ModelType.MEDIUM
+    if ps.rec:
+        params["Rec.model_path"] = ps.rec
+        if ps.medium_rec:
+            params["Rec.model_type"] = ModelType.MEDIUM
+        elif ps.pack.lang_type:
+            # script model: RapidOCR needs its language (Arabic is put back
+            # in reading order, right to left, with python-bidi)
+            params.update({"Rec.lang_type": LangRec[ps.pack.lang_type],
+                           "Rec.ocr_version": OCRVersion.PPOCRV5,
+                           "Rec.model_type": ModelType.MOBILE})
+    eng = RapidOCR(params=params)
+    _ENGINES[key] = eng
     return eng
 
 
@@ -258,89 +206,48 @@ def _quads_to_words(boxes, texts, scores) -> List[OcrWord]:
     return words
 
 
-def _rapidocr(img, lang: str, large: bool = False) -> List[OcrWord]:
-    det = rec = ""
-    if large:
-        det, rec = _model(MEDIUM_DET), _model(MEDIUM_REC)
-    res = _rapid_engine(det, rec)(img)
-    words = _quads_to_words(res.boxes if res.boxes is not None else [],
-                            res.txts or (), res.scores or ())
-    if "ara" in (lang or "") and _model(ARABIC_REC) and _has_module("bidi"):
-        ara = _rapid_engine(det, _model(ARABIC_REC))(img)
-        words = _merge_arabic(words, _quads_to_words(
-            ara.boxes if ara.boxes is not None else [], ara.txts or (),
-            ara.scores or ()), only_arabic=lang != "ara")
+def _run(det: str, ps: _Pass, img) -> List[OcrWord]:
+    res = _engine(det, ps)(img)
+    return _quads_to_words(res.boxes if res.boxes is not None else [],
+                           res.txts or (), res.scores or ())
+
+
+def recognize(img, plan: OcrPlan) -> List[OcrWord]:
+    """Run a plan on a grayscale (or RGB) image. Raises on failure."""
+    words = _run(plan.det, plan.passes[0], img)
+    for ps in plan.passes[1:]:                 # Latin + one script
+        extra = _run(plan.det, ps, img)
+        words = merge_script(words, extra, ps.pack.script)
     return words
 
 
-def _arabic_share(text: str) -> float:
+def script_share(text: str, ranges) -> float:
+    """Share of the letters of `text` that belong to the given script."""
     letters = [c for c in text if c.isalpha()]
     if not letters:
         return 0.0
-    return sum(1 for c in letters if "\u0600" <= c <= "\u06ff") / len(letters)
+    inside = sum(1 for c in letters
+                 if any(a <= ord(c) <= b for a, b in ranges))
+    return inside / len(letters)
 
 
-def _merge_arabic(latin: List[OcrWord], arabic: List[OcrWord],
-                  only_arabic: bool) -> List[OcrWord]:
-    """Keep the Arabic reading where the line is mostly Arabic script."""
-    if not only_arabic:
-        return arabic
-    out = list(latin)
-    for a in arabic:
-        if _arabic_share(a.text) < 0.5:
+def merge_script(base: List[OcrWord], extra: List[OcrWord],
+                 ranges) -> List[OcrWord]:
+    """Keep the second reading where the line is mostly in its script
+    (replacing the Latin reading of the same place), the Latin reading
+    everywhere else."""
+    out = list(base)
+    for a in extra:
+        if script_share(a.text, ranges) < 0.5:
             continue
-        ax, ay, aw, ah = a.box
-        replaced = False
-        for k, w in enumerate(out):
-            x, y, ww, hh = w.box
-            ix = min(ax + aw, x + ww) - max(ax, x)
-            iy = min(ay + ah, y + hh) - max(ay, y)
-            if ix > 0 and iy > 0 and ix * iy > 0.5 * min(aw * ah, ww * hh):
-                out[k] = a
-                replaced = True
-                break
-        if not replaced:
-            out.append(a)
+        out = [w for w in out if not _overlap(a, w)] + [a]
     return out
 
 
-_PADDLE: Dict[str, object] = {}          # one PaddleOCR per language
-
-
-def _paddleocr(img, lang: str) -> List[OcrWord]:
-    import numpy as np
-    plang = "ar" if lang == "ara" else "fr" if "fra" in lang else "en"
-    engine = _PADDLE.get(plang)
-    if engine is None:
-        from paddleocr import PaddleOCR
-        engine = _PADDLE[plang] = PaddleOCR(
-            lang=plang, use_doc_orientation_classify=False,
-            use_doc_unwarping=False, use_textline_orientation=True)
-    rgb = np.stack([img] * 3, axis=-1) if img.ndim == 2 else img
-    words: List[OcrWord] = []
-    for res in engine.predict(rgb):
-        data = res if isinstance(res, dict) else getattr(res, "json", {})
-        data = data.get("res", data)
-        words += _quads_to_words(data.get("rec_polys", []),
-                                 data.get("rec_texts", []),
-                                 data.get("rec_scores", []))
-    return words
-
-
-def recognize(img, lang: str, engine: str) -> List[OcrWord]:
-    """Run one engine on a grayscale image. Raises on failure."""
-    if engine == "tesseract":
-        return _tesseract(img, lang)
-    if engine == "rapidocr":
-        return _rapidocr(img, lang)
-    if engine == "paddleocr":
-        if _has_module("paddleocr") and _has_module("paddle"):
-            return _paddleocr(img, lang)
-        return _rapidocr(img, lang, large=True)
-    raise ValueError(f"unknown OCR engine: {engine}")
-
-
-def reads_any_orientation(engine: str) -> bool:
-    """PP-OCR engines find vertical text themselves; Tesseract needs the
-    extra 'vertical text' pass on the image turned 90 degrees."""
-    return engine in ("rapidocr", "paddleocr")
+def _overlap(a: OcrWord, b: OcrWord) -> bool:
+    """The two boxes cover mostly the same place."""
+    ax, ay, aw, ah = a.box
+    x, y, w, h = b.box
+    ix = min(ax + aw, x + w) - max(ax, x)
+    iy = min(ay + ah, y + h) - max(ay, y)
+    return ix > 0 and iy > 0 and ix * iy > 0.5 * min(aw * ah, w * h)

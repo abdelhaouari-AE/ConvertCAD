@@ -6,7 +6,7 @@ General Public License v3.0 (see `LICENSE`).
 ConvertCAD uses the open-source components below. The programs we distribute — the
 Windows portable zip and installer, the Linux tar.gz, AppImage and .deb — include the
 ones marked **bundled**. Their licence texts are in their own package folders inside
-`_internal` (`*.dist-info`, `libredwg/COPYING`, `tesseract/`) and on the websites listed.
+`_internal` (`*.dist-info`, `libredwg/COPYING`) and on the websites listed.
 
 | Component | Used for | Licence | Distribution | Website |
 |---|---|---|---|---|
@@ -19,18 +19,16 @@ ones marked **bundled**. Their licence texts are in their own package folders in
 | OpenCV (opencv-python-headless) | scanned-page tracing | Apache-2.0 (OpenCV); MIT (Python packaging) | bundled | <https://opencv.org/>, <https://github.com/opencv/opencv-python> |
 | **GNU LibreDWG** 0.13.4, with 3 ConvertCAD patches | DWG output (`dxf2dwg`, `dwg2dxf` programs) | **GPL-3.0-or-later** | bundled (`libredwg` folder: programs, `COPYING`, `SOURCE.txt`) | <https://www.gnu.org/software/libredwg/> |
 | libssp (GCC runtime) | used by the Windows LibreDWG programs | GPL-3.0 with the GCC Runtime Library Exception | bundled (Windows) | <https://gcc.gnu.org/> |
-| RapidOCR (RapidAI) | "Accurate" OCR engine | Apache-2.0 | bundled | <https://github.com/RapidAI/RapidOCR> |
-| PP-OCR models (PaddleOCR, Baidu), ONNX format | text detection / recognition models of the "Accurate" and "Maximum" engines and Arabic | Apache-2.0 | bundled (`rapidocr/models`, `ocr_models`) | <https://github.com/PaddlePaddle/PaddleOCR> |
+| RapidOCR (RapidAI) | OCR of scanned pages | Apache-2.0 | bundled | <https://github.com/RapidAI/RapidOCR> |
+| PP-OCR models (PaddleOCR, Baidu), ONNX format as published by RapidOCR | text detection / recognition: the built-in model (PP-OCRv6 small: Latin-script languages, Chinese, Japanese); the maximum accuracy models (PP-OCRv6 medium) and the script models (PP-OCRv5: Arabic, Cyrillic, Greek, Korean, Devanagari, Thai, Tamil, Telugu) | Apache-2.0 | built-in model bundled (`rapidocr/models`); the others downloaded by the user from the program (release `ocr-models-v1` of this repository, or RapidOCR's model repository) | <https://github.com/PaddlePaddle/PaddleOCR> |
 | ONNX Runtime (Microsoft) | runs the OCR models | MIT | bundled | <https://onnxruntime.ai/> |
 | flatbuffers, protobuf | ONNX Runtime dependencies | Apache-2.0, BSD-3-Clause | bundled | <https://github.com/google/flatbuffers>, <https://github.com/protocolbuffers/protobuf> |
 | Shapely (+ GEOS), pyclipper (+ Clipper) | RapidOCR dependencies (text box geometry) | BSD-3-Clause (GEOS: LGPL-2.1); MIT (Clipper: Boost Software License 1.0) | bundled | <https://shapely.readthedocs.io/>, <https://github.com/fonttools/pyclipper> |
 | OmegaConf (+ ANTLR4 runtime), PyYAML | RapidOCR settings files | BSD-3-Clause, BSD-3-Clause, MIT | bundled | <https://omegaconf.readthedocs.io/>, <https://pyyaml.org/> |
-| requests, urllib3, idna, charset-normalizer, certifi, tqdm, colorlog, six | RapidOCR dependencies (never used to download anything by ConvertCAD) | Apache-2.0, MIT, BSD-3-Clause, MIT, MPL-2.0, MPL-2.0 AND MIT, MIT, MIT | bundled | <https://pypi.org/> |
+| requests, urllib3, idna, charset-normalizer, tqdm, colorlog, six | RapidOCR dependencies (never used to download anything by ConvertCAD) | Apache-2.0, MIT, BSD-3-Clause, MIT, MPL-2.0 AND MIT, MIT, MIT | bundled | <https://pypi.org/> |
+| certifi | trusted certificates for the OCR model downloads (HTTPS) | MPL-2.0 | bundled | <https://github.com/certifi/python-certifi> |
 | python-bidi | right-to-left order of Arabic OCR text | LGPL-3.0 | bundled | <https://github.com/MeirKriheli/python-bidi> |
-| pytesseract | bridge to Tesseract | Apache-2.0 | bundled | <https://github.com/madmaze/pytesseract> |
-| Pillow, packaging | pytesseract / RapidOCR dependencies | MIT-CMU (HPND); Apache-2.0 / BSD-2-Clause | bundled | <https://python-pillow.org/> |
-| Tesseract OCR (+ eng/fra/ara language data) | "Fast" OCR engine | Apache-2.0 | bundled in the Windows downloads (`tesseract` folder, with its licence); on Linux the system package is used | <https://github.com/tesseract-ocr/tesseract> |
-| PaddleOCR, PaddlePaddle | "Maximum" OCR with the full library | Apache-2.0 | optional, only when running from source (`requirements-paddle.txt`) | <https://github.com/PaddlePaddle/PaddleOCR> |
+| Pillow, packaging | RapidOCR dependencies | MIT-CMU (HPND); Apache-2.0 / BSD-2-Clause | bundled | <https://python-pillow.org/> |
 | Inno Setup (Jordan Russell, Martijn Laan) | engine of the Windows installer (`setup.exe`) | Inno Setup License (free, BSD-style) | in the installer only | <https://jrsoftware.org/isinfo.php> |
 | AppImage runtime, appimagetool | the Linux AppImage file | MIT | runtime in the AppImage only; appimagetool is a build tool | <https://appimage.org/> |
 | PyInstaller | building the executable | GPL-2.0 with bootloader exception (the exception allows any licence for the built program) | build tool only | <https://pyinstaller.org/> |

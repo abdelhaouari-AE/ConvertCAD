@@ -17,8 +17,18 @@ The version number lives HERE ONLY. The interface, the conversion log, the
 About box and the build scripts all read it from this module.
 """
 
+import os as _os
+
+# Privacy: ONNX Runtime (which runs the OCR models) records usage data — the
+# program path, operating system, processor… — and uploads it to Microsoft
+# (seen on Linux too, with version 1.31). ConvertCAD sends nothing anywhere, so
+# this is switched off here, before any part of ConvertCAD can load ONNX
+# Runtime: the setting is read when the library is imported, and the
+# conversion processes started by the interface inherit it.
+_os.environ["ORT_DISABLE_TELEMETRY"] = "1"
+
 APP_NAME = "ConvertCAD"
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.1.0"
 APP_AUTHOR = "abdelhaouari"
 APP_YEAR = "2026"
 APP_DESCRIPTION = "PDF 2D drawings to editable DXF converter"

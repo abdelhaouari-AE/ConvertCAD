@@ -24,8 +24,25 @@ def french():
     i18n.set_language("en")
 
 
+def _translated_calls(node):
+    """Literal strings that reach tr(): tr("…"), and the menu actions
+    A("…", tip="…") / self._act("…") of the main window."""
+    if not isinstance(node, ast.Call):
+        return
+    name = getattr(node.func, "id", None) or getattr(node.func, "attr", None)
+    if name not in ("tr", "A", "_act"):
+        return
+    if node.args and isinstance(node.args[0], ast.Constant) \
+            and isinstance(node.args[0].value, str):
+        yield node.args[0].value
+    if name != "tr":
+        for kw in node.keywords:
+            if kw.arg == "tip" and isinstance(kw.value, ast.Constant):
+                yield kw.value.value
+
+
 def _tr_literals():
-    """(text, location) of every tr("literal") call in the package."""
+    """(text, location) of every string the interface translates."""
     for root, _, files in os.walk(PKG):
         for name in files:
             if not name.endswith(".py"):
@@ -34,13 +51,9 @@ def _tr_literals():
             with open(path, encoding="utf-8") as fh:
                 tree = ast.parse(fh.read())
             for node in ast.walk(tree):
-                if (isinstance(node, ast.Call)
-                        and getattr(node.func, "id", None) == "tr"
-                        and node.args
-                        and isinstance(node.args[0], ast.Constant)
-                        and isinstance(node.args[0].value, str)):
+                for text in _translated_calls(node):
                     rel = os.path.relpath(path, ROOT)
-                    yield node.args[0].value, f"{rel}:{node.lineno}"
+                    yield text, f"{rel}:{node.lineno}"
 
 
 def test_every_interface_string_has_a_french_version():
@@ -48,6 +61,16 @@ def test_every_interface_string_has_a_french_version():
                       if text and text not in i18n.FR})
     assert not missing, "Add these to FR in convertcad/i18n.py:\n" + \
         "\n".join(missing)
+
+
+def test_ocr_catalogue_and_choices_are_translated():
+    """The OCR model names and languages are shown with tr(variable)."""
+    from convertcad.core.constants import OCR_QUALITIES
+    from convertcad.core.ocr_catalog import PACKS
+    texts = [p.label for p in PACKS] + [p.languages for p in PACKS] + \
+        [p.short for p in PACKS if p.short] + list(OCR_QUALITIES.values())
+    missing = [t for t in texts if t not in i18n.FR]
+    assert not missing, missing
 
 
 def _fields(text):

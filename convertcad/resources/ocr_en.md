@@ -1,35 +1,51 @@
 # OCR for scanned PDFs
 
-ConvertCAD traces the lines and circles of scanned drawings on its own. To also **read the text** of a scan, it uses an OCR engine. Choose it in *Settings > Scanned pages > OCR engine*:
-
-| Engine | What it is | Best for |
-|---|---|---|
-| **Automatic** (default) | the best engine installed | most users |
-| **Fast — Tesseract** | the classic open-source OCR program | clean typed text, quick checks |
-| **Accurate — RapidOCR** | PaddleOCR's PP-OCR models, run by ONNX Runtime | drawings: whole text lines, small, rotated and vertical text |
-| **Maximum — PaddleOCR** | the larger PP-OCR models | difficult scans (low quality, dense title blocks) — slower |
-
-On drawings, *Accurate* reads far better than *Fast*: Tesseract is tuned for pages of prose, the PP-OCR models find text lines anywhere, at any angle, even crossed by lines. An engine that is not installed is marked *(not installed)*; the report always says which engine was used.
-
-**The downloads of ConvertCAD already include the engines** (Windows: all three; Linux: *Accurate* and *Maximum*, plus Tesseract from the system). Nothing to install. The sections below are for running from the source code or adding languages.
-
-## Tesseract ("Fast")
-
-- **Windows, installed**: download the installer published by the University of Mannheim (search for **"Tesseract UB Mannheim"**) and tick the extra languages you need (**French**, **Arabic**). ConvertCAD looks in `C:\Program Files\Tesseract-OCR`, in your user programs folder and on the system PATH.
-- **Windows, portable**: copy a whole `Tesseract-OCR` folder, rename it **`tesseract`** and place it **next to ConvertCAD.exe** (with `tesseract.exe` and `tessdata\eng.traineddata`, `fra.traineddata`, `ara.traineddata`).
-- **Linux**: `sudo apt install tesseract-ocr tesseract-ocr-fra tesseract-ocr-ara`.
-
-## RapidOCR ("Accurate") and PaddleOCR ("Maximum") from source
-
-- *Accurate* comes with the Python packages (`pip install -r requirements.txt`): `rapidocr` and `onnxruntime`, models included.
-- *Maximum* uses the larger models: run `python scripts/get_ocr_models.py` once (it also gets the Arabic model). Alternatively, install the full PaddleOCR library: `pip install -r requirements-paddle.txt` (about 1 GB; it downloads its own models the first time it is used — the only case where ConvertCAD's OCR goes online).
+ConvertCAD traces the lines and circles of scanned drawings and **reads their text** with PaddleOCR's **PP-OCR** models, run on this computer by RapidOCR and ONNX Runtime. They find whole text lines anywhere on the sheet — small, rotated, vertical or crossed by lines. No drawing ever leaves the computer.
 
 ## Languages
 
-Choose the language in *Settings > Scanned pages*: `eng+fra` (default), `fra`, `eng`, `eng+fra+ara` or `ara`. Tesseract needs the `.traineddata` file of each language. The PP-OCR models read Latin-script languages (English, French…) together; Arabic uses its own model (included in the downloads) and is written in the normal reading order.
+Choose them in *Settings > Scanned pages > OCR languages*:
+
+| Choice | Reads | Model |
+|---|---|---|
+| **English, French… (Latin script)** — default | English, French, Spanish, German, Italian, Portuguese, Dutch, Polish, Turkish, Vietnamese and 37 other Latin-script languages; also Chinese and Japanese | **built in** (about 30 MB) |
+| **Arabic**, **Cyrillic**, **Greek**, **Korean**, **Devanagari**, **Thai**, **Tamil**, **Telugu** | that script (Arabic also reads Persian and Urdu; Cyrillic reads Russian, Ukrainian, Bulgarian, Serbian…) | download |
+| **English, French… + Arabic** (or another script) | drawings that mix both, e.g. a French plan with an Arabic title block: each line keeps the reading of its own script | built in + download |
+
+Only the installed languages are listed. A choice whose model is missing (settings copied from another computer, model removed) stays visible, marked *(not downloaded)*: the built-in model is used instead, and the report says so.
+
+## Accuracy
+
+- **Standard** (default) — the built-in model: fast, very good on clean scans.
+- **Maximum** — larger models (download): better on poor scans, small or dense text, but about 3 times slower. It applies to the Latin-script languages; the other scripts have one model each.
+
+## Downloading languages and models
+
+*Settings > Scanned pages > OCR languages and models…* (also in the *Tools* menu):
+
+1. Choose a model in the list (its size is shown), then **Download**. A progress bar follows the download; **Cancel** stops it.
+2. Every file is checked (SHA-256) before it is kept: an interrupted or damaged download never leaves a bad model behind.
+3. The model then works **offline, for good**. **Remove** deletes it.
+
+Where the models are stored:
+
+| ConvertCAD | Folder |
+|---|---|
+| Windows (installer or portable zip) | `%LOCALAPPDATA%\ConvertCAD\ocr_models` |
+| Linux (AppImage, .deb, tar.gz) | `~/.local/share/convertcad/ocr_models` |
+| Portable mode (an empty file `ConvertCAD.portable` next to the program) | the `ocr_models` folder next to the program: the models travel with it |
+
+The environment variable `CONVERTCAD_OCR_MODELS` can choose another folder. Uninstalling ConvertCAD on Windows removes the downloaded models; updating it keeps them.
+
+**Where they come from:** ConvertCAD's GitHub release `ocr-models-v1`, otherwise RapidOCR's model repository (ModelScope). Only the requested file is downloaded; nothing is sent, neither drawings nor information about you. A company proxy is used automatically when it is set for the system (or in the `HTTPS_PROXY` variable).
+
+**Computer without internet:** on another computer, open the download page (button *Download page*), download the `.onnx` files of the model, copy them (USB stick…), then click **Install from file…** — the files are recognised by their checksum, whatever their name.
+
+**Command line:** `ConvertCAD-cli --list-ocr` lists the models, `ConvertCAD-cli --get-ocr-model arabic latin_max` downloads them, then `--ocr-lang latin+arabic --ocr-quality maximum` uses them.
 
 ## Tips
 
 - 300 dpi is a good default. Use 400–600 dpi for small text on large sheets (slower).
-- *Also read vertical text* adds a second Tesseract pass for texts written bottom-to-top; the PP-OCR engines read vertical text without it.
+- Vertical text is read without any extra setting.
 - When a scanned PDF is already searchable (it contains a text layer), ConvertCAD uses that text instead of OCR.
+- Running from the source code: `pip install -r requirements.txt` installs RapidOCR, ONNX Runtime and the built-in model.

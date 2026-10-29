@@ -13,7 +13,8 @@ from typing import List, Optional
 from .. import APP_VERSION
 from .constants import (CURVE_PRECISION, DEFAULT_DXF_VERSION,
                         DEFAULT_LAYER_MODE, DEFAULT_PAGE_MODE, DEFAULT_UNITS,
-                        DWG_DXF_VERSION, OCR_ENGINES, OUTPUT_FORMATS)
+                        DWG_DXF_VERSION, OCR_QUALITIES, OUTPUT_FORMATS)
+from .ocr_catalog import language_set
 from .units import effective_denominator
 
 
@@ -56,10 +57,10 @@ class Options:
     # ---- scanned pages ----
     raster_mode: bool = True               # trace scanned pages
     ocr: bool = True                       # OCR scanned text
-    ocr_engine: str = "auto"               # auto | tesseract | rapidocr |
-                                           # paddleocr (see core/ocr.py)
-    ocr_lang: str = "eng+fra"
-    ocr_vertical: bool = False             # second OCR pass for vertical text
+    ocr_lang: str = "latin"                # OCR languages: latin, arabic,
+                                           # latin+arabic… (ocr_catalog.py)
+    ocr_quality: str = "standard"          # standard (built-in model) |
+                                           # maximum (downloaded models)
     raster_dpi: int = 300
     use_pdf_text_layer: bool = True        # scanned PDF already searchable
     include_images: bool = True            # keep raster images (locked layer)
@@ -86,12 +87,18 @@ class Options:
         """Build from a (possibly older or partial) dict; unknown keys are
         ignored and missing keys keep their defaults — presets never break."""
         known = {f.name for f in fields(cls)}
-        clean = {k: v for k, v in (data or {}).items() if k in known}
+        data = dict(data or {})
+        # version 1.0: the "Maximum" OCR engine became the maximum accuracy
+        if data.get("ocr_engine") == "paddleocr" and \
+                "ocr_quality" not in data:
+            data["ocr_quality"] = "maximum"
+        clean = {k: v for k, v in data.items() if k in known}
         opt = cls(**clean)
         if opt.curve_precision not in CURVE_PRECISION:
             opt.curve_precision = "normal"
-        if opt.ocr_engine not in OCR_ENGINES:
-            opt.ocr_engine = "auto"
+        opt.ocr_lang = language_set(opt.ocr_lang).key    # 1.0 codes too
+        if opt.ocr_quality not in OCR_QUALITIES:
+            opt.ocr_quality = "standard"
         if opt.output_format not in OUTPUT_FORMATS:
             opt.output_format = "dxf"
         opt.clip_rect = normalize_rect(opt.clip_rect)
@@ -159,8 +166,8 @@ class Options:
                 if self.block_detection else "off"),
             "Scanned pages: tracing": (f"on ({self.raster_dpi} dpi)"
                                        if self.raster_mode else "off"),
-            "Scanned pages: OCR": (f"on ({self.ocr_engine}, {self.ocr_lang}"
-                                   f"{', vertical' if self.ocr_vertical else ''})"
+            "Scanned pages: OCR": (f"on ({language_set(self.ocr_lang).label}"
+                                   f", {self.ocr_quality} accuracy)"
                                    if self.ocr else "off"),
             "Raster images": on(self.include_images),
             "Engine version": APP_VERSION,

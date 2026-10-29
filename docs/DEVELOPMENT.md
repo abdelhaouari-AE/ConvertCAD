@@ -51,7 +51,7 @@ The guiding principles, applied everywhere in the code:
 | **Never invent, never corrupt** | A dimension is rebuilt only when every part agrees; the value shown is always the original PDF text; unmatched measurement texts go to layer `DIM_RAW`; traced scan content goes to `TRACE_*` layers with the scan kept underneath (`annotations.py`, `raster.py`). |
 | **Review before saving** | The interface converts into a private temporary folder; the user checks the DXF preview, the layers and the report, then saves (`postprocess.py`). |
 | **One engine, many front-ends** | The interface, the command line, the folder batch and the tests all call `pipeline.convert()` with the same `Options` object. |
-| **Local and portable** | No network access; the portable zip needs no installation; every download bundles its tools (DWG converter, OCR engines and models), settings in the user profile or next to the program. |
+| **Local and portable** | Conversions never use the network (the only connection: downloading an OCR model when the user asks); the portable zip needs no installation; every download bundles its tools (DWG converter, OCR with its built-in model), settings and downloaded OCR models in the user profile or next to the program. |
 | **Fast to open, fast to look at** | Heavy libraries load after the window shows (§18); the DXF preview merges thousands of primitives into a few hundred items. |
 | **Maintainable by one person** | Pure-Python engine without Qt, small focused modules, plain dataclasses between steps, a test for every feature, comments that explain *why*. |
 
@@ -88,13 +88,10 @@ Declared in [`requirements.txt`](../requirements.txt) and [`pyproject.toml`](../
 | **ezdxf** | 1.3 → 1.4.5 | Creating the DXF document (R12 → R2018): layers, linetypes, LWPOLYLINE, ARC, CIRCLE, SPLINE, HATCH, TEXT, MTEXT, DIMENSION, MULTILEADER, BLOCK/INSERT, IMAGE; its *drawing add-on* renders the DXF preview. | MIT |
 | **NumPy** | 1.26 → 2.5 | Least-squares circle fitting (Kasa method), image arrays for scan tracing. | BSD-3-Clause |
 | **opencv-python-headless** | 4.8 → 5.0 | Scanned pages: adaptive binarisation, despeckling, probabilistic Hough lines, Hough circles. | Apache-2.0 (wrapper MIT) |
-| **pytesseract** | 0.3.10 → 0.3.13 | Bridge to the Tesseract OCR program (brings Pillow and packaging). | Apache-2.0 |
-| **Tesseract OCR** *(external program)* | 4/5 → 5.3 | "Fast" OCR engine (English, French, Arabic). Bundled in the Windows downloads (`tesseract\` folder); on Linux and from source it is installed separately. | Apache-2.0 |
-| **rapidocr** `[rtl]` | 3.10 | "Accurate" OCR engine: PaddleOCR's PP-OCR detection / recognition models run with ONNX Runtime; whole text lines, small and rotated text. Models included in the package (PP-OCRv6 small). `[rtl]` adds python-bidi for the reading order of Arabic. | Apache-2.0 (python-bidi LGPL-3.0) |
+| **rapidocr** `[rtl]` | 3.10 | The OCR: PaddleOCR's PP-OCR detection / recognition models run with ONNX Runtime; whole text lines, small, rotated and vertical text. The built-in model is in the package (PP-OCRv6 small: Latin-script languages, Chinese, Japanese). `[rtl]` adds python-bidi for the reading order of Arabic. | Apache-2.0 (python-bidi LGPL-3.0) |
 | **onnxruntime** | 1.20 → 1.31 | Runs the PP-OCR models on the CPU, offline. | MIT |
 | **GNU LibreDWG** *(external programs `dxf2dwg`, `dwg2dxf`)* | 0.13.4 + 3 patches | DWG output (AutoCAD 2000 format) and its read-back check. Windows programs in `vendor/libredwg/win64`, Linux built by `scripts/build_libredwg.sh`; bundled in every download. | GPL-3.0-or-later |
-| PP-OCR "medium" + Arabic models *(optional files)* | PP-OCRv6 / v5 | "Maximum" OCR and Arabic text, downloaded by `scripts/get_ocr_models.py` into `vendor/ocr_models`, bundled by the builds. | Apache-2.0 |
-| paddleocr + paddlepaddle *(optional)* | 3.x | The full PaddleOCR library for "Maximum" when running from source (`requirements-paddle.txt`, about 1 GB). Never bundled. | Apache-2.0 |
+| Downloadable PP-OCR models *(files, not bundled)* | PP-OCRv6 medium, PP-OCRv5 mobile | Maximum accuracy (Latin) and the other scripts (Arabic, Cyrillic, Greek, Korean, Devanagari, Thai, Tamil, Telugu), downloaded by the users from the program (§5.14). | Apache-2.0 |
 
 ezdxf itself depends on `pyparsing`, `fonttools` and `typing_extensions` (installed
 automatically).
@@ -136,9 +133,14 @@ automatically).
   not be redistributed with other software (ODA Community User Agreement §3.1.1) and is for
   non-commercial use by non-members; LibreDWG is free software, so it ships inside every
   download and users install nothing (§5.15).
-- **RapidOCR as the default OCR**: the same PP-OCR models as PaddleOCR, but run with ONNX
-  Runtime (about 30 MB instead of about 1 GB for PaddlePaddle), much better than Tesseract
-  on drawings (whole lines, small, rotated and vertical text).
+- **RapidOCR as the only OCR** (1.1): the same PP-OCR models as PaddleOCR, but run with
+  ONNX Runtime (about 30 MB instead of about 1 GB for PaddlePaddle), and much better than
+  Tesseract on drawings (whole lines, small, rotated and vertical text) — Tesseract and the
+  PaddleOCR library were removed in 1.1.
+- **One OCR model built in, the others downloaded** (1.1): the built-in model covers
+  English, French and 45 other Latin-script languages (plus Chinese and Japanese) in about
+  30 MB; bundling every script and the larger models would add about 180 MB to every
+  download for the few users who need them.
 
 ---
 
@@ -158,7 +160,7 @@ automatically).
    extractor → raster (scans) → clip → geometry/patterns → layers → annotations → blocks
                                                 → dxf_writer → report  (→ dwg: LibreDWG)
                                                                     │
-       PyMuPDF · NumPy · OpenCV · RapidOCR / Tesseract / PaddleOCR   ezdxf · LibreDWG
+       PyMuPDF · NumPy · OpenCV · RapidOCR (PP-OCR, ONNX Runtime)    ezdxf · LibreDWG
 ```
 
 Dependency rules (keep them when you modify the code):
@@ -168,7 +170,8 @@ Dependency rules (keep them when you modify the code):
 2. The interface talks to the engine only through a few functions:
    `pipeline.convert` (via `jobs.JobRunner`), `pdfinfo.inspect_document` / `detect_scale`
    (before converting), `postprocess.layer_summary` / `finalize` (after converting),
-   `presets.apply_preset` and `raster.tesseract_status`.
+   `presets.apply_preset` and the OCR model functions (`ocr.language_choices`,
+   `ocr.pack_usable`, `ocr_store`: download, install, remove).
 3. Every option is a field of `options.Options` (re-exported by `pipeline` and
    `convertcad.core`). The interface, the command line and the presets read and write that
    one dataclass.
@@ -205,7 +208,7 @@ Dependency rules (keep them when you modify the code):
 |---|---|---|
 | 0 | `pipeline.convert` | opens the PDF, checks password, selects pages, computes the scale, creates the `DxfWriter`(s); a `.dwg` target goes through `_convert_to_dwg` (step 8) |
 | 1 | `extractor.extract_page` | PDF page → `PageData` (raw `RawSegment`, `RawBezier`, `RawFill`, `RawText`, `RawImage`, SHX texts, page kind) in displayed coordinates; letter outlines under invisible text removed |
-| 1b | `raster.vectorize_page` + `merge_into_page` *(scanned pages only)* | page image → traced segments, circles and OCR texts (engine chosen by `ocr.resolve_engine`) added to `PageData` |
+| 1b | `raster.vectorize_page` + `merge_into_page` *(scanned pages only)* | page image → traced segments, circles and OCR texts (models chosen by `ocr.make_plan`) added to `PageData` |
 | 1c | `clip.clip_page` *(selected area only)* | every primitive cut to `Options.clip_rect` |
 | 1d | `pipeline._drop_white` | white strokes / texts dropped, white fills kept aside as masks |
 | 1e | `pipeline._page_scale` | scale of this sheet: calibration › written on the sheet (`auto_scale`) › drawing scale |
@@ -301,16 +304,15 @@ ConvertCAD/
 | `main.py` | Application launcher: `python main.py [drawing.pdf]`. Calls `multiprocessing.freeze_support()` (needed by the exe), checks the libraries when run from source (`convertcad/launcher.py`), then `convertcad.ui.app.run_gui()`. Imports stay inside `main()` so the conversion child process does not load the interface. Entry point of `ConvertCAD.exe`. |
 | `ConvertCAD.pyw` | Same as `main.py` without a console window: double-click it on Windows to run from source. |
 | `convertcad_cli.py` | Console launcher of the command-line tool; entry point of `ConvertCAD-cli.exe`. Without arguments it prints its help and waits (instead of closing at once). |
-| `ConvertCAD.spec` | PyInstaller recipe: data files (resources, ezdxf, RapidOCR settings and models, LibreDWG programs, optional OCR models), hidden imports, excluded modules, Windows version information, folder or single-file build, console twin (§15). |
+| `ConvertCAD.spec` | PyInstaller recipe: data files (resources, ezdxf, RapidOCR settings and its built-in model, LibreDWG programs, OCR models of `vendor/ocr_models` for an offline build), hidden imports, excluded modules, Windows version information, folder or single-file build, console twin (§15). |
 | `pyproject.toml` | Project metadata (name, version read from `convertcad/__init__.py`, dependencies, licence, entry points `convertcad` / `convertcad-cli`), pytest and Ruff configuration. Allows `pip install -e .`. |
 | `requirements.txt` | Runtime dependencies with minimum versions and a comment on each. |
 | `requirements-dev.txt` | Runtime + development tools (pytest, PyInstaller, Ruff). |
-| `requirements-paddle.txt` | Optional full PaddleOCR library for "Maximum" OCR from source (never bundled). |
 | `README.md` | GitHub home page: features, screenshots, install, use, build, licence, French summary. |
-| `CHANGELOG.md` | Version history (1.0.0, first public release). |
+| `CHANGELOG.md` | Version history (1.0.0 first public release, 1.1.0 OCR models). |
 | `LICENSE` | GNU Affero General Public License v3.0 (full text). |
 | `THIRD_PARTY_NOTICES.md` | Licences of every library used or bundled. |
-| `.gitignore` | Files Git must ignore: caches, `.venv/`, `build/`, `dist/`, test outputs (`*.dxf`, `*.dwg`, `*_log.txt`), portable `tesseract/` folder, the Linux LibreDWG build and the downloaded OCR models. |
+| `.gitignore` | Files Git must ignore: caches, `.venv/`, `build/`, `dist/`, test outputs (`*.dxf`, `*.dwg`, `*_log.txt`), the Linux LibreDWG build and the OCR models of an offline build (`vendor/ocr_models`). |
 | `.gitattributes` | Line endings: LF for Python/Markdown/shell/patches, CRLF for `.bat` and `.iss`; binary files marked. |
 | `.editorconfig` | UTF-8, 4-space indentation for Python, 100-character lines, CRLF for batch files. |
 
@@ -320,7 +322,7 @@ ConvertCAD/
 |---|---|
 | `__init__.py` | `APP_NAME`, `APP_VERSION` (**the only place the version number is written**), `APP_AUTHOR`, `APP_YEAR`; package overview. |
 | `__main__.py` | `python -m convertcad` opens the interface; `python -m convertcad --cli …` runs the command line. |
-| `cli.py` | Command-line tool: argument parser (presets, every option, `--scale N\|auto`, pages, `--area`, `--format dxf\|dwg`, DXF version, `--ocr-engine`, `--list-ocr`, JSON report, batch, quiet), `options_from_args()`, `parse_area()`, progress printer, exit codes 0/1/2. |
+| `cli.py` | Command-line tool: argument parser (presets, every option, `--scale N\|auto`, pages, `--area`, `--format dxf\|dwg`, DXF version, `--ocr-lang`, `--ocr-quality`, `--list-ocr`, `--get-ocr-model`, JSON report, batch, quiet), `options_from_args()`, `parse_area()`, progress printers, exit codes 0/1/2. |
 | `config.py` | `Settings` dataclass saved as JSON (theme, language, recent files, folders, last options, user presets, snap modes, window layout). Location: `~/.convertcad/` or `settings/` next to the exe in portable mode; atomic save; tolerant load; migration of the v1/v2 terms flag. |
 | `launcher.py` | Start-up checks when running from source, standard library only: Python version, missing libraries (offers to install `requirements.txt` with pip, in the console or through a dialog under `pythonw`), and keeps a double-clicked console window open so messages can be read. Not used inside the exe. |
 | `i18n.py` | Interface translation: `tr()` (English text is the key, French in the `FR` dictionary), `tr_progress()` (translates engine progress messages), `tr_paper()` (paper names), `set_language()`. |
@@ -331,15 +333,17 @@ ConvertCAD/
 | File | Content / role |
 |---|---|
 | `__init__.py` | Re-exports `convert`, `convert_folder`, `Options`, `Cancelled`, `ConversionReport`, `find_pdfs` — **lazily** (PEP 562 `__getattr__`): importing a light module such as `constants` does not load PyMuPDF, NumPy and ezdxf. |
-| `constants.py` | Plain data shared by everything: point→mm factor, units table (`$INSUNITS` codes), paper scales offered, DXF versions, output formats, reserved layer names, layer naming modes, page modes, curve precision factors, OCR languages and engines, scan resolutions. |
+| `constants.py` | Plain data shared by everything: point→mm factor, units table (`$INSUNITS` codes), paper scales offered, DXF versions, output formats, reserved layer names, layer naming modes, page modes, curve precision factors, OCR accuracy choices, scan resolutions. |
 | `options.py` | `Options` — every option and its default (standard library only, so the settings panel builds at start-up without the conversion libraries); `from_dict()` (tolerant: old or partial presets never break), `writer_dxf_version()` (AutoCAD 2000 DXF for a DWG), `describe()` (options block of the log), `normalize_rect()`. |
 | `units.py`, `stats.py`, `paths.py`, `layer_edits.py` | Light modules shared by the engine and the interface: `compute_scale()` / `effective_denominator()`; `WriteStats` (entity counters); `find_pdfs()` / `output_paths()`; `LayerEdit` / `LayerRow` / protected layers. |
 | `compat.py` | Single import point for PyMuPDF (`import pymupdf`); blocks PyMuPDF 2.x's optional `pymupdf.layout` / `pymupdf4llm` add-ons (≈ 0.6 s faster start); `page_matrix()` (rotation), point/vector transforms, `library_versions()` for the About box and the log. |
 | `spatial.py` | `GridIndex` (uniform-grid spatial index) and geometry helpers: point–segment and point–line distances, segment intersection, angles. Makes neighbourhood searches O(n) instead of O(n²). |
 | `pdfinfo.py` | Quick inspection before converting: page kind (vector / scanned / empty) from path counts and image coverage, ISO paper size name, rotation, metadata, password, `detect_scale()` (reads "Echelle : 1/100", "SCALE 1:50", "Ech. 2.5:1000" → 1:400, a ratio alone above a scale bar; refuses fractions and sheets with several scales), thumbnails. |
 | `extractor.py` | **Step 1.** Reads one page with PyMuPDF into raw dataclasses (`Style`, `RawSegment`, `RawBezier`, `RawFill`, `RawText`, `RawImage` with its placement matrix, `PageData`) in displayed coordinates; linetype classification from dash arrays; page classification; SHX texts placed on their letters (strokes moved to the hidden layer `TEXT_SHX_STROKES`); letter outlines lying under invisible text removed (`_drop_text_outlines`). |
-| `raster.py` | **Step 1b.** Scanned pages: render, OCR through `ocr.py` (line boxes of the PP-OCR engines, words of Tesseract, optional vertical pass for Tesseract, confidence and noise filters, text masking), adaptive binarisation, Hough circles validated against ink, Hough lines merged collinearly; `tesseract_status()`. |
-| `ocr.py` | The three OCR engines behind one `recognize(img, lang, engine)`: Tesseract (portable discovery), RapidOCR (bundled PP-OCR models, or the larger / Arabic models of `ocr_models/` by path, offline), PaddleOCR library (when installed). `engine_status()`, `resolve_engine()` ("Automatic" = best available, fallbacks with a note in the report). |
+| `raster.py` | **Step 1b.** Scanned pages: render, OCR through `ocr.py` (text-line boxes, horizontal or vertical, confidence and noise filters, text masking), adaptive binarisation, Hough circles validated against ink, Hough lines merged collinearly. |
+| `ocr.py` | The OCR (PP-OCR models run by RapidOCR + ONNX Runtime, offline): `make_plan(languages, quality)` turns the user's choice into the models to run, falling back to the built-in model with a note for the report when a model is missing; `recognize(img, plan)`; `merge_script()` keeps, line by line, the reading of each script for mixed drawings (Latin + Arabic…); `available()`, `pack_usable()`, `language_choices()` (installed languages for the interface). |
+| `ocr_catalog.py` | The OCR models ConvertCAD knows (*packs*): the built-in Latin model, the maximum accuracy models and one model per script, with their files, SHA-256, sizes and download addresses (GitHub release `ocr-models-v1`, then RapidOCR's repository); `language_set()` / `language_error()` parse the language keys (`latin`, `arabic`, `latin+arabic`, and the 1.0 codes `eng+fra+ara`…). Standard library only. |
+| `ocr_store.py` | Where downloaded models live (user folder per operating system, portable mode, `CONVERTCAD_OCR_MODELS`), whether a pack is installed, `download_pack()` (streamed into a `.part` file, SHA-256 checked, then renamed; fallback address; progress; cancel), `install_files()` (offline installation, files recognised by checksum), `remove_pack()`. Standard library only. |
 | `clip.py` | Selected area: Liang–Barsky segment clipping, Bezier subdivision clipping, Sutherland–Hodgman polygon clipping, `clip_page()`. |
 | `geometry.py` | **Step 2.** Rebuilds CAD geometry: segment de-duplication, dashed lines and hatch patterns (`patterns.py`), Kasa circle fit, Bezier→ARC, arc merging into ARC/CIRCLE, Bezier chains → one exact SPLINE, chaining into polylines, back-track collapse, collinear merge; tolerances in `Tol`. |
 | `patterns.py` | What CAD plotters explode: `merge_dashed_lines()` (collinear pieces with a regular rhythm → one line with a measured linetype: DASHED, CENTER, DASHDOT, PHANTOM, DOT, DIVIDE), `detect_hatch_patterns()` (families of parallel, regularly spaced lines → `HatchPattern` with angle, spacing, boundary and holes; crossing grids), `add_mask_holes()` (white masks under texts become holes); tolerances in `PTol`. |
@@ -367,12 +371,13 @@ ConvertCAD/
 | `dxf_view.py` | `DxfView`: renders the converted DXF with ezdxf's drawing add-on in a background `QThread` (`Recorder`); `merge_recording()` merges the primitives into one `QGraphicsPathItem` per layer set, colour, width, kind and tile (8 × 8), with cosmetic pens — a few hundred items instead of tens of thousands; hiding a layer stays instant; overlay of the PDF sheets (`set_overlay`, `set_overlay_opacity`); theme-aware background. |
 | `snap.py` | `SnapEngine` (Qt-free): endpoints, midpoints, intersections and centres computed once per page from PyMuPDF paths, stored in a `GridIndex`; `SnapHit`. |
 | `pages_panel.py` | Sheet list: thumbnails rendered one by one on a timer, include checkbox, Vector / Scan / Empty badge with tooltip, paper size and rotation, selection menu (all, none, vector, scanned, invert), selected-sheets summary. |
-| `options_panel.py` | `OptionsPanel`: preset selector (save / delete user presets), collapsible sections with every option and its tooltip (output format DXF / DWG, area *Select area… / Whole sheet*, OCR engine), calibration status, OCR availability probe (engines not installed are marked), "options changed" notice, conversion to / from `Options`. |
+| `options_panel.py` | `OptionsPanel`: preset selector (save / delete user presets), collapsible sections with every option and its tooltip (output format DXF / DWG, area *Select area… / Whole sheet*, OCR languages — installed ones only, a missing choice kept and marked *(not downloaded)* — and OCR accuracy, button *OCR languages and models…*), calibration status, OCR status line, "options changed" notice, conversion to / from `Options`. |
 | `layers_panel.py` | `LayersPanel`: layer table (keep checkbox, bordered colour swatch, name + linetype on two lines, entity count), filter, show / hide all, undo all, kept-layers counter; edits applied at save time. |
 | `report_panel.py` | `ReportPanel` (translated HTML report, save as `.txt` / `.html`, copy) and `ActivityPanel` (timestamped session log). |
 | `statusbar.py` | `TitleBlockBar`: status bar drawn like a drawing title block — sheet, paper, scale or calibration, cursor X/Y in real units, snap toggles END/MID/INT/CEN, zoom, message, progress. |
 | `empty_state.py` | Welcome screen: drop zone, *Open PDF…*, *Try the sample plan*, recent drawings, the four workflow steps. |
-| `dialogs.py` | `MarkdownDialog` (renders `resources/*.md`), `GuideDialog`, `TermsDialog` (first-launch gate), `AboutDialog` (component versions including the OCR engines and LibreDWG, licence status), `ShortcutsDialog`, `CalibrateDialog` (real distance input with validation). |
+| `dialogs.py` | `MarkdownDialog` (renders `resources/*.md`), `GuideDialog`, `TermsDialog` (first-launch gate), `AboutDialog` (component versions including RapidOCR, ONNX Runtime, the installed OCR models and LibreDWG, licence status), `ShortcutsDialog`, `CalibrateDialog` (real distance input with validation). |
+| `ocr_models_dialog.py` | `OcrModelsDialog` (*OCR languages and models…*): installed models (built in / downloaded / included) with *Remove*, drop-down list of the models to download with their size, *Download* with progress bar and *Cancel* (`DownloadWorker`, a `QThread`), *Install from file…* (offline computers), models folder, download page, help; `models_changed` signal; `stop_downloads()` at exit. |
 | `batch_dialog.py` | `BatchDialog`: input / output folders, sub-folders, *read the scale on each sheet*, per-file status and time, progress, cancel, open output folder. |
 | `widgets.py` | Reusable pieces: `PanelHeader` (title + small actions), `CollapsibleSection`, `Toast` (fading message), `small_button`, `label`, `hline`, `restyle`. |
 | `theme.py` | Colour tokens for the dark and light themes, fixed markup palette, fonts, Qt palette and the complete style sheet; `apply_theme()`, `tok()`, `current()`. |
@@ -384,7 +389,7 @@ ConvertCAD/
 |---|---|
 | `guide_en.md`, `guide_fr.md` | User guide (Help → User guide, F1): workflow, navigation, snap, what the conversion produces, every setting, batch, checklist, troubleshooting. |
 | `terms_en.md`, `terms_fr.md` | Terms of use shown at first launch (local processing, user's rights, engineering responsibility, no warranty, settings). |
-| `ocr_en.md`, `ocr_fr.md` | The three OCR engines, which one to choose, Tesseract installation (installed or portable), the larger models, languages, tips. |
+| `ocr_en.md`, `ocr_fr.md` | OCR guide (Help → OCR guide): languages (built in / downloaded / mixed scripts), accuracy, downloading, models folders per system, offline installation, command line, tips. |
 
 Placeholders `{APP_VERSION}`, `{APP_AUTHOR}`, `{APP_YEAR}` are replaced when displayed. The
 folder is bundled into the exe by `ConvertCAD.spec`.
@@ -403,11 +408,12 @@ folder is bundled into the exe by `ConvertCAD.spec`.
 | `test_blocks.py` | Repeated symbols become blocks; walls do not glue symbols; sample plan: doors ×3, columns ×20; rotated and mirrored copies (all 8 orientations) give exactly the drawn lines once the INSERTs are exploded. |
 | `test_writer.py` | Every DXF version, scale and units, ACI mapping, ByLayer, dimension angles, R12 fallbacks. |
 | `test_pipeline.py` | End-to-end counts on the sample plan, options switched off, multi-page and split output, invalid pages, cancel, password, batch folder, per-sheet automatic scale. |
-| `test_raster.py` | Scan tracing (OpenCV), OCR with Tesseract and with RapidOCR (each skipped when absent), engine fallback. |
+| `test_raster.py` | Scan tracing (OpenCV), OCR of the sample scan with the built-in model (skipped without RapidOCR), fallback to the built-in model when a model is missing, no OCR engine, mixed-script merge (Latin + Arabic). |
+| `test_ocr_store.py` | OCR catalogue consistency, language keys (including the 1.0 codes), models folder (environment variable, portable mode, Linux), download from a local web server: progress, checksum, fallback address, failure and cancel leave nothing behind; wrong-size files ignored; install from file and remove. |
 | `test_postprocess.py` | Layer edits at save time (remove, rename-merge, recolour), images, log. |
-| `test_cli_and_jobs.py` | Page ranges, CLI single / batch / errors, option mapping (including `--format`, `--area`, `--ocr-engine`), presets keep the scale, background job runner (convert and cancel), `--scale auto`, `--list-ocr`. |
-| `test_i18n.py` | Every `tr("…")` string has a French translation, placeholders survive translation, engine progress messages are translated. |
-| `test_ui_smoke.py` | The real window offscreen: open the sample, convert in the child process, edit layers, save through the real save code, switch theme twice; select an area, convert, overlay on / off, save as DWG (with the automatic re-conversion). |
+| `test_cli_and_jobs.py` | Page ranges, CLI single / batch / errors, option mapping (including `--format`, `--area`, `--ocr-lang`, `--ocr-quality`), invalid OCR languages, presets keep the scale, background job runner (convert and cancel), `--scale auto`, `--list-ocr`, `--get-ocr-model`, options of version 1.0. |
+| `test_i18n.py` | Every `tr("…")` string and menu action has a French translation, as do the OCR catalogue names; placeholders survive translation, engine progress messages are translated. |
+| `test_ui_smoke.py` | The real window offscreen: open the sample, convert in the child process, edit layers, save through the real save code, switch theme twice; select an area, convert, overlay on / off, save as DWG (with the automatic re-conversion); OCR languages list and status, *OCR languages and models…* window. |
 
 ### 4.7 `scripts/`
 
@@ -415,13 +421,13 @@ folder is bundled into the exe by `ConvertCAD.spec`.
 |---|---|
 | `setup_venv.bat` / `setup_venv.sh` | Create `.venv/` and install `requirements-dev.txt` (run once). |
 | `run_from_source.bat` / `run_from_source.sh` | Start the application from the source (uses `.venv/` when present). |
-| `build_exe.bat` | Build the portable Windows program: install tools → run tests → OCR models → regenerate icon → PyInstaller → copy Tesseract (from `vendor\tesseract\` or the installed copy) → optional signing → zip (`onefile` argument for a single exe). |
+| `build_exe.bat` | Build the portable Windows program: install tools → run tests → regenerate icon → PyInstaller → optional signing → zip (`onefile` argument for a single exe). |
 | `build_installer.bat` | Windows installer with Inno Setup (builds the program first when needed), optional signing. |
 | `sign_windows.bat` | Authenticode signing with `signtool` when a certificate is configured (does nothing otherwise). |
 | `build_linux.sh` | Build the portable Linux program (`dist/ConvertCAD/ConvertCAD` + tar.gz), LibreDWG built the first time. |
 | `build_appimage.sh`, `build_deb.sh` | Linux AppImage and Debian package from `dist/ConvertCAD/`. |
 | `build_libredwg.sh` | Build the LibreDWG programs from the vendored source + patches (`linux`, or `windows` with MinGW-w64). |
-| `get_ocr_models.py` | Download (SHA-256 checked) the larger PP-OCR models and the Arabic model into `vendor/ocr_models`; `--check` test-loads them. |
+| `get_ocr_models.py` | Maintainers: list the OCR catalogue, download packs (SHA-256 checked) — into the user folder, `vendor/ocr_models` for an offline build, or `release/` for the GitHub release (`--mirror-only`) —, `--check DIR --load` (checksums + test run), `--notes` (release description). |
 | `make_icon.py` | Render `APP_ICON_SVG` to `assets/icon.svg`, `icon.png` and a multi-size `icon.ico` (16–256 px) with Qt only. |
 | `make_samples.py` | Write `samples/sample_plan.pdf` and `samples/sample_scan.pdf`. |
 
@@ -435,8 +441,8 @@ folder is bundled into the exe by `ConvertCAD.spec`.
 | `installer/` | `ConvertCAD.iss`, the Inno Setup script of the Windows installer. |
 | `packaging/linux/` | `convertcad.desktop` (menu entry) and `AppRun` (AppImage launcher, `--cli` switch). |
 | `vendor/libredwg/` | GNU LibreDWG 0.13.4 source tarball, `patches/` (3 fixes), `win64/` Windows programs, `COPYING`, `README.md`, `SOURCE.txt`; `linux-x86_64/` is built locally (not in Git). |
-| `vendor/ocr_models/` | Optional larger OCR models (downloaded, not in Git). |
-| `.github/workflows/` | `tests.yml` (lint + tests, Windows and Linux, Python 3.10 / 3.12 / 3.13, LibreDWG built and cached on Linux), `build.yml` (Windows portable zip + installer, Linux tar.gz + AppImage + .deb, as artifacts and release assets). |
+| `vendor/ocr_models/` | Only for an offline build: downloadable OCR models bundled with the program (not in Git). |
+| `.github/workflows/` | `tests.yml` (lint + tests, Windows and Linux, Python 3.10 / 3.12 / 3.13, LibreDWG built and cached on Linux), `build.yml` (Windows portable zip + installer, Linux tar.gz + AppImage + .deb, as artifacts and release assets), `ocr-models.yml` (publishes the downloadable OCR models as the release `ocr-models-v1`). |
 | `.github/` | Issue templates (conversion problem, feature request) and pull-request checklist. |
 | `.vscode/` | `settings.json`, `launch.json` (app, sample, CLI, current-PDF, tests), `tasks.json` (setup, tests, lint, samples, icon, builds), `extensions.json`. |
 
@@ -502,12 +508,11 @@ print(report.status_word(), report.stats.total_entities(), report.outputs)
 
 1. Render the page in grayscale at `raster_dpi` (capped by `MAX_RASTER_PIXELS` for huge
    sheets).
-2. OCR (when enabled) with the engine chosen by `ocr.resolve_engine()` (§5.14): the PP-OCR
-   engines return whole text lines with their boxes (vertical lines recognised), Tesseract
-   returns words (page segmentation mode 11, optional second pass on the image rotated 90°
-   for vertical texts); results kept above a confidence threshold and with enough
-   alphanumeric characters (noise filter); recognised boxes are erased from the image so
-   letters are not traced. The engine used is written in the report.
+2. OCR (when enabled) with the models chosen by `ocr.make_plan()` (§5.14): whole text
+   lines with their boxes (a line much taller than wide is vertical text, written with a
+   90° rotation); results kept above a confidence threshold and with enough alphanumeric
+   characters (noise filter); recognised boxes are erased from the image so letters are
+   not traced. The models used are written in the report ("N OCR text(s) (PP-OCR: …)").
 3. Adaptive threshold + small-component removal.
 4. `HoughCircles`, each candidate validated by measuring the fraction of its perimeter lying
    on ink (`CIRCLE_COVER` = 70 %).
@@ -517,8 +522,7 @@ print(report.status_word(), report.stats.total_entities(), report.outputs)
    The scan itself is kept as an image on the locked `IMG_RASTER` layer.
 
 When a scanned PDF already contains a text layer (searchable PDF), that text is used
-instead of OCR (`use_pdf_text_layer`). `ocr.find_tesseract()` looks first for a `tesseract`
-folder next to the exe, then on the PATH, then in the standard installation folders.
+instead of OCR (`use_pdf_text_layer`).
 
 ### 5.4 Step 2 — `geometry.py`
 
@@ -668,7 +672,7 @@ Described in §3.2, §4.3 and their module docstrings. Built-in presets:
 | Recommended (all features) | none |
 | Architectural plans | tick dimensions on, MTEXT on, style layers, blocks from 2 repeats |
 | Structural / formwork plans | dimensions + ticks, linetypes, blocks from 3 repeats |
-| Scanned archive drawings | tracing + OCR + vertical OCR, 400 dpi, no block detection |
+| Scanned archive drawings | tracing + OCR, 400 dpi, no block detection |
 | Geometry only | no dimensions, leaders, blocks or MTEXT |
 | CNC / laser | R12 DXF, single layer, no PDF layers, no text, no hatch (solid or pattern), no annotations, no blocks, no images |
 
@@ -697,26 +701,57 @@ sheet had 26 445 dash pieces) and cannot be edited.
 - `add_mask_holes()`: white fills inside a hatch boundary (masks under texts) become
   holes, so the text stays readable in CAD.
 
-### 5.14 `ocr.py` — three OCR engines
+### 5.14 `ocr.py`, `ocr_catalog.py`, `ocr_store.py` — OCR models
 
-| Engine (interface name) | Library | Models | Bundled |
+One engine — PaddleOCR's PP-OCR models run by **RapidOCR + ONNX Runtime**, on the CPU,
+offline — and models in *packs* (`ocr_catalog.PACKS`):
+
+| Pack | Models | Reads | Where it comes from |
 |---|---|---|---|
-| Fast — Tesseract | `pytesseract` + Tesseract program | Tesseract `eng`, `fra`, `ara` | Windows: yes (`tesseract\`); Linux: system package |
-| Accurate — RapidOCR | `rapidocr` + `onnxruntime` | PP-OCRv6 *small* (in the package) | yes |
-| Maximum — PaddleOCR | PaddleOCR library if installed (source); else `rapidocr` with the PP-OCRv6 *medium* models of `ocr_models/` | PP-OCRv6 *medium* | yes when `scripts/get_ocr_models.py` ran before the build |
+| `latin` (built in) | PP-OCRv6 *small* detection + recognition (in the `rapidocr` package) | English, French and 45 other Latin-script languages, Chinese, Japanese | bundled (≈ 30 MB) |
+| `latin_max` | PP-OCRv6 *medium* detection + recognition | the same, maximum accuracy (slower) | download |
+| `arabic`, `cyrillic`, `greek`, `korean`, `devanagari`, `thai`, `tamil`, `telugu` | one PP-OCRv5 *mobile* recognition model each (the detection model is shared) | that script | download |
 
-- **Which is better?** On drawings, the PP-OCR engines are clearly more accurate than
-  Tesseract: they detect text *lines* (Tesseract is tuned for pages of prose), read small,
-  rotated and vertical text, and cope with lines crossing the text. Tesseract stays useful
-  as a small fallback.
-- `engine_status()` tells the interface which engines are available without loading any
-  model; `resolve_engine(requested, lang)` returns the engine actually used ("Automatic" =
-  the best available) and a note when it had to fall back.
-- **Arabic**: the PP-OCRv5 Arabic recognition model (`arabic_PP-OCRv5_rec_mobile.onnx`,
-  from `get_ocr_models.py`) is run on the lines and kept where the text is mostly Arabic
-  script; RapidOCR puts the letters back in reading order with python-bidi. Without the
-  model, Arabic text is read by Tesseract.
-- Models given by path are never downloaded at run time: the engines work offline.
+Why PP-OCR, and why one built-in model: on drawings PP-OCR detects text *lines* anywhere,
+small, rotated or vertical, even crossed by lines — far better than Tesseract (removed in
+1.1). The built-in model covers the users' main languages; the others are one click away
+instead of making every download about 180 MB larger.
+
+- **The user's choice** is a *language key* (`Options.ocr_lang`): `latin`, a script
+  (`arabic`), or `latin+<script>` for mixed drawings, plus an accuracy
+  (`Options.ocr_quality`: `standard` | `maximum`). `ocr_catalog.language_set()` parses it
+  (1.0 settings such as `eng+fra+ara` are mapped: `latin+arabic`).
+- **`make_plan(languages, quality)`** → an `OcrPlan`: the detection model (built-in or
+  medium) and one recognition *pass* per pack. A missing pack never stops the conversion:
+  the built-in model is used and a note goes to the report.
+- **`recognize(img, plan)`** runs the first pass, then each script pass; `merge_script()`
+  keeps the script reading where a line is mostly in that script (Unicode ranges of the
+  pack) and removes the Latin reading of the same place. RapidOCR puts Arabic back in
+  reading order with python-bidi.
+- RapidOCR instances are cached per model set; models given by path are never downloaded
+  by RapidOCR itself.
+- **No telemetry**: ONNX Runtime records usage data (program path, operating system,
+  processor, a device identifier) in `~/.cache/Microsoft/DeveloperTools/.onnxruntime` and
+  uploads it to Microsoft — on Linux too (seen with version 1.31). `convertcad/__init__.py` sets
+  `ORT_DISABLE_TELEMETRY=1` before anything can import the library (it is read at import
+  time; `disable_telemetry_events()`, also called, comes too late on its own). Keep it
+  first if you reorganise the start-up code.
+- **`ocr_store`**: models folder (`user_models_dir()`: `%LOCALAPPDATA%\ConvertCAD\ocr_models`,
+  `~/.local/share/convertcad/ocr_models`, `~/Library/Application Support/ConvertCAD/ocr_models`,
+  `<program>/ocr_models` in portable mode, or `CONVERTCAD_OCR_MODELS`); models are also
+  looked for in `<program>/ocr_models` and `_internal/ocr_models` (offline build). A file
+  only counts when its size matches the catalogue (interrupted copies are ignored).
+- **Downloads** (`download_pack`): GitHub release `ocr-models-v1` first, RapidOCR's
+  repository (ModelScope) second; streamed in 256 KB blocks into `<name>.part` while the
+  SHA-256 is computed, renamed only when it matches; progress and cancel callbacks; system
+  certificates + certifi; proxy from the system / `HTTPS_PROXY` (urllib). Only the model
+  file is requested; no drawing or user data is ever sent.
+- **Offline installation** (`install_files`): `.onnx` files copied from anywhere are
+  recognised by their SHA-256, whatever their name.
+- **Adding a language**: add a pack to `PACKS` (file name, path under the mirror, SHA-256
+  from RapidOCR's `default_models.yaml`, size, `lang_type` = RapidOCR `LangRec` member,
+  Unicode ranges), its English label and languages to `i18n.py` (French), run the *OCR
+  models release* workflow, and the interface lists it automatically.
 
 ### 5.15 `dwg.py` — native DWG output
 
@@ -866,10 +901,11 @@ python -m convertcad --cli plan.pdf --calibrate 35.2778     :: real units per PD
 python -m convertcad --cli plan.pdf --pages 1-3,5 --split-pages --dxf-version R2013
 python -m convertcad --cli plan.pdf -o plan.dwg                 :: native DWG
 python -m convertcad --cli plan.pdf --area 20,30,420,290        :: rectangle in mm on the sheet
-python -m convertcad --cli scan.pdf --ocr-engine rapidocr --ocr-lang fra
+python -m convertcad --cli scan.pdf --ocr-lang latin+arabic --ocr-quality maximum
 python -m convertcad --cli drawings\ -o dwg\ --format dwg --recursive --preset structural
 python -m convertcad --cli --list-presets
-python -m convertcad --cli --list-ocr                           :: engines and their status
+python -m convertcad --cli --list-ocr                           :: OCR models: installed / to download
+python -m convertcad --cli --get-ocr-model arabic latin_max     :: download OCR models
 ```
 
 In the portable build, `ConvertCAD-cli.exe` accepts exactly the same arguments. Without
@@ -888,8 +924,9 @@ when none is found — the log says which scale each sheet received.
 | `--pages`, `--split-pages`, `--dxf-version`, `--layer-mode`, `--true-color` | output |
 | `--no-arcs`, `--no-polylines`, `--no-text`, `--no-mtext`, `--no-hatch`, `--no-hatch-patterns`, `--no-dashes`, `--no-block-rotations`, `--no-dims`, `--no-ticks`, `--no-leaders`, `--no-blocks`, `--no-pdf-layers`, `--no-linetypes`, `--no-raster`, `--no-ocr`, `--no-images`, `--no-shx`, `--no-log` | switch features off |
 | `--min-repeats N`, `--precision fine\|normal\|loose` | blocks, curve fitting |
-| `--ocr-engine auto\|tesseract\|rapidocr\|paddleocr`, `--ocr-lang`, `--ocr-vertical`, `--dpi` | scanned pages |
-| `--list-ocr` | list the OCR engines and whether they are installed |
+| `--ocr-lang KEY` (`latin`, `arabic`, `latin+arabic`…), `--ocr-quality standard\|maximum`, `--dpi` | scanned pages |
+| `--list-ocr` | list the OCR models (built in, installed, available), the models folder and the `--ocr-lang` keys |
+| `--get-ocr-model ID [ID…]` | download OCR models (progress on stderr; exit code 1 if one failed, 2 if unknown) |
 | `--recursive` | include sub-folders |
 | `--json FILE` | write the report(s) as JSON |
 | `-q, --quiet` | no progress lines |
@@ -937,9 +974,8 @@ All options are fields of `convertcad.core.options.Options` (also importable fro
 | `block_rotations` | on | Layers › Also match rotated and mirrored copies | `--no-block-rotations` | INSERT with rotation / mirror |
 | `raster_mode` | on | Scanned › Trace lines and circles | `--no-raster` | OpenCV tracing |
 | `ocr` | on | Scanned › Read text with OCR | `--no-ocr` | OCR of scanned pages |
-| `ocr_engine` | `auto` | Scanned › OCR engine | `--ocr-engine` | Automatic (best available), Fast — Tesseract, Accurate — RapidOCR, Maximum — PaddleOCR (§5.14) |
-| `ocr_lang` | `eng+fra` | Scanned › OCR language | `--ocr-lang` | languages (Arabic: `ara`) |
-| `ocr_vertical` | off | Scanned › Also read vertical text | `--ocr-vertical` | second OCR pass (Tesseract; the PP-OCR engines read vertical text anyway) |
+| `ocr_lang` | `latin` | Scanned › OCR languages | `--ocr-lang` | `latin` (English, French…), a script (`arabic`, `cyrillic`, `greek`, `korean`, `devanagari`, `thai`, `tamil`, `telugu`) or `latin+<script>` for mixed drawings (§5.14); 1.0 codes such as `eng+fra+ara` are accepted |
+| `ocr_quality` | `standard` | Scanned › OCR accuracy | `--ocr-quality` | `standard` (built-in model) or `maximum` (larger models, downloaded; 1.0's "Maximum — PaddleOCR" engine maps to it) |
 | `raster_dpi` | 300 | Scanned › Scan resolution | `--dpi` | 200–600 |
 | `use_pdf_text_layer` | on | Scanned › Use the PDF's text layer | — | skip OCR on searchable scans |
 | `include_images` | on | Scanned › Keep raster images | `--no-images` | locked `IMG_RASTER` |
@@ -1037,8 +1073,9 @@ python -m ruff check .                    :: lint
 
 - Test PDFs are **drawn by the tests** (`conftest.py`, `samples.py`): no binary fixtures,
   every case is readable in code.
-- The OCR tests are skipped automatically when their engine is not installed (Tesseract,
-  RapidOCR); CI installs Tesseract on Linux. The DWG tests are skipped when the LibreDWG
+- The OCR tests that run the models are skipped automatically when RapidOCR is not
+  installed; the download tests use a local web server (no internet needed). The DWG
+  tests are skipped when the LibreDWG
   programs are missing (Linux: `./scripts/build_libredwg.sh linux`; CI builds and caches
   them).
 - `test_ui_smoke.py` runs the real window with `QT_QPA_PLATFORM=offscreen` (set
@@ -1104,9 +1141,8 @@ scripts\build_installer.bat      :: Windows installer (Inno Setup)
 ```
 
 `build_exe.bat`: install `requirements-dev.txt` → run the tests (the build stops if one
-fails) → `scripts/get_ocr_models.py` (once) → `scripts/make_icon.py` →
-`PyInstaller --noconfirm --clean ConvertCAD.spec` → copy Tesseract → optional code signing
-→ copy README, LICENSE, THIRD_PARTY_NOTICES, CHANGELOG → zip
+fails) → `scripts/make_icon.py` → `PyInstaller --noconfirm --clean ConvertCAD.spec` →
+optional code signing → copy README, LICENSE, THIRD_PARTY_NOTICES, CHANGELOG → zip
 `dist\ConvertCAD-<version>-win64-portable.zip`. `build_linux.sh` does the same on Linux and
 builds LibreDWG first when `vendor/libredwg/linux-x86_64` is missing.
 
@@ -1118,12 +1154,14 @@ build may end up in the bundle. On Linux, build on the oldest distribution you s
 
 - **Entry points**: `main.py` → `ConvertCAD.exe` (windowed), `convertcad_cli.py` →
   `ConvertCAD-cli.exe` (console), both in the same folder sharing `_internal\`.
-- **Data**: `convertcad/resources`, ezdxf's data files, RapidOCR's settings and PP-OCR
-  models, the LibreDWG programs of the build platform (`_internal/libredwg/`, with
-  `COPYING`, `README.md`, `SOURCE.txt`), and the optional OCR models of `vendor/ocr_models`
-  (`_internal/ocr_models/`). A warning is printed when LibreDWG is missing.
+- **Data**: `convertcad/resources`, ezdxf's data files, RapidOCR's settings and its
+  built-in PP-OCR model, the LibreDWG programs of the build platform (`_internal/libredwg/`,
+  with `COPYING`, `README.md`, `SOURCE.txt`), and — offline build only — the OCR models
+  placed in `vendor/ocr_models` (`_internal/ocr_models/`). A warning is printed when
+  LibreDWG is missing.
 - **Hidden imports**: ezdxf drawing add-on modules, RapidOCR's modules (ONNX Runtime back-end
-  only), `onnxruntime`, `bidi`, `pytesseract`, `PySide6.QtSvg`.
+  only), `onnxruntime`, `bidi`, `certifi` (HTTPS certificates for the model downloads),
+  `PySide6.QtSvg`.
 - **Excludes**: modules never used but sometimes imported optionally by libraries
   (tkinter, matplotlib, pandas, scipy, torch, Qt WebEngine/Quick/Qml…), the other OCR
   back-ends (paddle, openvino, tensorrt, MNN), the optional HTTPS add-ons of requests
@@ -1146,16 +1184,15 @@ dist\ConvertCAD\
 ├── ConvertCAD-cli.exe      the command-line tool
 ├── _internal\              Python, Qt, MuPDF, OpenCV, NumPy, ezdxf, ONNX Runtime…
 │   ├── libredwg\           dxf2dwg, dwg2dxf (DWG output), COPYING, SOURCE.txt
-│   ├── rapidocr\models\    PP-OCR models of "Accurate"
-│   └── ocr_models\         larger models of "Maximum" + Arabic (when downloaded)
-├── tesseract\              Tesseract OCR (Windows, when found on the build PC)
+│   ├── rapidocr\models\    the built-in PP-OCR model (≈ 30 MB)
+│   └── ocr_models\         other OCR models (offline build only)
 ├── README.md, LICENSE, THIRD_PARTY_NOTICES.md, CHANGELOG.md
 ```
 
-The folder is large (Qt, OpenCV, MuPDF, ONNX Runtime and the OCR models are the largest
-parts): count about 450–600 MB unpacked depending on the platform and the models, and
-roughly 40 % of that for the zip / AppImage / installer. An empty file
-`ConvertCAD.portable` next to `ConvertCAD.exe` keeps the settings in `settings\` beside
+The folder is large (Qt, OpenCV, MuPDF and ONNX Runtime are the largest parts): count
+about 450–550 MB unpacked depending on the platform, and roughly 40 % of that for the
+zip / AppImage / installer. An empty file `ConvertCAD.portable` next to `ConvertCAD.exe`
+keeps the settings in `settings\` and the downloaded OCR models in `ocr_models\` beside
 the program (USB stick use); the installer never installs that file.
 
 ### 15.4 Antivirus and SmartScreen
@@ -1175,8 +1212,7 @@ PACKAGING.md for where to get a certificate), or run from source.
 | The exe opens a second window when converting | `multiprocessing.freeze_support()` missing at the top of `main()` |
 | Bundle much larger than expected | build from a clean `.venv`; add the unwanted package to `excludes` |
 | "DWG output unavailable" in the built program | the spec printed "LibreDWG not found": `vendor/libredwg/win64` missing (Windows) or not built (`./scripts/build_libredwg.sh linux`) |
-| "Maximum" OCR marked *not installed* | `scripts/get_ocr_models.py` could not download the models (network): run it again, then rebuild |
-| OCR "Fast" not available in the exe | Tesseract was not found on the build PC: install it (or put it in `vendor\tesseract\`) and rebuild, or add the `tesseract\` folder next to the exe |
+| OCR downloads fail in the built program only (certificate error) | `certifi` missing from the bundle: keep it in `hiddenimports` |
 | `Failed to expand shell folder constant "autopf"` when testing the installer under Wine | Wine lacks the per-user Program Files folder; test with `/ALLUSERS` (real Windows is fine) |
 
 ---
@@ -1184,17 +1220,21 @@ PACKAGING.md for where to get a certificate), or run from source.
 ## 16. Continuous integration and releases
 
 - **`tests.yml`** — on every push to `main` and every pull request: Windows and Ubuntu ×
-  Python 3.10 / 3.12 / 3.13; installs the Qt runtime libraries, Tesseract (fra) and the
-  build tools on Linux; builds LibreDWG once and caches it (Windows uses the programs in
+  Python 3.10 / 3.12 / 3.13; installs the Qt runtime libraries and the build tools on
+  Linux; builds LibreDWG once and caches it (Windows uses the programs in
   the repository); runs `ruff check .` and `pytest` (DWG tests included).
-- **`build.yml`** — on a tag `v*` or manually. *Windows job*: tests, OCR models (cached),
-  PyInstaller build, Tesseract installed with Chocolatey + French and Arabic language data,
-  smoke test of the built CLI (PDF → DWG, `AC1015` checked), optional code signing
-  (secrets `SIGN_PFX_BASE64`, `SIGN_PFX_PASSWORD`), portable zip, installer with Inno Setup
-  (Chocolatey). *Linux job* (Ubuntu 22.04): LibreDWG and OCR models (cached),
-  `build_linux.sh` (tests included), AppImage, .deb, smoke test (AppImage → DWG). The five
-  downloads are uploaded as workflow artifacts and attached to the GitHub release of the
-  tag.
+- **`build.yml`** — on a tag `v*` or manually. *Windows job*: tests, PyInstaller build,
+  smoke test of the built CLI (PDF → DWG, `AC1015` checked; the sample scan read by the
+  built-in OCR model), optional code signing (secrets `SIGN_PFX_BASE64`,
+  `SIGN_PFX_PASSWORD`), portable zip, installer with Inno Setup (Chocolatey). *Linux job*
+  (Ubuntu 22.04): LibreDWG (cached), `build_linux.sh` (tests included), AppImage, .deb,
+  smoke test (AppImage → DWG, OCR), and — for information only — an OCR model download from
+  the built program. The five downloads are uploaded as workflow artifacts and attached to
+  the GitHub release of the tag.
+- **`ocr-models.yml`** — manual (*Run workflow*): downloads the downloadable OCR models
+  from RapidOCR's repository, checks their SHA-256, test-runs each one and publishes them
+  as the release `ocr-models-v1` (not marked *latest*), where the program downloads them
+  from. Run it once, then after any change of `convertcad/core/ocr_catalog.py`.
 
 **Publishing the repository on GitHub (first time)**
 
@@ -1329,8 +1369,10 @@ Where the speed comes from:
   since 2000 and every current CAD program opens it, and saving it again from AutoCAD gives
   the latest format. Entities that DWG 2000 cannot hold are written in their AutoCAD 2000
   form (classic LEADER + MTEXT instead of MULTILEADER, ACI colours).
-- **OCR**: the full PaddleOCR library is used only from source; the downloads run the same
-  PP-OCR models through RapidOCR. "Maximum" needs the models downloaded at build time.
+- **OCR**: one script besides Latin per drawing (Latin + Arabic, Latin + Cyrillic…);
+  vertical text read top-to-bottom may come out with the wrong rotation; the downloaded
+  models come from the GitHub release only when the repository is public (otherwise from
+  RapidOCR's repository).
 - Blocks: copies rotated by multiples of 90° and mirrored are matched; other angles are not
   (§17.3).
 - Dimensions: linear (horizontal, vertical, aligned/rotated) only; angular, radial and
@@ -1377,6 +1419,7 @@ All third-party licences: [`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md).
 | Version | Date | Highlights |
 |---|---|---|
 | 1.0.0 | 2026-10-29 | First public release: Qt 6 interface (dark/light, EN/FR, review before saving), vector engine (arcs, splines, polylines, dimensions, leaders, blocks with rotations, dashed lines and hatch patterns rebuilt, SHX texts), scanned drawings with three OCR engines, selected-area conversion, overlay check, native DWG output, command line, Windows portable + installer, Linux tar.gz + AppImage + .deb |
+| 1.1.0 | 2026-10-29 | OCR: one built-in PP-OCR model (English, French, Latin-script languages), other scripts and maximum accuracy downloaded from the program (*OCR languages and models…*, `--get-ocr-model`), mixed-script drawings, offline installation from files; Tesseract and the PaddleOCR library removed; smaller downloads |
 
 The program was developed privately before this release (internal versions 1.x–3.x);
 version numbers restart at 1.0.0 for the public repository. Details:

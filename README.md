@@ -8,7 +8,7 @@
   <b>Convert 2D PDF drawings into editable DXF and DWG files built with real CAD entities.</b><br>
   Lines, polylines, arcs, circles, splines, hatches, text, <b>true dimensions</b>, <b>leaders</b>,
   <b>layers</b> and <b>blocks</b> — not exploded line spaghetti.<br>
-  Windows (portable or installer) · Linux (AppImage, .deb) · 100 % offline · English / Français
+  Windows (portable or installer) · Linux (AppImage, .deb) · conversions 100 % offline · English / Français
 </p>
 
 ![ConvertCAD — converted plan with its layers](docs/screenshots/03-result-layers.png)
@@ -34,7 +34,7 @@ ConvertCAD rebuilds the **intent** of the drawing:
 | Stacked text lines | One **MTEXT** paragraph |
 | Solid fills · hatching drawn as hundreds of parallel lines | **HATCH** (solid · pattern with its angle and spacing) |
 | AutoCAD SHX text plotted as strokes | Real **TEXT** with the original string |
-| Scanned sheets | Traced lines and circles + OCR text (3 engines), scan kept on a locked layer |
+| Scanned sheets | Traced lines and circles + OCR text (PP-OCR, 50+ languages), scan kept on a locked layer |
 | Colours, line weights, PDF layers | Organised **layers** (`GEO_BLACK_050_CENTER`, `DIM`, `TEXT`, …) |
 
 **Safe by design:** a dimension is rebuilt only when arrows, line and text all agree.
@@ -58,19 +58,21 @@ Nothing is invented.
   (keep / hide, rename, recolour), detailed conversion report with warnings.
 - **Full options** — curve precision, text height ratio, MTEXT grouping, arrow and tick
   dimensions, leaders, layer naming modes, AutoCAD Color Index or true colour, block detection threshold,
-  OCR engine, language and resolution, one file or one file per sheet,
+  OCR languages, accuracy and resolution, one file or one file per sheet,
   6 built-in presets + your own.
-- **Scanned drawings** — line and circle tracing (OpenCV) and OCR with three engines:
-  **Fast — Tesseract**, **Accurate — RapidOCR** (PaddleOCR's PP-OCR models, reads whole
-  lines, small and rotated text) and **Maximum — PaddleOCR** (the larger PP-OCR models);
-  English, French, Arabic. The original scan is kept underneath for checking.
+- **Scanned drawings** — line and circle tracing (OpenCV) and OCR with PaddleOCR's PP-OCR
+  models (whole text lines, small, rotated and vertical text). **Built in:** English, French
+  and the other Latin-script languages. **One click away** (*Settings → Scanned pages → OCR
+  languages and models…*): Arabic, Cyrillic, Greek, Korean, Devanagari, Thai, Tamil, Telugu
+  and a maximum-accuracy model — mixed drawings (French + Arabic…) are read line by line.
+  The original scan is kept underneath for checking.
 - **Big drawings** — an A0 sheet with 40 000 entities previews smoothly; the window opens
   in about half a second (libraries load in the background).
 - **Batch** — convert a whole folder (sub-folders included), each file with its log.
 - **Command line** — `ConvertCAD-cli.exe` / `python -m convertcad --cli` for scripts.
-- **Portable or installed** — portable zip (no installation, no admin rights, settings can
-  live next to the program on a USB stick) or a normal installer; nothing is ever sent over
-  the network.
+- **Portable or installed** — portable zip (no installation, no admin rights, settings and
+  OCR models can live next to the program on a USB stick) or a normal installer; no drawing
+  is ever sent anywhere (the only network use: downloading an OCR language when you ask).
 - Dark and light themes, crisp on every display scaling, English and French interface.
 
 <table>
@@ -95,8 +97,9 @@ Nothing is invented.
 ## Getting started
 
 Download from the **Releases** page of this repository. Every download contains
-**everything** — Python, all libraries, the DWG converter and the OCR engines with their
-models (Windows: Tesseract too). Nothing else to install.
+**everything** — Python, all libraries, the DWG converter and the OCR with its built-in
+model (English, French and the other Latin-script languages). Nothing else to install.
+Other OCR languages are downloaded from the program when needed, then work offline.
 
 ### Windows
 
@@ -116,9 +119,6 @@ models (Windows: Tesseract too). Nothing else to install.
 | `convertcad_<version>_amd64.deb` | Debian / Ubuntu / Mint: `sudo apt install ./convertcad_<version>_amd64.deb`, then *ConvertCAD* in the menu or `convertcad` |
 | `ConvertCAD-<version>-linux-x86_64.tar.gz` | Portable folder: `./ConvertCAD/ConvertCAD` (needs `sudo apt install libxcb-cursor0`) |
 
-The "Fast — Tesseract" engine uses the system Tesseract on Linux:
-`sudo apt install tesseract-ocr tesseract-ocr-fra` (the two other engines are included).
-
 ### From the source code (developers)
 
 Requires **Python 3.10 or newer** ([python.org](https://www.python.org/downloads/),
@@ -133,10 +133,9 @@ scripts\run_from_source.bat   :: starts ConvertCAD
 
 Linux: `./scripts/setup_venv.sh` then `./scripts/run_from_source.sh`. You can also
 double-click **`ConvertCAD.pyw`** (no console window) or run `python main.py`: if libraries
-are missing, ConvertCAD lists them and offers to install them. From source, the
-"Accurate" OCR engine comes with the Python packages; "Fast" needs Tesseract installed
-separately (*Help → OCR setup*); "Maximum" needs `python scripts/get_ocr_models.py` (larger
-models) or the full PaddleOCR library (`pip install -r requirements-paddle.txt`, about 1 GB).
+are missing, ConvertCAD lists them and offers to install them. From source, the OCR and
+its built-in model come with the Python packages; other OCR languages are downloaded from
+the program, as in the downloads.
 DWG output needs the converter: Windows uses `vendor\libredwg\win64` (included), Linux
 builds it once with `./scripts/build_libredwg.sh linux`.
 
@@ -168,9 +167,10 @@ ConvertCAD-cli plan.pdf -o plan.dwg                       :: native DWG (AutoCAD
 ConvertCAD-cli plan.pdf --area 20,30,420,290              :: only that rectangle (mm on the sheet)
 ConvertCAD-cli plan.pdf --pages 1-3,5 --split-pages --dxf-version R2013
 ConvertCAD-cli drawings\ -o dxf\ --recursive --preset structural
-ConvertCAD-cli scan.pdf --preset scanned --ocr-engine rapidocr --ocr-lang fra --json report.json
+ConvertCAD-cli scan.pdf --preset scanned --ocr-lang latin+arabic --json report.json
 ConvertCAD-cli --list-presets
-ConvertCAD-cli --list-ocr                                 :: OCR engines and whether installed
+ConvertCAD-cli --list-ocr                                 :: OCR languages: installed / to download
+ConvertCAD-cli --get-ocr-model arabic latin_max           :: download OCR models
 ```
 
 From source: `python -m convertcad --cli <same arguments>`. Run with `--help` for every
@@ -184,15 +184,17 @@ option. Exit code: `0` all converted, `1` a conversion failed, `2` bad arguments
 | Windows installer | `scripts\build_installer.bat` (needs [Inno Setup](https://jrsoftware.org/isinfo.php) 6.3+) |
 | Linux tar.gz · AppImage · .deb | `./scripts/build_linux.sh` · `./scripts/build_appimage.sh` · `./scripts/build_deb.sh` |
 
-Pushing a tag such as `v1.0.0` builds **all five** on GitHub Actions and attaches them to
-the release ([`.github/workflows/build.yml`](.github/workflows/build.yml)). Details, code
-signing and the release checklist: **[docs/PACKAGING.md](docs/PACKAGING.md)**.
+Pushing a tag such as `v1.1.0` builds **all five** on GitHub Actions and attaches them to
+the release ([`.github/workflows/build.yml`](.github/workflows/build.yml)). The downloadable
+OCR models are published once, as the release `ocr-models-v1`, by the workflow
+*OCR models release*. Details, code signing and the release checklist:
+**[docs/PACKAGING.md](docs/PACKAGING.md)**.
 
 ## For developers
 
 - **Language:** Python 3.10+ · **Interface:** PySide6 (Qt 6) · **PDF:** PyMuPDF ·
-  **DXF:** ezdxf · **DWG:** GNU LibreDWG · **Scans:** OpenCV + RapidOCR / Tesseract /
-  PaddleOCR · **Tests:** pytest · **Lint:** Ruff · **Packaging:** PyInstaller, Inno Setup,
+  **DXF:** ezdxf · **DWG:** GNU LibreDWG · **Scans:** OpenCV + RapidOCR (PP-OCR models,
+  ONNX Runtime) · **Tests:** pytest · **Lint:** Ruff · **Packaging:** PyInstaller, Inno Setup,
   AppImage, dpkg · **CI:** GitHub Actions
 - Open the folder in **VS Code**: recommended extensions, run/debug configurations
   (application, CLI, tests) and tasks are included in [`.vscode/`](.vscode).
@@ -230,9 +232,11 @@ ConvertCAD convertit des plans PDF 2D en fichiers DXF ou **DWG** modifiables con
 de vraies entités CAO : arcs et cercles, polylignes, splines, hachures (pleines et à motif),
 textes et paragraphes, **vraies cotes**, **lignes de repère**, **calques** et **blocs**.
 Windows (installateur ou version portable sans installation) et Linux (AppImage, .deb),
-100 % hors ligne, interface en français et en anglais (*Affichage → Langue*). Conversion
-d'une zone choisie, contrôle par superposition du PDF. Les plans scannés sont vectorisés et
-lus par OCR (trois moteurs : Rapide, Précis, Maximum). Après chaque conversion,
+conversions 100 % hors ligne, interface en français et en anglais (*Affichage → Langue*).
+Conversion d'une zone choisie, contrôle par superposition du PDF. Les plans scannés sont
+vectorisés et lus par OCR (modèles PP-OCR : anglais, français et autres langues latines
+intégrés ; arabe, cyrillique, grec… téléchargeables en un clic depuis *Réglages → Pages
+scannées → Langues et modèles OCR…*). Après chaque conversion,
 vérifiez l'échelle sur une cote connue, contrôlez le calque `DIM` et passez en revue le
 calque `DIM_RAW`. Guide complet : *Aide → Guide d'utilisation* ou
 [`guide_fr.md`](convertcad/resources/guide_fr.md).

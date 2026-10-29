@@ -54,6 +54,7 @@ from .dxf_view import DxfView
 from .empty_state import EmptyState
 from .icons import app_icon, icon, icon_size
 from .layers_panel import LayersPanel
+from .ocr_models_dialog import OcrModelsDialog, stop_downloads
 from .options_panel import OptionsPanel
 from .pages_panel import PagesPanel
 from .pdf_view import PdfView, format_length
@@ -196,8 +197,12 @@ class MainWindow(QMainWindow):
                          "help")
         self.a_keys = A("Keyboard shortcuts",
                         lambda: ShortcutsDialog(self).exec())
-        self.a_ocr = A("OCR setup (scanned PDFs)",
+        self.a_ocr = A("OCR guide (scanned PDFs)",
                        lambda: GuideDialog(self, "ocr").exec())
+        self.a_ocr_models = A("OCR languages and models…",
+                              self.open_ocr_models,
+                              tip="Download other OCR languages or the "
+                                  "maximum accuracy models")
         self.a_terms = A("Terms of use",
                          lambda: TermsDialog(self, gate=False).exec())
         self.a_about = A("About ConvertCAD", lambda: AboutDialog(self).exec())
@@ -255,6 +260,8 @@ class MainWindow(QMainWindow):
         t.addSeparator()
         t.addAction(self.a_next)
         t.addAction(self.a_prev)
+        t.addSeparator()
+        t.addAction(self.a_ocr_models)
         h = mb.addMenu(tr("&Help"))
         for a in (self.a_guide, self.a_keys, self.a_ocr):
             h.addAction(a)
@@ -437,6 +444,7 @@ class MainWindow(QMainWindow):
             lambda: self.set_tool("area"))
         self.options_panel.area_cleared.connect(self.clear_area)
         self.options_panel.preset_message.connect(self.notify)
+        self.options_panel.ocr_models_requested.connect(self.open_ocr_models)
         self.layers_panel.edits_changed.connect(self._on_layer_edits)
         self.report_panel.message.connect(self.notify)
         self.statusbar.snap_toggled.connect(self._on_snap_toggled)
@@ -1208,6 +1216,13 @@ class MainWindow(QMainWindow):
         if self.toast.isVisible():
             self.toast._place()
 
+    def open_ocr_models(self) -> None:
+        """Settings > Scanned pages > OCR languages and models…"""
+        dlg = OcrModelsDialog(self)
+        dlg.models_changed.connect(self.options_panel.refresh_ocr)
+        dlg.exec()
+        self.options_panel.refresh_ocr()
+
     def closeEvent(self, event) -> None:
         if self._save_thread is not None:
             self._save_thread.wait(60000)            # let the save finish
@@ -1222,6 +1237,7 @@ class MainWindow(QMainWindow):
             event.ignore()
             return
         self.runner.shutdown()
+        stop_downloads()                             # OCR model downloads
         self.options_panel.save_to_settings()
         self.settings.window_geometry = bytes(
             self.saveGeometry().toBase64()).decode()

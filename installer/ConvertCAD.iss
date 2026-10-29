@@ -3,20 +3,22 @@
 ;
 ;  Build it with scripts\build_installer.bat (recommended): the script builds
 ;  the program first, reads the version and calls the Inno Setup compiler.
-;  By hand:  ISCC.exe /DAppVersion=1.0.0 installer\ConvertCAD.iss
+;  By hand:  ISCC.exe /DAppVersion=1.1.0 installer\ConvertCAD.iss
 ;
 ;  Needs Inno Setup 6.3 or later (free): https://jrsoftware.org/isinfo.php
 ;  Input:   dist\ConvertCAD\           (the portable folder, build_exe.bat)
 ;  Output:  dist\ConvertCAD-<version>-win64-setup.exe
 ;
 ;  The installer copies the SAME folder as the portable zip (LibreDWG for
-;  DWG output, the OCR engines and models, Tesseract when bundled). Users
-;  install nothing else. No administrator rights are needed: by default it
-;  installs for the current user; "Install for all users" asks for them.
+;  DWG output, the OCR with its built-in model; other OCR languages are
+;  downloaded from the program into %LOCALAPPDATA%\ConvertCAD\ocr_models,
+;  removed by the uninstaller). Users install nothing else. No administrator
+;  rights are needed: by default it installs for the current user;
+;  "Install for all users" asks for them.
 ; ===========================================================================
 
 #ifndef AppVersion
-  #define AppVersion "1.0.0"
+  #define AppVersion "1.1.0"
 #endif
 #ifndef SourceDir
   #define SourceDir "..\dist\ConvertCAD"
@@ -64,6 +66,8 @@ PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 ; close a running ConvertCAD before updating it
 CloseApplications=yes
+; the uninstaller removes the OCR models downloaded by the user (below)
+UsedUserAreasWarning=no
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -80,6 +84,12 @@ Name: "sendto"; Description: "{cm:SendToTask}"; GroupDescription: "{cm:Additiona
 [InstallDelete]
 ; an update replaces the whole program: no file of the old version is left
 Type: filesandordirs; Name: "{app}\_internal"
+
+[UninstallDelete]
+; OCR models downloaded from the program (convertcad/core/ocr_store.py);
+; an update keeps them, only uninstalling removes them
+Type: filesandordirs; Name: "{localappdata}\ConvertCAD\ocr_models"
+Type: dirifempty; Name: "{localappdata}\ConvertCAD"
 
 [Files]
 ; the portable marker must never be installed (settings go to the profile)

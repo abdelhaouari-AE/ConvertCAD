@@ -13,7 +13,7 @@ the interface always agree on what each option means.
 import re
 from typing import Dict
 
-from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QRegularExpressionValidator
 from PySide6.QtCore import QRegularExpression
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox,
@@ -21,8 +21,9 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox,
                                QPushButton, QScrollArea, QSpinBox, QToolButton,
                                QVBoxLayout, QWidget)
 
-from ..core.constants import (DXF_VERSIONS, OCR_ENGINES, OCR_LANGUAGES,
-                              PAPER_SCALES, RASTER_DPI_CHOICES, UNITS)
+from ..core.constants import (DXF_VERSIONS, OCR_QUALITIES, PAPER_SCALES,
+                              RASTER_DPI_CHOICES, UNITS)
+from ..core.ocr_catalog import BY_ID, language_set
 from ..core.options import Options
 from ..core.units import effective_denominator
 from ..core.presets import (BUILTIN_PRESETS, apply_preset,
@@ -44,6 +45,7 @@ class OptionsPanel(QScrollArea):
     area_requested = Signal()
     area_cleared = Signal()
     preset_message = Signal(str)
+    ocr_models_requested = Signal()
 
     def __init__(self, settings, parent=None):
         super().__init__(parent)
@@ -87,7 +89,6 @@ class OptionsPanel(QScrollArea):
         self.set_options(Options.from_dict(settings.options))
         self._snapshot = self.options().to_dict()
         self._update_modified()
-        QTimer.singleShot(1500, self._probe_ocr)
 
     # ---- small builders -------------------------------------------------------------
     def _check(self, text: str, tip: str) -> QCheckBox:
@@ -404,19 +405,33 @@ class OptionsPanel(QScrollArea):
                "TRACE_LINES.")))
         self.ocr = sec.add(self._check(
             tr("Read text with OCR"),
-            tr("Text on scanned pages is recognised by an OCR engine.")))
-        self.ocr_engine = self._combo(
-            [(tr(OCR_ENGINES[k]), k) for k in OCR_ENGINES],
-            tr("Fast: Tesseract. Accurate: RapidOCR (PaddleOCR models, "
-               "better on drawings). Maximum: PaddleOCR's largest models. "
-               "Automatic: the best one installed."))
-        self._row(sec, tr("OCR engine"), self.ocr_engine, stacked=True)
-        self.ocr_lang = self._combo([(c, c) for c in OCR_LANGUAGES],
-                                    tr("OCR language"))
-        self._row(sec, tr("OCR language"), self.ocr_lang)
-        self.ocr_vertical = sec.add(self._check(
-            tr("Also read vertical text (slower)"),
-            tr("A second OCR pass reads text written bottom-to-top.")))
+            tr("Text on scanned pages is read by the OCR built into "
+               "ConvertCAD (PP-OCR models), on this computer, at any "
+               "angle.")))
+        # languages: only the installed ones are listed (filled by
+        # _fill_ocr_langs); others are downloaded with the button below
+        self.ocr_lang = self._combo(
+            [], tr("Languages read on scanned pages. For a drawing that mixes "
+                   "two scripts (e.g. French and Arabic), choose \"English, "
+                   "French… + Arabic\". Other languages: \"OCR languages and "
+                   "models…\"."))
+        self.ocr_lang.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.ocr_lang.setMinimumContentsLength(16)
+        self._row(sec, tr("OCR languages"), self.ocr_lang, stacked=True)
+        self.ocr_quality = self._combo(
+            [(tr(OCR_QUALITIES[k]), k) for k in OCR_QUALITIES],
+            tr("Standard: the built-in model, fast. Maximum: larger models, "
+               "better on poor scans and small text, but slower (download "
+               "them first)."))
+        self._row(sec, tr("OCR accuracy"), self.ocr_quality, stacked=True)
+        self.btn_ocr_models = QPushButton(icon("save"),
+                                          tr("OCR languages and models…"))
+        self.btn_ocr_models.setToolTip(tr(
+            "Download other OCR languages (Arabic, Cyrillic, Greek…) or the "
+            "maximum accuracy models, or install them from files."))
+        self.btn_ocr_models.clicked.connect(self.ocr_models_requested)
+        sec.add(self.btn_ocr_models)
         self.dpi = self._combo([(f"{d} dpi", d) for d in RASTER_DPI_CHOICES],
                                tr("Higher resolution traces finer details "
                                   "but takes longer."))
@@ -502,9 +517,8 @@ class OptionsPanel(QScrollArea):
             block_rotations=self.block_rotations.isChecked(),
             raster_mode=self.raster.isChecked(),
             ocr=self.ocr.isChecked(),
-            ocr_engine=self.ocr_engine.currentData(),
-            ocr_lang=self.ocr_lang.currentData(),
-            ocr_vertical=self.ocr_vertical.isChecked(),
+            ocr_lang=self.ocr_lang.currentData() or "latin",
+            ocr_quality=self.ocr_quality.currentData(),
             raster_dpi=self.dpi.currentData(),
             use_pdf_text_layer=self.text_layer.isChecked(),
             include_images=self.images.isChecked(),
@@ -540,7 +554,6 @@ class OptionsPanel(QScrollArea):
                           (self.blocks, o.block_detection),
                           (self.block_rotations, o.block_rotations),
                           (self.raster, o.raster_mode), (self.ocr, o.ocr),
-                          (self.ocr_vertical, o.ocr_vertical),
                           (self.text_layer, o.use_pdf_text_layer),
                           (self.images, o.include_images),
                           (self.auto_scale, o.auto_scale),
@@ -549,8 +562,7 @@ class OptionsPanel(QScrollArea):
             for combo, v in ((self.precision, o.curve_precision),
                              (self.layer_mode, o.layer_mode),
                              (self.color_mode, o.color_mode),
-                             (self.ocr_lang, o.ocr_lang),
-                             (self.ocr_engine, o.ocr_engine),
+                             (self.ocr_quality, o.ocr_quality),
                              (self.output_format, o.output_format),
                              (self.dpi, o.raster_dpi),
                              (self.units, o.units),
@@ -562,13 +574,16 @@ class OptionsPanel(QScrollArea):
             self.text_factor.setValue(o.text_height_factor)
             self.repeats.setValue(o.block_min_repeats)
             self.set_scale_denominator(o.scale_denominator)
+            self._fill_ocr_langs(o.ocr_lang)
         finally:
             self._loading = False
         self._update_enabled()
+        self.refresh_ocr_status()
 
     def _on_change(self, *_):
         if self._loading:
             return
+        self.refresh_ocr_status()
         self._update_enabled()
         self._update_modified()
         self._refresh_cal_label()
@@ -584,7 +599,7 @@ class OptionsPanel(QScrollArea):
         self.repeats.setEnabled(self.blocks.isChecked())
         self.block_rotations.setEnabled(self.blocks.isChecked())
         scan_ocr = self.ocr.isChecked()
-        for w in (self.ocr_lang, self.ocr_vertical, self.ocr_engine):
+        for w in (self.ocr_lang, self.ocr_quality):
             w.setEnabled(scan_ocr)
         dwg = self.output_format.currentData() == "dwg"
         self.dxf_version.setEnabled(not dwg)
@@ -644,38 +659,65 @@ class OptionsPanel(QScrollArea):
     def clip_rect(self):
         return list(self._clip_rect) if self._clip_rect else None
 
-    # ---- OCR availability ----------------------------------------------------------------
-    def _probe_ocr(self) -> None:
-        """Which OCR engines are installed (cheap: no model is loaded)."""
-        try:
-            from ..core.ocr import engine_status
-            st = engine_status()
-        except Exception:                                  # pragma: no cover
-            st = {}
-        names = {"tesseract": tr("Fast — Tesseract"),
-                 "rapidocr": tr("Accurate — RapidOCR"),
-                 "paddleocr": tr("Maximum — PaddleOCR")}
-        for i in range(self.ocr_engine.count()):
-            key = self.ocr_engine.itemData(i)
-            if key in names:
-                ok = st.get(key, {}).get("available", False)
-                self.ocr_engine.setItemText(
-                    i, names[key] if ok else
-                    names[key] + "  " + tr("(not installed)"))
-        ready = [names[k] for k in ("paddleocr", "rapidocr", "tesseract")
-                 if st.get(k, {}).get("available")]
-        if ready:
-            self.ocr_status.setText(tr("OCR ready: {engines}",
-                                       engines=", ".join(ready)))
-            self.ocr_status.setProperty("role", "ok")
-        else:
-            self.ocr_status.setText(tr("OCR not available: no OCR engine was "
-                                       "found. Tracing still works."))
-            self.ocr_status.setProperty("role", "warn")
-        restyle(self.ocr_status)
+    # ---- OCR languages and models -------------------------------------------------
+    @staticmethod
+    def ocr_lang_label(key: str) -> str:
+        """'latin+arabic' -> 'English, French… + Arabic', in the interface
+        language."""
+        return " + ".join(tr(n) for n in language_set(key).names())
 
-    # backwards-compatible name
-    _probe_tesseract = _probe_ocr
+    def _fill_ocr_langs(self, select: str) -> None:
+        """List the installed OCR languages (cheap: files are only looked
+        for, no model is loaded). A choice whose model is missing (settings
+        copied from another computer, model removed) stays visible, marked,
+        so it is never changed silently."""
+        from ..core.ocr import language_choices
+        select = language_set(select).key
+        self.ocr_lang.blockSignals(True)
+        self.ocr_lang.clear()
+        for key, _label, _ok in language_choices():
+            self.ocr_lang.addItem(self.ocr_lang_label(key), key)
+        if self.ocr_lang.findData(select) < 0:
+            self.ocr_lang.addItem(self.ocr_lang_label(select) + "  "
+                                  + tr("(not downloaded)"), select)
+        self.ocr_lang.setCurrentIndex(max(self.ocr_lang.findData(select), 0))
+        self.ocr_lang.blockSignals(False)
+
+    def refresh_ocr(self) -> None:
+        """After models were downloaded or removed."""
+        was = self._loading
+        self._loading = True
+        try:
+            self._fill_ocr_langs(self.ocr_lang.currentData() or "latin")
+        finally:
+            self._loading = was
+        self.refresh_ocr_status()
+
+    def refresh_ocr_status(self) -> None:
+        from ..core import ocr as ocr_engines
+        from ..core.ocr_catalog import MAXIMUM
+        maximum_ok = ocr_engines.pack_usable(MAXIMUM)
+        i = self.ocr_quality.findData("maximum")
+        if i >= 0:
+            text = tr(OCR_QUALITIES["maximum"])
+            self.ocr_quality.setItemText(
+                i, text if maximum_ok else text + "  " + tr("(not downloaded)"))
+        key = self.ocr_lang.currentData() or "latin"
+        missing = [tr(BY_ID[p].label) for p in language_set(key).packs
+                   if not ocr_engines.pack_usable(BY_ID[p])]
+        if self.ocr_quality.currentData() == "maximum" and not maximum_ok:
+            missing.append(tr(MAXIMUM.label))
+        if not ocr_engines.available():
+            text, role = tr("OCR not available: the OCR engine is not "
+                            "installed. Tracing still works."), "warn"
+        elif missing:
+            text, role = tr("Not downloaded: {names}. The built-in model is "
+                            "used instead.", names=", ".join(missing)), "warn"
+        else:
+            text, role = tr("OCR ready, offline."), "ok"
+        self.ocr_status.setText(text)
+        self.ocr_status.setProperty("role", role)
+        restyle(self.ocr_status)
 
     def save_to_settings(self) -> None:
         opt = self.options()

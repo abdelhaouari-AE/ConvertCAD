@@ -1,11 +1,13 @@
 # Builds every download of a ConvertCAD release:
 #   Windows : portable zip + installer (setup.exe)
 #   Linux   : portable tar.gz + AppImage + .deb
-# Each one includes the DWG converter (GNU LibreDWG) and the OCR engines and
-# models: users install nothing else.
+# Each one includes the DWG converter (GNU LibreDWG) and the OCR with its
+# built-in model (English, French and the other Latin languages): users
+# install nothing else. Other OCR languages are downloaded from the program
+# (their files: workflow "OCR models release").
 #
 #  - manually: Actions tab > build > Run workflow
-#  - automatically when a version tag is pushed:  git tag v1.0.0 && git push --tags
+#  - automatically when a version tag is pushed:  git tag v1.1.0 && git push --tags
 #    (the files are then attached to the GitHub release of that tag)
 #
 # Optional code signing (Windows): add the repository secrets
@@ -44,33 +46,10 @@ jobs:
       - name: Tests
         run: python -m pytest -q
 
-      - name: OCR models (cache)
-        uses: actions/cache@v4
-        with:
-          path: vendor/ocr_models
-          key: ocr-models-${{ hashFiles('scripts/get_ocr_models.py') }}
-
-      - name: OCR models (download and check)
-        run: python scripts/get_ocr_models.py --check
-
       - name: Build with PyInstaller
         run: |
           python scripts/make_icon.py
           python -m PyInstaller --noconfirm --clean ConvertCAD.spec
-
-      - name: Bundle Tesseract OCR (English, French, Arabic)
-        shell: pwsh
-        run: |
-          choco install tesseract -y --no-progress
-          $src = "$env:ProgramFiles\Tesseract-OCR"
-          foreach ($lang in "fra", "ara") {
-            Invoke-WebRequest -Uri "https://github.com/tesseract-ocr/tessdata_fast/raw/main/$lang.traineddata" `
-                              -OutFile "$src\tessdata\$lang.traineddata"
-          }
-          Copy-Item $src dist/ConvertCAD/tesseract -Recurse
-          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/tesseract-ocr/tesseract/main/LICENSE" `
-                            -OutFile dist/ConvertCAD/tesseract/LICENSE-Tesseract.txt
-          dist/ConvertCAD/tesseract/tesseract.exe --list-langs
 
       - name: Smoke test of the built program (PDF -> DWG with the bundled converter)
         shell: pwsh
@@ -81,11 +60,11 @@ jobs:
           $head = [System.Text.Encoding]::ASCII.GetString([System.IO.File]::ReadAllBytes("dist/check/sample.dwg")[0..5])
           if ($head -ne "AC1015") { Write-Error "not a DWG 2000 file: $head"; exit 1 }
           dist/ConvertCAD/ConvertCAD-cli.exe --list-ocr
-          # the OCR engine really runs inside the built program (DLLs, models)
-          dist/ConvertCAD/ConvertCAD-cli.exe samples/sample_scan.pdf -o dist/check/scan.dxf -q --ocr-engine rapidocr
+          # the OCR really runs inside the built program (DLLs, built-in model)
+          dist/ConvertCAD/ConvertCAD-cli.exe samples/sample_scan.pdf -o dist/check/scan.dxf -q
           if ($LASTEXITCODE -ne 0) { exit 1 }
-          if (-not (Select-String -Path dist/check/scan_log.txt -Pattern "(RapidOCR)" -SimpleMatch -Quiet)) {
-            Write-Error "RapidOCR did not run in the built program"; exit 1 }
+          if (-not (Select-String -Path dist/check/scan_log.txt -Pattern "[1-9][0-9]* OCR text\(s\) \(PP-OCR" -Quiet)) {
+            Write-Error "the OCR did not run in the built program"; exit 1 }
           Remove-Item dist/check -Recurse
 
       - name: Code signing (only when the secrets are set)
@@ -147,24 +126,18 @@ jobs:
           cache: pip
           cache-dependency-path: requirements*.txt
 
-      - name: System libraries (Qt runtime, Tesseract for the tests, build tools)
+      - name: System libraries (Qt runtime, build tools)
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends libegl1 libgl1 \
             libxkbcommon0 libxkbcommon-x11-0 libxcb-cursor0 libfontconfig1 libdbus-1-3 \
-            tesseract-ocr tesseract-ocr-fra build-essential xz-utils
+            build-essential xz-utils
 
       - name: DWG converter (cache)
         uses: actions/cache@v4
         with:
           path: vendor/libredwg/linux-x86_64
           key: libredwg-ubuntu22-${{ hashFiles('vendor/libredwg/patches/*', 'scripts/build_libredwg.sh') }}
-
-      - name: OCR models (cache)
-        uses: actions/cache@v4
-        with:
-          path: vendor/ocr_models
-          key: ocr-models-${{ hashFiles('scripts/get_ocr_models.py') }}
 
       - name: Portable program (tests included)
         run: bash scripts/build_linux.sh
@@ -182,10 +155,18 @@ jobs:
               samples/sample_plan.pdf -o /tmp/check/sample.dwg -q
           test "$(head -c 6 /tmp/check/sample.dwg)" = "AC1015"
           ./dist/ConvertCAD-*-x86_64.AppImage --appimage-extract-and-run --cli \
-              samples/sample_scan.pdf -o /tmp/check/scan.dxf -q --ocr-engine rapidocr
-          grep -qF "(RapidOCR)" /tmp/check/scan_log.txt
+              samples/sample_scan.pdf -o /tmp/check/scan.dxf -q
+          grep -qE "[1-9][0-9]* OCR text\(s\) \(PP-OCR" /tmp/check/scan_log.txt
           dpkg-deb --info dist/convertcad_*_amd64.deb
           dpkg-deb --contents dist/convertcad_*_amd64.deb | grep -q libredwg/dxf2dwg
+
+      - name: OCR model download from the built program (information only)
+        continue-on-error: true
+        env:
+          CONVERTCAD_OCR_MODELS: /tmp/check/models
+        run: |
+          ./dist/ConvertCAD-*-x86_64.AppImage --appimage-extract-and-run --cli --get-ocr-model greek
+          ./dist/ConvertCAD-*-x86_64.AppImage --appimage-extract-and-run --cli --list-ocr
 
       - uses: actions/upload-artifact@v6
         with:
