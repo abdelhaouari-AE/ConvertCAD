@@ -24,7 +24,8 @@ import ezdxf
 from ezdxf import colors as ezcolors
 from ezdxf.math import BSpline, Vec2, Vec3
 
-from .annotations import AnnotationResult, DimensionEntity, LeaderEntity
+from .annotations import (AngularDimension, AnnotationResult, DimensionEntity,
+                          LeaderEntity, RadialDimension)
 from .blocks import BlockResult
 from .constants import (LAYER_BLOCKS, LAYER_DIM, LAYER_DIM_RAW, LAYER_HATCH,
                         LAYER_IMAGE, LAYER_LEADER, LAYER_SHX_TEXT, LAYER_TEXT,
@@ -33,6 +34,7 @@ from .extractor import PageData, RawText, Style
 from .geometry import EArc, ECircle, EPolyline, ESpline, RebuiltPage
 from .patterns import parse_dash_pattern
 from .layers import LayerInfo, build_layer_table, layer_for_style, lineweight_enum
+from .spatial import angle_diff_mod180
 from .stats import WriteStats
 from .units import compute_scale, effective_denominator  # noqa: F401 (re-export)
 
@@ -585,10 +587,14 @@ class DxfWriter:
 
     # ---- dimensions & leaders ------------------------------------------------------
     def write_annotations(self, ann: AnnotationResult, tr) -> None:
-        if ann.dimensions:
+        if ann.dimensions or ann.radial or ann.angular:
             self._role_layer(LAYER_DIM, (255, 0, 0))
         for d in ann.dimensions:
             self._write_dimension(d, tr)
+        for r in ann.radial:
+            self._write_radial(r, tr)
+        for a in ann.angular:
+            self._write_angular(a, tr)
         if ann.leaders:
             self._role_layer(LAYER_LEADER, (0, 0, 255))
         for ld in ann.leaders:
@@ -605,13 +611,9 @@ class DxfWriter:
             if math.dist(t1, t2) < 1e-9:
                 return
             angle = math.degrees(math.atan2(t2[1] - t1[1], t2[0] - t1[0]))
-            h = max(tr.length(d.height) * self.s.text_height_factor, 1e-6)
-            override = {"dimtxt": h, "dimasz": h * 0.9, "dimexe": h * 0.5,
-                        "dimexo": h * 0.3, "dimgap": h * 0.25,
-                        "dimclrd": 0, "dimclre": 0, "dimclrt": 0,
-                        "dimtxsty": TEXT_STYLE}
+            override = self._dim_override(d.height, tr)
             if d.kind == "tick":
-                override["dimtsz"] = h * 0.6           # oblique ticks
+                override["dimtsz"] = override["dimtxt"] * 0.6  # ticks
             dim = self.msp.add_linear_dim(
                 base=tr.pt(d.line_point), p1=p1, p2=p2, angle=angle,
                 text=d.text, dimstyle="Standard", override=override,
@@ -627,6 +629,127 @@ class DxfWriter:
             self._count(LAYER_DIM)
         except Exception as exc:
             self._warn_once("dim", f"Some dimensions fell back: {exc}")
+
+    def _dim_override(self, height_pt: float, tr) -> dict:
+        """Dimension sizes in drawing units, from the PDF text height."""
+        h = max(tr.length(height_pt) * self.s.text_height_factor, 1e-6)
+        return {"dimtxt": h, "dimasz": h * 0.9, "dimexe": h * 0.5,
+                "dimexo": h * 0.3, "dimgap": h * 0.25,
+                "dimclrd": 0, "dimclre": 0, "dimclrt": 0,
+                "dimtxsty": TEXT_STYLE}
+
+    def _undo_from(self, count: int) -> None:
+        """Remove what a failed ezdxf call left in model space (it may add
+        the entity before failing)."""
+        for e in list(self.msp)[count:]:
+            try:
+                self.msp.delete_entity(e)
+            except Exception:                              # pragma: no cover
+                pass
+
+    def _write_radial(self, d: RadialDimension, tr) -> None:
+        """RADIUS / DIAMETER dimension. The arrow touches the circle exactly
+        where the PDF arrow does; the value shown is the original PDF text,
+        along the line or horizontal like in the PDF."""
+        before = len(self.msp)
+        try:
+            c, tip = tr.pt(d.center), tr.pt(d.tip)
+            dd = math.dist(c, tip)
+            r = tr.length(d.radius)
+            if dd < 1e-9 or r < 1e-9:
+                return
+            u = ((tip[0] - c[0]) / dd, (tip[1] - c[1]) / dd)
+            override = self._dim_override(d.height, tr)
+            # value written along the line, or horizontal (with a landing
+            # when outside)
+            line_ang = math.degrees(math.atan2(u[1], u[0]))
+            aligned = angle_diff_mod180(line_ang, d.text_rotation) <= 10.0
+            override["dimtih"] = override["dimtoh"] = 0 if aligned else 1
+            # ezdxf: the dimension line runs from the centre through
+            # `location` -> put it ON the PDF line, where the value (or the
+            # corner before a horizontal landing) is
+            ref = d.kink if d.kink is not None and not aligned \
+                else d.text_center
+            s = None
+            if ref is not None:
+                p = tr.pt(ref)
+                s = (p[0] - c[0]) * u[0] + (p[1] - c[1]) * u[1]
+                if d.kind == "radius" and s < 0.25 * r:
+                    s = None                   # value at the centre: default
+                elif d.kind == "diameter" and abs(s) < 1e-3 * r:
+                    s = 1e-3 * r               # value at the centre
+            add = (self.msp.add_radius_dim if d.kind == "radius"
+                   else self.msp.add_diameter_dim)
+            common = dict(text=d.text, dimstyle="Standard", override=override,
+                          dxfattribs={"layer": LAYER_DIM})
+            if s is not None:
+                dim = add(center=c, radius=r,
+                          location=(c[0] + u[0] * s, c[1] + u[1] * s),
+                          **common)
+            else:
+                dim = add(center=c, mpoint=(c[0] + u[0] * r, c[1] + u[1] * r),
+                          **common)
+            dim.render()
+            self.stats.dimensions += 1
+            self._count(LAYER_DIM)
+        except Exception as exc:
+            self._undo_from(before)
+            self._warn_once("dim", f"Some dimensions fell back: {exc}")
+
+    def _write_angular(self, d: AngularDimension, tr) -> None:
+        """ANGLE (3-point angular) or ARC LENGTH dimension on the PDF arc.
+        Its extension lines are not drawn: the PDF ones stay as geometry.
+        ARC_DIMENSION exists from AutoCAD 2007 (and not in LibreDWG): for
+        older versions and DWG it is written as its drawing (lines, arc,
+        arrows, text) on layer DIM."""
+        before = len(self.msp)
+        try:
+            cx, cy = d.center
+            sweep = d.sweep
+
+            def at(a: float, rad: float):
+                return tr.pt((cx + rad * math.cos(math.radians(a)),
+                              cy + rad * math.sin(math.radians(a))))
+            rad = d.radius if d.kind == "angle" else (d.arc_radius or d.radius)
+            override = self._dim_override(d.height, tr)
+            override["dimse1"] = override["dimse2"] = 1
+            # the y flip reverses the angles: the DXF angle goes from the
+            # PDF end point to the PDF start point (counter-clockwise)
+            args = dict(base=at(d.start_angle + sweep / 2.0, d.radius),
+                        center=tr.pt(d.center), p1=at(d.end_angle, rad),
+                        p2=at(d.start_angle, rad),
+                        location=(tr.pt(d.text_center)
+                                  if d.text_center is not None else None),
+                        text=d.text, text_rotation=d.text_rotation,
+                        dimstyle="Standard", override=override,
+                        dxfattribs={"layer": LAYER_DIM})
+            if d.kind == "angle":
+                dim = self.msp.add_angular_dim_3p(**args)
+                dim.render()
+            else:
+                dim = self.msp.add_arc_dim_3p(**args)
+                dim.render()
+                if self.s.dxf_version in ("R12", "R2000", "R2004"):
+                    self._explode_dimension(dim.dimension)
+            self.stats.dimensions += 1
+            self._count(LAYER_DIM)
+        except Exception as exc:
+            self._undo_from(before)
+            self._warn_once("dim", f"Some dimensions fell back: {exc}")
+
+    def _explode_dimension(self, dim) -> None:
+        """Replace a rendered dimension by its drawing, on layer DIM."""
+        block = dim.dxf.get("geometry", "")
+        for e in dim.explode():
+            if e.dxftype() == "POINT":                 # definition points
+                self.msp.delete_entity(e)
+            else:
+                e.dxf.layer = LAYER_DIM
+        if block and block in self.doc.blocks:
+            try:
+                self.doc.blocks.delete_block(block, safe=False)
+            except Exception:                              # pragma: no cover
+                pass
 
     def _write_leader(self, ld: LeaderEntity, tr) -> None:
         """MULTILEADER (R2007+) or classic LEADER + text. Multi-line notes

@@ -222,7 +222,8 @@ def _convert_dxf(pdf_path: str, dxf_path: str, opt: Options,
                 step("reconstructing dimensions and leaders…", 0.6)
                 ann = reconstruct(rp, enable_dims=opt.dimensions,
                                   enable_leaders=opt.leaders,
-                                  enable_ticks=opt.tick_dimensions)
+                                  enable_ticks=opt.tick_dimensions,
+                                  units_per_pt=page_scale)
 
                 step("detecting repeated symbols…", 0.7)
                 br = (detect_blocks(rp, opt.block_min_repeats,

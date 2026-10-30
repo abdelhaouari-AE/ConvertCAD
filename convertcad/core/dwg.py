@@ -292,6 +292,7 @@ def _remap_handles(path: str) -> None:
         lines[seed_line] = format(highest + 1, "X")
     _fix_ltype_count(lines, n)
     lines = _complete_insert_scales(lines)
+    lines = _drop_angular_arc_point(lines)
     with open(path, "w", encoding="utf-8", newline="\n") as fh:
         fh.write("\n".join(lines))
 
@@ -334,6 +335,29 @@ def _complete_insert_scales(lines: List[str]) -> List[str]:
         i = j
     out += lines[n:]
     return out
+
+
+def _drop_angular_arc_point(lines: List[str]) -> List[str]:
+    """Remove group 16 (with 26, 36) from 3-point ANGULAR dimensions.
+
+    ezdxf writes it for every angular dimension; AutoCAD only uses it for
+    the 2-line kind, and LibreDWG refuses the whole drawing ("Invalid DXF
+    code 16 for DIMENSION_ANG3PT")."""
+    n = len(lines) - (len(lines) % 2)
+    out: List[str] = []
+    entity = subclass = ""
+    for i in range(0, n, 2):
+        code, value = lines[i].strip(), lines[i + 1].strip()
+        if code == "0":
+            entity, subclass = value, ""
+        elif code == "100":
+            subclass = value
+        elif (entity == "DIMENSION"
+              and subclass == "AcDb3PointAngularDimension"
+              and code in ("16", "26", "36")):
+            continue
+        out += lines[i:i + 2]
+    return out + lines[n:]
 
 
 def _fix_ltype_count(lines: List[str], n: int) -> None:

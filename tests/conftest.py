@@ -86,6 +86,18 @@ def arrow(page, tip, direction, length=7.0, half=1.2):
     sh.commit()
 
 
+def arc(page, center, r, a0, a1, width=0.25):
+    """Circular arc from page angle a0 to a1 (degrees, y down like EArc:
+    increasing angles turn clockwise on the sheet)."""
+    import math
+    sh = page.new_shape()
+    p = (center[0] + r * math.cos(math.radians(a0)),
+         center[1] + r * math.sin(math.radians(a0)))
+    sh.draw_sector(center, p, a0 - a1, fullSector=False)   # beta > 0 turns
+    sh.finish(color=(0, 0, 0), width=width, closePath=False)  # the other way
+    sh.commit()
+
+
 @pytest.fixture
 def pdf_factory(tmp_path):
     counter = {"n": 0}

@@ -99,12 +99,15 @@ def describe_entity(entity) -> dict:
             info["text"] = entity.dxf.text
         elif kind == "MTEXT":
             info["text"] = entity.plain_text().split("\n")[0]
-        elif kind == "DIMENSION":
+        elif kind in ("DIMENSION", "ARC_DIMENSION"):
             override = entity.dxf.get("text", "")
             if override and override not in ("<>", " "):
                 info["text"] = override.replace("<>", "").strip() or override
             else:
-                info["measurement"] = float(entity.get_measurement() or 0.0)
+                try:                  # (ezdxf cannot measure every kind)
+                    info["measurement"] = float(entity.get_measurement() or 0)
+                except Exception:
+                    pass
         elif kind == "INSERT":
             info["block"] = entity.dxf.name
         elif kind == "HATCH":

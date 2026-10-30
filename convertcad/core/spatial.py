@@ -66,6 +66,27 @@ class GridIndex(Generic[T]):
                 self._cells.setdefault(key, []).append(idx)
         return idx
 
+    def insert_path(self, item: T, points: List[Tuple[float, float]]) -> int:
+        """Add an item drawn along a polyline (e.g. a sampled arc), under ONE
+        id, registering only the cells the polyline crosses. (A large arc
+        must not claim every cell of its circle's bounding box.)"""
+        idx = len(self._items)
+        self._items.append(item)
+        xs = [p[0] for p in points]
+        ys = [p[1] for p in points]
+        self._boxes.append((min(xs), min(ys), max(xs), max(ys)))
+        seen: Set[Tuple[int, int]] = set()
+        for p, q in zip(points, points[1:]):
+            steps = max(1, int(math.dist(p, q) / (self.cell * 0.5)))
+            for k in range(steps + 1):
+                t = k / steps
+                key = (int(math.floor((p[0] + (q[0] - p[0]) * t) / self.cell)),
+                       int(math.floor((p[1] + (q[1] - p[1]) * t) / self.cell)))
+                if key not in seen:
+                    seen.add(key)
+                    self._cells.setdefault(key, []).append(idx)
+        return idx
+
     def query_ids(self, x0: float, y0: float, x1: float, y1: float) -> Set[int]:
         """Ids of items whose cells intersect the box (candidates only)."""
         out: Set[int] = set()
