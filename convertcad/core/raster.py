@@ -27,7 +27,7 @@ from typing import Dict, List, Tuple
 import numpy as np
 
 from .constants import LAYER_TRACE, MAX_RASTER_PIXELS
-from .extractor import PageData, RawSegment, RawText, Style
+from .extractor import PageData, RawBezier, RawSegment, RawText, Style
 
 try:                                              # hard dependency for tracing
     import cv2
@@ -59,6 +59,16 @@ class RTol:
                              # result at 200 dpi, twice as slow)...
     OCR_MIN_SIDE = 2000      # ...but small sheets keep at least 2000 px on
                              # their long side (finer for tiny A4/A3 text)
+    ARC_EPS = 1.2            # arcs: outline simplified to this (px)...
+    ARC_TURN = 40.0          # ...a curved outline bends less than this at
+                             # each corner (degrees), always the same way
+    ARC_MIN_SWEEP = 25.0     # degrees
+    ARC_MIN_LEN = 20.0       # px along the arc
+    ARC_MIN_R = 6.0          # px
+    ARC_MAX_R = 4000.0       # px
+    ARC_RMS = 0.7            # circle fit: mean distance of the outline (px)
+    ARC_SAG = 2.0            # px: flatter arcs are straight lines
+    ARC_PAIR = 12.0          # px: the two sides of one stroke
     MERGE_ANGLE = 1.5        # collinear merge: max angle difference (deg)
     MERGE_OFFSET = 0.6       # ...max perpendicular offset (page points)
     MERGE_GAP = 1.5          # ...max gap between pieces (page points)
@@ -71,10 +81,19 @@ class RasterCircle:
 
 
 @dataclass
+class RasterArc:
+    center: Tuple[float, float]      # page points
+    radius: float
+    start_angle: float               # degrees, page convention (y down),
+    end_angle: float                 # like EArc: increasing from start to end
+
+
+@dataclass
 class RasterResult:
     segments: List[RawSegment] = field(default_factory=list)
     texts: List[RawText] = field(default_factory=list)
     circles: List[RasterCircle] = field(default_factory=list)
+    arcs: List[RasterArc] = field(default_factory=list)
     dpi_used: int = 0
     ocr_used: bool = False
     ocr_model: str = ""                  # models actually used (report)
@@ -161,6 +180,213 @@ def find_circles(work: np.ndarray, binary: np.ndarray
         if all(math.hypot(cx - a, cy - b) > 0.2 * r or abs(r - rr) > 0.2 * r
                for a, b, rr in out):
             out.append((cx, cy, r))
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Arcs
+# ---------------------------------------------------------------------------
+def _fit_circle(pts: np.ndarray) -> Tuple[float, float, float, float]:
+    """Least-squares circle through points: (cx, cy, r, rms distance).
+    Algebraic fit, then a few geometric (Gauss-Newton) steps."""
+    x, y = pts[:, 0], pts[:, 1]
+    a = np.c_[2.0 * x, 2.0 * y, np.ones(len(x))]
+    sol = np.linalg.lstsq(a, x * x + y * y, rcond=None)[0]
+    cx, cy = float(sol[0]), float(sol[1])
+    r = math.sqrt(max(sol[2] + cx * cx + cy * cy, 1e-12))
+    for _ in range(4):
+        dx, dy = x - cx, y - cy
+        d = np.maximum(np.hypot(dx, dy), 1e-9)
+        jac = np.c_[-dx / d, -dy / d, -np.ones(len(x))]
+        step = np.linalg.lstsq(jac, -(d - r), rcond=None)[0]
+        cx, cy, r = cx + step[0], cy + step[1], r + step[2]
+    rms = float(np.sqrt(np.mean((np.hypot(x - cx, y - cy) - r) ** 2)))
+    return cx, cy, abs(r), rms
+
+
+def _vertex_indices(pts: np.ndarray, poly: np.ndarray) -> List[int]:
+    """Index in the closed outline `pts` of each vertex of its simplified
+    polygon (same order, going round)."""
+    n = len(pts)
+    first = np.flatnonzero((pts == poly[0]).all(axis=1))
+    if not len(first):
+        return []
+    out = [int(first[0])]
+    j = out[0]
+    for v in poly[1:]:
+        for step in range(1, n + 1):
+            k = (j + step) % n
+            if pts[k, 0] == v[0] and pts[k, 1] == v[1]:
+                j = k
+                break
+        else:
+            return []
+        out.append(j)
+    return out
+
+
+def _outline_arcs(pts: np.ndarray, min_r: float = RTol.ARC_MIN_R) -> list:
+    """Arcs along one stroke outline: runs of corners of its simplified
+    polygon that bend a little, always the same way, fitted by a circle.
+    Returns (cx, cy, r, start, sweep) in px, angles in degrees (y down)."""
+    # smoothed outline: the pixel staircase and the specks of a scan must
+    # not look like corners
+    k = 2
+    pts = sum(np.roll(pts.astype(np.float32), s, axis=0)
+              for s in range(-k, k + 1)) / (2 * k + 1)
+    poly = cv2.approxPolyDP(pts.reshape(-1, 1, 2), RTol.ARC_EPS,
+                            True).reshape(-1, 2)
+    m = len(poly)
+    if m < 4:
+        return []
+    idx = _vertex_indices(pts, poly)
+    if not idx:
+        return []
+    e = np.roll(poly, -1, axis=0) - poly                  # edge vectors
+    ang = np.degrees(np.arctan2(e[:, 1], e[:, 0]))
+    turn = (ang - np.roll(ang, 1) + 180.0) % 360.0 - 180.0   # at vertex i
+    sign = np.sign(turn)
+    soft = (np.abs(turn) < RTol.ARC_TURN) & (np.abs(turn) > 0.5)
+    n = len(pts)
+    out = []
+    i = 0
+    while i < m:                      # runs of soft corners, same sign
+        if not soft[i]:
+            i += 1
+            continue
+        j = i
+        while j + 1 < m and soft[j + 1] and sign[j + 1] == sign[i]:
+            j += 1
+        # corners i..j: the arc runs from vertex i-1 to vertex j+1; a line
+        # leaving the arc on its tangent bends little too: when the circle
+        # does not fit, the longer end edge is dropped and the fit retried
+        lo, hi = i - 1, j + 1
+        lengths = np.hypot(e[:, 0], e[:, 1])
+        while hi - lo >= 3:
+            a, b = idx[lo % m], idx[hi % m]
+            run = np.arange(a, a + ((b - a) % n) + 1) % n
+            if len(run) < RTol.ARC_MIN_LEN:
+                break
+            arc = _arc_of(pts[run], min_r)
+            if arc is not None:
+                out.append(arc)
+                break
+            if lengths[lo % m] >= lengths[(hi - 1) % m]:
+                lo += 1
+            else:
+                hi -= 1
+        i = j + 1
+    return out
+
+
+def _arc_of(run: np.ndarray, min_r: float = RTol.ARC_MIN_R):
+    """Circle arc through a run of outline points, if it is one."""
+    cx, cy, r, rms = _fit_circle(run.astype(float))
+    if not min_r <= r <= RTol.ARC_MAX_R or rms > RTol.ARC_RMS:
+        return None
+    a = np.unwrap(np.arctan2(run[:, 1] - cy, run[:, 0] - cx))
+    sweep = math.degrees(abs(a[-1] - a[0]))
+    if sweep < RTol.ARC_MIN_SWEEP or sweep >= 350.0 or \
+            r * (1.0 - math.cos(math.radians(sweep) / 2.0)) < RTol.ARC_SAG:
+        return None
+    start = math.degrees(min(a[0], a[-1])) % 360.0
+    return (cx, cy, r, start, sweep)
+
+
+def _same_circle(a, b, tol: float) -> bool:
+    return math.hypot(a[0] - b[0], a[1] - b[1]) <= tol
+
+
+def _overlap(a, b) -> float:
+    """Angle shared by two arcs (degrees)."""
+    best = 0.0
+    for shift in (-360.0, 0.0, 360.0):
+        s = max(a[3], b[3] + shift)
+        e = min(a[3] + a[4], b[3] + shift + b[4])
+        best = max(best, e - s)
+    return best
+
+
+def find_arcs(binary: np.ndarray, min_r: float = RTol.ARC_MIN_R
+              ) -> List[Tuple[float, float, float, float, float]]:
+    """Arcs of a scanned page drawn as thin curved strokes: (cx, cy, r in
+    px, start and end angles in degrees, y down, increasing from start to
+    end).
+
+    Each stroke outline (OpenCV contour) is simplified; where it bends a
+    little at every corner, always the same way, a circle is fitted. A
+    stroke has two sides: an arc is kept only when the other side of the
+    stroke gives the same circle (radius one stroke width apart) — the
+    outline of a filled area or of a speck of noise never does. Arcs of one
+    circle cut by crossing lines are joined again."""
+    contours, _ = cv2.findContours(binary, cv2.RETR_LIST,
+                                   cv2.CHAIN_APPROX_NONE)
+    sides = []
+    for c in contours:
+        if len(c) >= 2 * RTol.ARC_MIN_LEN:
+            sides += _outline_arcs(c.reshape(-1, 2), min_r)
+    # the two sides of each stroke -> its centre line
+    used = [False] * len(sides)
+    lines = []
+    for i, a in enumerate(sides):
+        if used[i]:
+            continue
+        for j in range(i + 1, len(sides)):
+            b = sides[j]
+            if used[j] or abs(a[2] - b[2]) > RTol.ARC_PAIR or \
+                    not _same_circle(a, b, max(2.0, 0.05 * a[2])):
+                continue
+            if _overlap(a, b) >= 0.6 * min(a[4], b[4]):
+                used[i] = used[j] = True
+                s0 = _mean_angle(a[3], b[3])
+                s1 = _mean_angle(a[3] + a[4], b[3] + b[4])
+                lines.append(((a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0,
+                              (a[2] + b[2]) / 2.0, s0, (s1 - s0) % 360.0,
+                              abs(a[2] - b[2])))
+                break
+    return _join_pieces(lines)
+
+
+def _mean_angle(a: float, b: float) -> float:
+    """Mean of two angles (degrees), the short way round."""
+    d = (b - a + 180.0) % 360.0 - 180.0
+    return (a + d / 2.0) % 360.0
+
+
+def _join_pieces(arcs: list) -> list:
+    """Pieces of one circle (a curve cut by the strokes that cross it)
+    joined: (cx, cy, r, start, end)."""
+    groups: list = []
+    for q in arcs:
+        for g in groups:
+            ref = g[0]
+            if abs(ref[2] - q[2]) <= 3.0 and \
+                    _same_circle(ref, q, max(2.0, 0.03 * q[2])):
+                g.append(q)
+                break
+        else:
+            groups.append([q])
+    out = []
+    for g in groups:
+        cx = sum(q[0] for q in g) / len(g)
+        cy = sum(q[1] for q in g) / len(g)
+        r = sum(q[2] for q in g) / len(g)
+        gap = math.degrees((max(q[5] for q in g) + 24.0) / max(r, 1.0))
+        spans = sorted((q[3] % 360.0, q[3] % 360.0 + q[4]) for q in g)
+        joined = [list(spans[0])]
+        for s0, s1 in spans[1:]:
+            if s0 <= joined[-1][1] + gap:
+                joined[-1][1] = max(joined[-1][1], s1)
+            else:
+                joined.append([s0, s1])
+        # the last piece may continue through 0 degrees into the first
+        if len(joined) > 1 and joined[-1][1] - 360.0 + gap >= joined[0][0]:
+            joined[0][0] = joined[-1][0] - 360.0
+            joined[0][1] = max(joined[0][1], joined[-1][1] - 360.0)
+            joined.pop()
+        for s0, s1 in joined:
+            sweep = min(s1 - s0, 359.0)
+            out.append((cx, cy, r, s0 % 360.0, (s0 + sweep) % 360.0))
     return out
 
 
@@ -271,6 +497,22 @@ def vectorize_page(doc, page_index: int, dpi: int = 300, ocr: bool = True,
                        int(round(c.radius * zoom)), 255, thickness=7)
         binary = cv2.bitwise_and(binary, cv2.bitwise_not(mask))
 
+    # ---- 3b. Arcs: curved strokes, before straight lines (a curve must not
+    #      become a chain of chords) -------------------------------------------
+    # (not the bowls of letters: 4 pt radius at least)
+    arcs = find_arcs(binary, max(RTol.ARC_MIN_R, 4.0 * zoom))
+    if arcs:
+        mask = np.zeros_like(binary)
+        for cx, cy, r, a0, a1 in arcs:
+            res.arcs.append(RasterArc(center=(cx / zoom, cy / zoom),
+                                      radius=r / zoom, start_angle=a0,
+                                      end_angle=a1))
+            sweep = (a1 - a0) % 360.0
+            cv2.ellipse(mask, (int(round(cx * 4)), int(round(cy * 4))),
+                        (int(round(r * 4)), int(round(r * 4))), 0.0, a0,
+                        a0 + sweep, 255, thickness=9, shift=2)
+        binary = cv2.bitwise_and(binary, cv2.bitwise_not(mask))
+
     # ---- 4. Straight lines, then merge the fragments ------------------------
     lines = cv2.HoughLinesP(binary, rho=1, theta=math.pi / 360.0,
                             threshold=RTol.HOUGH_THRESH,
@@ -283,7 +525,7 @@ def vectorize_page(doc, page_index: int, dpi: int = 300, ocr: bool = True,
                np.asarray(lines, dtype=float).reshape(-1, 4)]
         for x1, y1, x2, y2 in merge_collinear(raw):
             res.segments.append(RawSegment((x1, y1), (x2, y2), style))
-    if not res.segments and not res.circles:
+    if not res.segments and not res.circles and not res.arcs:
         res.warnings.append(f"Page {page_index + 1}: raster tracing found no "
                             "recognisable geometry (very light scan?).")
     return res
@@ -336,8 +578,32 @@ def _run_ocr(img: np.ndarray, zoom: float, plan):
     return texts, boxes, None
 
 
+def arc_beziers(arc: RasterArc, style: Style) -> List[RawBezier]:
+    """A traced arc as cubic Beziers (at most 90 degrees each), like a PDF
+    draws it: the normal rebuild turns them back into one ARC."""
+    sweep = (arc.end_angle - arc.start_angle) % 360.0
+    n = max(1, int(math.ceil(sweep / 90.0)))
+    step = math.radians(sweep / n)
+    k = 4.0 / 3.0 * math.tan(step / 4.0)
+    cx, cy = arc.center
+    r = arc.radius
+    out = []
+    for i in range(n):
+        a0 = math.radians(arc.start_angle) + i * step
+        a1 = a0 + step
+        p0 = (cx + r * math.cos(a0), cy + r * math.sin(a0))
+        p3 = (cx + r * math.cos(a1), cy + r * math.sin(a1))
+        p1 = (p0[0] - k * r * math.sin(a0), p0[1] + k * r * math.cos(a0))
+        p2 = (p3[0] + k * r * math.sin(a1), p3[1] - k * r * math.cos(a1))
+        out.append(RawBezier(p0, p1, p2, p3, style))
+    return out
+
+
 def merge_into_page(page_data: PageData, res: RasterResult) -> None:
     """Inject traced primitives into the normal pipeline structures."""
     page_data.segments.extend(res.segments)
+    style = Style(color=(0, 0, 0), width=0.4, pdf_layer=LAYER_TRACE)
+    for arc in res.arcs:
+        page_data.beziers.extend(arc_beziers(arc, style))
     page_data.texts.extend(res.texts)
     page_data.warnings.extend(res.warnings)

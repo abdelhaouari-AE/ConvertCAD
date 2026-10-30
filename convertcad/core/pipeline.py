@@ -502,7 +502,8 @@ def _scanned_page(doc, pd: PageData, opt: Options, rep: ConversionReport,
            else "no OCR")
     rep.page_notes.append(
         f"Page {pd.number}: scanned page traced at {rres.dpi_used} dpi — "
-        f"{len(rres.segments)} line(s), {len(rres.circles)} circle(s), {src}; "
+        f"{len(rres.segments)} line(s), {len(rres.circles)} circle(s), "
+        f"{len(rres.arcs)} arc(s), {src}; "
         f"original scan kept on locked layer IMG_RASTER for checking.")
     return rres.circles
 

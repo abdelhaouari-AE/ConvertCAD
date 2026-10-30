@@ -183,3 +183,51 @@ def test_circles_found_quickly_on_a_large_sheet():
     for cx, cy, r in truth:
         assert any(math.hypot(cx - a, cy - b) <= 3 and abs(r - c) <= 3
                    for a, b, c in found), (cx, cy, r)
+
+
+def _scan_of(pdf_factory, draw, dpi=300):
+    """An image-only PDF: the drawing rasterised, like a scanner does."""
+    from convertcad.core.compat import pymupdf
+    src = pymupdf.open(pdf_factory(draw, width=600, height=420))
+    pix = src[0].get_pixmap(dpi=dpi, colorspace=pymupdf.csGRAY)
+
+    def put(page):
+        page.insert_image(page.rect, pixmap=pix)
+    return pdf_factory(put, width=600, height=420)
+
+
+ARCS = [((150, 150), 60, -150, -30), ((350, 150), 25, 0, 120),
+        ((480, 120), 40, 90, 270), ((420, 320), 15, 180, 300)]
+
+
+def _arcs_and_lines(page):
+    from conftest import arc, stroke
+    for c, r, a0, a1 in ARCS:
+        arc(page, c, r, a0, a1, width=0.6)
+    stroke(page, [("line", (60, 150), (240, 150)),
+                  ("line", (300, 60), (300, 260))], width=0.6)
+    # a filled disc: its outline is not an arc of a stroke
+    sh = page.new_shape()
+    sh.draw_circle((250, 330), 22)
+    sh.finish(color=None, fill=(0, 0, 0))
+    sh.commit()
+
+
+def test_arcs_traced_on_a_scan(pdf_factory, tmp_path):
+    from convertcad.core.compat import pymupdf
+    from convertcad.core.raster import vectorize_page
+    scan = _scan_of(pdf_factory, _arcs_and_lines)
+    res = vectorize_page(pymupdf.open(scan), 0, dpi=300, ocr=False)
+    for (cx, cy), r, a0, a1 in ARCS:
+        hits = [a for a in res.arcs
+                if abs(a.center[0] - cx) < 1.0 and abs(a.center[1] - cy) < 1.0
+                and abs(a.radius - r) < 0.5]
+        assert len(hits) == 1, (cx, cy, r)
+        sweep = (hits[0].end_angle - hits[0].start_angle) % 360.0
+        assert abs(sweep - (a1 - a0)) < 10.0
+    assert len(res.arcs) <= len(ARCS) + 1          # (+ the disc's outline)
+    # the pipeline writes them as ARC entities
+    rep = convert(scan, str(tmp_path / "arcs.dxf"),
+                  Options(scale_denominator=1, ocr=False, write_log=False))
+    assert rep.success and rep.stats.arcs >= len(ARCS)
+    assert any("arc(s)" in n for n in rep.page_notes)
