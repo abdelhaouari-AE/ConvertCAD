@@ -8,7 +8,7 @@
   <b>Convert 2D PDF drawings into editable DXF and DWG files built with real CAD entities.</b><br>
   Lines, polylines, arcs, circles, splines, hatches, text, <b>true dimensions</b>, <b>leaders</b>,
   <b>layers</b> and <b>blocks</b> — not exploded line spaghetti.<br>
-  Windows (portable or installer) · Linux (AppImage, .deb) · conversions 100 % offline · English / Français
+  Windows (portable or installer) · Linux (AppImage, .deb) · conversions 100 % offline · English · Français · Español · Deutsch · العربية
 </p>
 
 ![ConvertCAD — converted plan with its layers](docs/screenshots/03-result-layers.png)
@@ -29,17 +29,20 @@ ConvertCAD rebuilds the **intent** of the drawing:
 | Touching segments | One **LWPOLYLINE** (closed when it loops) |
 | Dash patterns, or dashes drawn as separate pieces | One line with a linetype **CENTER**, **DASHED**, **DASHDOT**, **PHANTOM**… measured on the PDF |
 | Arrows + line + value, oblique ticks + line + value | Real **DIMENSION** entities (the PDF value is kept) |
+| Arrow on a circle + "R…" / "Ø…"; two arrows on an arc + "45°" or an arc length | Real **RADIUS**, **DIAMETER**, **ANGULAR** and **ARC LENGTH** dimensions |
 | Arrow + polyline + note | **MULTILEADER** (classic **LEADER** for older DXF versions) |
-| The same symbol repeated (columns, doors, bolts…), even rotated or mirrored | One **BLOCK** + one **INSERT** per occurrence |
+| The same symbol repeated (columns, doors, bolts…), even turned by any angle or mirrored | One **BLOCK** + one **INSERT** per occurrence |
 | Stacked text lines | One **MTEXT** paragraph |
 | Solid fills · hatching drawn as hundreds of parallel lines | **HATCH** (solid · pattern with its angle and spacing) |
+| Sand, concrete, gravel, earth, brick, insulation, dots plotted as thousands of dashes and dots | One **HATCH** with the standard AutoCAD pattern (AR-SAND, AR-CONC, GRAVEL, EARTH, BRICK, INSUL, DOTS…) at its measured scale and angle |
 | AutoCAD SHX text plotted as strokes | Real **TEXT** with the original string |
-| Scanned sheets | Traced lines and circles + OCR text (PP-OCR, 50+ languages), scan kept on a locked layer |
+| Scanned sheets | Traced lines, circles and arcs + OCR text (PP-OCR, 50+ languages), scan kept on a locked layer |
 | Colours, line weights, PDF layers | Organised **layers** (`GEO_BLACK_050_CENTER`, `DIM`, `TEXT`, …) |
 
-**Safe by design:** a dimension is rebuilt only when arrows, line and text all agree.
-Measurement texts that matched nothing go to the red layer `DIM_RAW` for review.
-Nothing is invented.
+**Safe by design:** a dimension is rebuilt only when arrows, line and text all agree (an
+angle or an arc length only when its value agrees with the drawn arc); a texture becomes a
+standard pattern only when that pattern, drawn again, reproduces the PDF. Measurement
+texts that matched nothing go to the red layer `DIM_RAW` for review. Nothing is invented.
 
 ## Features
 
@@ -54,13 +57,14 @@ Nothing is invented.
 - **Scale tools** — scale read from the title block, *Calibrate* on two points of known
   distance, *Measure* any distance, with **object snap** (END / MID / INT / CEN) like AutoCAD.
   Sheets with different scales in one set: *read the scale written on each sheet*.
-- **Review before saving** — preview of the DXF as CAD software will read it, layer table
-  (keep / hide, rename, recolour), detailed conversion report with warnings.
+- **Review before saving** — preview of the DXF as CAD software will read it (click an
+  entity to see its type, layer and size), layer table (keep / hide, rename, recolour),
+  detailed conversion report with warnings.
 - **Full options** — curve precision, text height ratio, MTEXT grouping, arrow and tick
   dimensions, leaders, layer naming modes, AutoCAD Color Index or true colour, block detection threshold,
   OCR languages, accuracy and resolution, one file or one file per sheet,
   6 built-in presets + your own.
-- **Scanned drawings** — line and circle tracing (OpenCV) and OCR with PaddleOCR's PP-OCR
+- **Scanned drawings** — line, circle and arc tracing (OpenCV) and OCR with PaddleOCR's PP-OCR
   models (whole text lines, small, rotated and vertical text). **Built in:** English, French
   and the other Latin-script languages. **One click away** (*Settings → Scanned pages → OCR
   languages and models…*): Arabic, Cyrillic, Greek, Korean, Devanagari, Thai, Tamil, Telugu
@@ -72,8 +76,10 @@ Nothing is invented.
 - **Command line** — `ConvertCAD-cli.exe` / `python -m convertcad --cli` for scripts.
 - **Portable or installed** — portable zip (no installation, no admin rights, settings and
   OCR models can live next to the program on a USB stick) or a normal installer; no drawing
-  is ever sent anywhere (the only network use: downloading an OCR language when you ask).
-- Dark and light themes, crisp on every display scaling, English and French interface.
+  is ever sent anywhere (the only network uses: downloading an OCR language, or checking
+  for a newer version — off by default — when you ask).
+- Dark and light themes, crisp on every display scaling; interface in English, French,
+  Spanish, German and Arabic (right to left).
 
 <table>
   <tr>
@@ -184,7 +190,7 @@ option. Exit code: `0` all converted, `1` a conversion failed, `2` bad arguments
 | Windows installer | `scripts\build_installer.bat` (needs [Inno Setup](https://jrsoftware.org/isinfo.php) 6.3+) |
 | Linux tar.gz · AppImage · .deb | `./scripts/build_linux.sh` · `./scripts/build_appimage.sh` · `./scripts/build_deb.sh` |
 
-Pushing a tag such as `v1.1.0` builds **all five** on GitHub Actions and attaches them to
+Pushing a tag such as `v1.2.0` builds **all five** on GitHub Actions and attaches them to
 the release ([`.github/workflows/build.yml`](.github/workflows/build.yml)). The downloadable
 OCR models are published once, as the release `ocr-models-v1`, by the workflow
 *OCR models release*. Details, code signing and the release checklist:
@@ -229,12 +235,15 @@ Version history: [CHANGELOG.md](CHANGELOG.md).
 ## En bref (français)
 
 ConvertCAD convertit des plans PDF 2D en fichiers DXF ou **DWG** modifiables construits avec
-de vraies entités CAO : arcs et cercles, polylignes, splines, hachures (pleines et à motif),
-textes et paragraphes, **vraies cotes**, **lignes de repère**, **calques** et **blocs**.
-Windows (installateur ou version portable sans installation) et Linux (AppImage, .deb),
-conversions 100 % hors ligne, interface en français et en anglais (*Affichage → Langue*).
-Conversion d'une zone choisie, contrôle par superposition du PDF. Les plans scannés sont
-vectorisés et lus par OCR (modèles PP-OCR : anglais, français et autres langues latines
+de vraies entités CAO : arcs et cercles, polylignes, splines, hachures (pleines, à motif, et
+textures — sable, béton, gravier, terre, brique, isolant — rendues au motif AutoCAD
+standard), textes et paragraphes, **vraies cotes** (linéaires, rayon, diamètre, angle,
+longueur d'arc), **lignes de repère**, **calques** et **blocs** (copies tournées de tout
+angle). Windows (installateur ou version portable sans installation) et Linux (AppImage,
+.deb), conversions 100 % hors ligne, interface en français, anglais, espagnol, allemand et
+arabe (*Affichage → Langue*). Conversion d'une zone choisie, contrôle par superposition du
+PDF, sélection d'une entité dans le résultat. Les plans scannés sont vectorisés (lignes,
+cercles, arcs) et lus par OCR (modèles PP-OCR : anglais, français et autres langues latines
 intégrés ; arabe, cyrillique, grec… téléchargeables en un clic depuis *Réglages → Pages
 scannées → Langues et modèles OCR…*). Après chaque conversion,
 vérifiez l'échelle sur une cote connue, contrôlez le calque `DIM` et passez en revue le

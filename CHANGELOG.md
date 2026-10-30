@@ -2,6 +2,43 @@
 
 All notable changes to ConvertCAD. Versions follow *major.minor.patch*.
 
+## [1.2.0] — 2026-10-30
+
+### Added
+- **Radius, diameter, angle and arc length dimensions.** An arrow touching a circle or an
+  arc along its radius with an "R…" / "Ø…" value becomes a true RADIUS or DIAMETER
+  dimension (value inside or outside, with its landing). Two arrows on an arc pointing
+  along it become an ANGULAR dimension when the value ("45°", "30°15'") agrees with the
+  drawn arc, or an ARC LENGTH dimension when the value is written with "⌒" or matches the
+  arc length at the sheet scale. Values that disagree with the drawing are not rebuilt
+  (they stay on `DIM_RAW`). ARC_DIMENSION is written from DXF 2007; for older versions and
+  DWG the arc length dimension is kept as its drawing on layer `DIM`.
+- **Texture hatches**: sand, concrete, gravel, earth, brick, insulation and dotted areas,
+  which plotters explode into thousands of dashes and dots, become one HATCH with the
+  standard AutoCAD pattern (AR-SAND, AR-CONC, GRAVEL, EARTH, BRICK, AR-B816, AR-BRSTD,
+  INSUL, DOTS) at the scale, angle and origin measured on the PDF, inside the drawn
+  boundary. A pattern is kept only when, drawn again, it reproduces the PDF pieces; sand
+  and concrete, which look random, are accepted on their statistics and the report says
+  their scale and position are estimated. Anything else stays as lines.
+- **Repeated symbols at any angle** (a valve turned 30°…) become one block, with the
+  measured rotation (and mirroring).
+- **Arcs on scanned drawings**: curved strokes are traced as ARC entities (door swings,
+  fillets, curved walls) instead of chains of short lines.
+- **Selection in the result preview** (read-only): click an entity to highlight it; the
+  status bar shows its type, layer and size, and its layer is selected in *Layers*.
+- **Interface in Spanish, German and Arabic** (*View → Language*), with the user guide, the
+  OCR guide and the terms of use; Arabic is written right to left (the drawings are not
+  mirrored). Translations not yet reviewed by native speakers. Windows installer wizard in
+  Spanish, German and Arabic too.
+- **Optional update check** (*Help → Check for updates…*, *Check for updates at startup*,
+  off by default): one request to GitHub for the latest version number; nothing is sent,
+  nothing is installed.
+
+### Changed
+- Toolbar tools show their icon only when their labels do not fit the window (longer
+  German and Spanish labels); the name stays in the tooltip.
+- DWG: 3-point angular dimensions are adapted for LibreDWG (it refused the whole drawing).
+
 ## [1.1.2] — 2026-10-30
 
 ### Fixed

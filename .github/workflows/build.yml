@@ -7,7 +7,7 @@
 # (their files: workflow "OCR models release").
 #
 #  - manually: Actions tab > build > Run workflow
-#  - automatically when a version tag is pushed:  git tag v1.1.0 && git push --tags
+#  - automatically when a version tag is pushed:  git tag v1.2.0 && git push --tags
 #    (the files are then attached to the GitHub release of that tag)
 #
 # Optional code signing (Windows): add the repository secrets

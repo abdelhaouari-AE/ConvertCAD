@@ -15,7 +15,7 @@ bundled: users download the ones they need from the program (see *OCR models* be
 | Debian / Ubuntu package | `scripts/build_deb.sh` | same | `convertcad_<v>_amd64.deb` |
 
 The GitHub workflow `.github/workflows/build.yml` builds all five on every version tag
-(`git tag v1.1.0 && git push --tags`) and attaches them to the GitHub release.
+(`git tag v1.2.0 && git push --tags`) and attaches them to the GitHub release.
 
 ## Windows
 
@@ -39,15 +39,19 @@ installs that file.
    (or <https://jrsoftware.org/isdl.php>).
 2. Run `scripts\build_installer.bat` (`rebuild` as argument to rebuild the program).
 
-By hand: `ISCC.exe /DAppVersion=1.1.0 installer\ConvertCAD.iss`, after `build_exe.bat`.
+By hand: `ISCC.exe /DAppVersion=1.2.0 installer\ConvertCAD.iss`, after `build_exe.bat`.
 
 What `installer\ConvertCAD.iss` does: installs `dist\ConvertCAD\` for the current user
-without administrator rights (or for all users on request), English and French wizard,
+without administrator rights (or for all users on request), wizard in English, French,
+Spanish, German and — with Inno Setup 6.5 or later, which ships `Arabic.isl` — Arabic
+(right to left; older versions simply leave Arabic out),
 Start-menu shortcut, optional desktop shortcut and *Send to → ConvertCAD* entry, clean
 upgrade (the old `_internal` folder is removed first), uninstaller in *Settings → Apps*.
 The settings (`%USERPROFILE%\.convertcad`) are kept on uninstall; the downloaded OCR
 models (`%LOCALAPPDATA%\ConvertCAD\ocr_models`) are removed (an upgrade keeps them).
-Never change its `AppId`: it links new versions to installed ones.
+Never change its `AppId`: it links new versions to installed ones. The script is UTF-8
+**with a byte order mark** (it contains Spanish, German and Arabic texts): keep the mark
+when editing it — without it Inno Setup reads the file as ANSI.
 
 ## Linux
 
@@ -64,7 +68,7 @@ a program built against a recent glibc does not start on an older one (CI uses U
 22.04, glibc 2.35).
 
 - **AppImage:** `chmod +x ConvertCAD-<v>-x86_64.AppImage`, then run it. `--cli` as first
-  argument runs the command-line tool: `./ConvertCAD-1.1.0-x86_64.AppImage --cli plan.pdf -o plan.dwg`.
+  argument runs the command-line tool: `./ConvertCAD-1.2.0-x86_64.AppImage --cli plan.pdf -o plan.dwg`.
 - **.deb:** `sudo apt install ./convertcad_<v>_amd64.deb` installs into `/opt/convertcad`
   with the commands `convertcad` and `convertcad-cli`, a menu entry, and pulls the few
   system libraries Qt needs.

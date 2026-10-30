@@ -1,10 +1,10 @@
 # ConvertCAD — Development guide
 
-Complete technical description of **ConvertCAD 1.0.0**: the programming language and
+Complete technical description of **ConvertCAD 1.2.0**: the programming language and
 tools, the architecture and data flow, the content of every file, the algorithms, the
 options, the tests, the build and release process, and how to extend the application.
 
-*Author: abdelhaouari · Last update: 29 October 2026 · Applies to version 1.0.0*
+*Author: abdelhaouari · Last update: 30 October 2026 · Applies to version 1.2.0*
 
 How to build the downloads (portable, installer, AppImage, .deb) and sign them:
 [PACKAGING.md](PACKAGING.md).
@@ -23,7 +23,7 @@ How to build the downloads (portable, installer, AppImage, .deb) and sign them:
 8. [Options reference](#8-options-reference)
 9. [Layers written in the DXF](#9-layers-written-in-the-dxf)
 10. [Settings, logs and files on the user's computer](#10-settings-logs-and-files-on-the-users-computer)
-11. [Languages (English / French)](#11-languages-english--french)
+11. [Languages (English, French, Spanish, German, Arabic)](#11-languages-english-french-spanish-german-arabic)
 12. [Theme and icons](#12-theme-and-icons)
 13. [Testing](#13-testing)
 14. [Working in VS Code](#14-working-in-vs-code)
@@ -48,10 +48,10 @@ The guiding principles, applied everywhere in the code:
 | Principle | How it shows in the code |
 |---|---|
 | **Real CAD entities, not spaghetti** | Bezier curves become ARC / CIRCLE or one exact SPLINE; touching segments become one LWPOLYLINE; repeated symbols become BLOCKs; arrows + line + value become a DIMENSION (`geometry.py`, `annotations.py`, `blocks.py`). |
-| **Never invent, never corrupt** | A dimension is rebuilt only when every part agrees; the value shown is always the original PDF text; unmatched measurement texts go to layer `DIM_RAW`; traced scan content goes to `TRACE_*` layers with the scan kept underneath (`annotations.py`, `raster.py`). |
+| **Never invent, never corrupt** | A dimension is rebuilt only when every part agrees (an angle or arc length only when its value agrees with the drawn arc); the value shown is always the original PDF text; unmatched measurement texts go to layer `DIM_RAW`; a texture hatch is kept only when the standard pattern drawn again reproduces the PDF pieces; traced scan content goes to `TRACE_*` layers with the scan kept underneath (`annotations.py`, `textures.py`, `raster.py`). |
 | **Review before saving** | The interface converts into a private temporary folder; the user checks the DXF preview, the layers and the report, then saves (`postprocess.py`). |
 | **One engine, many front-ends** | The interface, the command line, the folder batch and the tests all call `pipeline.convert()` with the same `Options` object. |
-| **Local and portable** | Conversions never use the network (the only connection: downloading an OCR model when the user asks); the portable zip needs no installation; every download bundles its tools (DWG converter, OCR with its built-in model), settings and downloaded OCR models in the user profile or next to the program. |
+| **Local and portable** | Conversions never use the network (the only connections: downloading an OCR model, or checking for a newer version — off by default — when the user asks); the portable zip needs no installation; every download bundles its tools (DWG converter, OCR with its built-in model), settings and downloaded OCR models in the user profile or next to the program. |
 | **Fast to open, fast to look at** | Heavy libraries load after the window shows (§18); the DXF preview merges thousands of primitives into a few hundred items. |
 | **Maintainable by one person** | Pure-Python engine without Qt, small focused modules, plain dataclasses between steps, a test for every feature, comments that explain *why*. |
 
@@ -309,7 +309,7 @@ ConvertCAD/
 | `requirements.txt` | Runtime dependencies with minimum versions and a comment on each. |
 | `requirements-dev.txt` | Runtime + development tools (pytest, PyInstaller, Ruff). |
 | `README.md` | GitHub home page: features, screenshots, install, use, build, licence, French summary. |
-| `CHANGELOG.md` | Version history (1.0.0 first public release, 1.1.0 OCR models). |
+| `CHANGELOG.md` | Version history (1.0.0 first public release, 1.1.0 OCR models, 1.2.0 curved dimensions, textures, five languages). |
 | `LICENSE` | GNU Affero General Public License v3.0 (full text). |
 | `THIRD_PARTY_NOTICES.md` | Licences of every library used or bundled. |
 | `.gitignore` | Files Git must ignore: caches, `.venv/`, `build/`, `dist/`, test outputs (`*.dxf`, `*.dwg`, `*_log.txt`), the Linux LibreDWG build and the OCR models of an offline build (`vendor/ocr_models`). |
@@ -323,9 +323,10 @@ ConvertCAD/
 | `__init__.py` | `APP_NAME`, `APP_VERSION` (**the only place the version number is written**), `APP_AUTHOR`, `APP_YEAR`; package overview. |
 | `__main__.py` | `python -m convertcad` opens the interface; `python -m convertcad --cli …` runs the command line. |
 | `cli.py` | Command-line tool: argument parser (presets, every option, `--scale N\|auto`, pages, `--area`, `--format dxf\|dwg`, DXF version, `--ocr-lang`, `--ocr-quality`, `--list-ocr`, `--get-ocr-model`, JSON report, batch, quiet), `options_from_args()`, `parse_area()`, progress printers, exit codes 0/1/2. |
-| `config.py` | `Settings` dataclass saved as JSON (theme, language, recent files, folders, last options, user presets, snap modes, window layout). Location: `~/.convertcad/` or `settings/` next to the exe in portable mode; atomic save; tolerant load; migration of the v1/v2 terms flag. |
+| `config.py` | `Settings` dataclass saved as JSON (theme, language — one of `i18n.LANGUAGES` —, recent files, folders, last options, user presets, snap modes, window layout, `check_updates`, off by default). Location: `~/.convertcad/` or `settings/` next to the exe in portable mode; atomic save; tolerant load; migration of the v1/v2 terms flag. |
 | `launcher.py` | Start-up checks when running from source, standard library only: Python version, missing libraries (offers to install `requirements.txt` with pip, in the console or through a dialog under `pythonw`), and keeps a double-clicked console window open so messages can be read. Not used inside the exe. |
-| `i18n.py` | Interface translation: `tr()` (English text is the key, French in the `FR` dictionary), `tr_progress()` (translates engine progress messages), `tr_paper()` (paper names), `set_language()`. |
+| `i18n.py` | Interface languages (§11): `LANGUAGES` (en, fr, es, de, ar), `tr()` (English text is the key; French in the `FR` dictionary, the other languages in `locales/`), `table(lang)`, `is_rtl()` (Arabic), `tr_progress()` (translates engine progress messages), `tr_paper()` (paper names), `set_language()`. |
+| `locales/` | `es.py`, `de.py`, `ar.py`: one `STRINGS` dictionary {English text: translation} per language, loaded when the language is chosen. |
 | `samples.py` | Draws the demonstration PDFs with PyMuPDF: an A3 formwork plan (*plan de coffrage*) at 1:100 with grid axes, columns, doors, tank, curved wall, spline, arrow and tick dimensions, leaders, notes, hatch, title block, plus a rotated second sheet; and a scanned version. Used by the welcome screen, the tests and `scripts/make_samples.py`. |
 
 ### 4.3 `convertcad/core/` — the conversion engine
@@ -337,26 +338,28 @@ ConvertCAD/
 | `options.py` | `Options` — every option and its default (standard library only, so the settings panel builds at start-up without the conversion libraries); `from_dict()` (tolerant: old or partial presets never break), `writer_dxf_version()` (AutoCAD 2000 DXF for a DWG), `describe()` (options block of the log), `normalize_rect()`. |
 | `units.py`, `stats.py`, `paths.py`, `layer_edits.py` | Light modules shared by the engine and the interface: `compute_scale()` / `effective_denominator()`; `WriteStats` (entity counters); `find_pdfs()` / `output_paths()`; `LayerEdit` / `LayerRow` / protected layers. |
 | `compat.py` | Single import point for PyMuPDF (`import pymupdf`); blocks PyMuPDF 2.x's optional `pymupdf.layout` / `pymupdf4llm` add-ons (≈ 0.6 s faster start); `page_matrix()` (rotation), point/vector transforms, `library_versions()` for the About box and the log. |
-| `spatial.py` | `GridIndex` (uniform-grid spatial index) and geometry helpers: point–segment and point–line distances, segment intersection, angles. Makes neighbourhood searches O(n) instead of O(n²). |
+| `spatial.py` | `GridIndex` (uniform-grid spatial index; `insert_path()` registers an arc or a circle along its outline only) and geometry helpers: point–segment and point–line distances, segment intersection, angles. Makes neighbourhood searches O(n) instead of O(n²). |
 | `pdfinfo.py` | Quick inspection before converting: page kind (vector / scanned / empty) from path counts and image coverage, ISO paper size name, rotation, metadata, password, `detect_scale()` (reads "Echelle : 1/100", "SCALE 1:50", "Ech. 2.5:1000" → 1:400, a ratio alone above a scale bar; refuses fractions and sheets with several scales), thumbnails. |
 | `extractor.py` | **Step 1.** Reads one page with PyMuPDF into raw dataclasses (`Style`, `RawSegment`, `RawBezier`, `RawFill`, `RawText`, `RawImage` with its placement matrix, `PageData`) in displayed coordinates; linetype classification from dash arrays; page classification; SHX texts placed on their letters (strokes moved to the hidden layer `TEXT_SHX_STROKES`); letter outlines lying under invisible text removed (`_drop_text_outlines`). |
-| `raster.py` | **Step 1b.** Scanned pages: render, OCR through `ocr.py` (text-line boxes, horizontal or vertical, confidence and noise filters, text masking), adaptive binarisation, Hough circles validated against ink, Hough lines merged collinearly. |
+| `raster.py` | **Step 1b.** Scanned pages: render, OCR through `ocr.py` (text-line boxes, horizontal or vertical, confidence and noise filters, text masking), adaptive binarisation, Hough circles validated against ink, arcs fitted on stroke outlines (`find_arcs`), Hough lines merged collinearly. |
 | `ocr.py` | The OCR (PP-OCR models run by RapidOCR + ONNX Runtime, offline): `make_plan(languages, quality)` turns the user's choice into the models to run, falling back to the built-in model with a note for the report when a model is missing; `recognize(img, plan)`; `merge_script()` keeps, line by line, the reading of each script for mixed drawings (Latin + Arabic…); `available()`, `pack_usable()`, `language_choices()` (installed languages for the interface). |
 | `ocr_catalog.py` | The OCR models ConvertCAD knows (*packs*): the built-in Latin model, the maximum accuracy models and one model per script, with their files, SHA-256, sizes and download addresses (GitHub release `ocr-models-v1`, then RapidOCR's repository); `language_set()` / `language_error()` parse the language keys (`latin`, `arabic`, `latin+arabic`, and the 1.0 codes `eng+fra+ara`…). Standard library only. |
 | `ocr_store.py` | Where downloaded models live (user folder per operating system, portable mode, `CONVERTCAD_OCR_MODELS`), whether a pack is installed, `download_pack()` (streamed into a `.part` file, SHA-256 checked, then renamed; fallback address; progress; cancel), `install_files()` (offline installation, files recognised by checksum), `remove_pack()`. Standard library only. |
 | `clip.py` | Selected area: Liang–Barsky segment clipping, Bezier subdivision clipping, Sutherland–Hodgman polygon clipping, `clip_page()`. |
-| `geometry.py` | **Step 2.** Rebuilds CAD geometry: segment de-duplication, dashed lines and hatch patterns (`patterns.py`), Kasa circle fit, Bezier→ARC, arc merging into ARC/CIRCLE, Bezier chains → one exact SPLINE, chaining into polylines, back-track collapse, collinear merge; tolerances in `Tol`. |
+| `geometry.py` | **Step 2.** Rebuilds CAD geometry: segment de-duplication, texture hatches (`textures.py`, before the dashed lines; zero-length dots kept for them; drawn boundaries snapped), dashed lines and hatch patterns (`patterns.py`), Kasa circle fit, Bezier→ARC, arc merging into ARC/CIRCLE, Bezier chains → one exact SPLINE, chaining into polylines, back-track collapse, collinear merge; tolerances in `Tol`. |
 | `patterns.py` | What CAD plotters explode: `merge_dashed_lines()` (collinear pieces with a regular rhythm → one line with a measured linetype: DASHED, CENTER, DASHDOT, PHANTOM, DOT, DIVIDE), `detect_hatch_patterns()` (families of parallel, regularly spaced lines → `HatchPattern` with angle, spacing, boundary and holes; crossing grids), `add_mask_holes()` (white masks under texts become holes); tolerances in `PTol`. |
+| `textures.py` | Texture hatches exploded by plotters (dots, sand, concrete, gravel, earth, brick, insulation): groups of dashes and dots compared with the standard patterns `TEXTURES` (scale from dash lengths or dot spacing, angle from directions, origin by vote), the pattern drawn again with ezdxf and kept only when it reproduces the PDF (§5.17); `TextureHatch`, `snap_boundaries()`. |
 | `layers.py` | **Step 3.** Layer naming rules: native PDF layer names, role layers, style fingerprints (`GEO_BLACK_050_CENTER`), readable colour names (HSV), lineweight mapping, name sanitising. |
-| `annotations.py` | **Step 4.** Recognises dimensions (arrowheads or oblique ticks + line + value, extension lines) and leaders (arrow + polyline + note); safe fallback to `DIM_RAW`; tolerances in `ATol`. |
-| `blocks.py` | **Step 5.** Clusters touching entities per layer (long lines cut into chunks, long elements excluded), computes fingerprints in the 8 orientations of a square (rotations by 90° and mirror images, `D4`), turns symbols repeated ≥ N times into block definitions + insertions with rotation / mirror (`insert_orientation()`); tolerances in `BTol`. |
-| `dxf_writer.py` | **Step 6.** `DxfWriter`: document setup (units, linetypes, text style, `$LTSCALE`), layers (hidden ones off), colours (ACI / true colour, ByLayer), polylines, arcs, circles, exact splines, solid and pattern hatches (`_USER` pattern with the measured angle and spacing), measured linetypes `CC_<FAMILY>_<n>`, images (exact placement and orientation), TEXT/MTEXT (cap height), SHX texts, rotated linear DIMENSIONs with text override, MULTILEADER with multi-line notes (LEADER + MTEXT on old versions), rotated / mirrored block inserts, R12 fallbacks; `Transform` (page → DXF). |
+| `annotations.py` | **Step 4.** Recognises dimensions — radius and diameter (arrow on a circle along its radius + R/Ø value), angle and arc length (two arrows along an arc + a value that agrees with it), linear (arrowheads or oblique ticks + line + value, extension lines) — and leaders (arrow + polyline + note); safe fallback to `DIM_RAW`; tolerances in `ATol`. |
+| `blocks.py` | **Step 5.** Clusters touching entities per layer (long lines cut into chunks, long elements excluded), computes fingerprints in the 8 orientations of a square (rotations by 90° and mirror images, `D4`), turns symbols repeated ≥ N times into block definitions + insertions with rotation / mirror (`insert_orientation()`); copies turned by any other angle matched by their key points (`_turned_copies`); tolerances in `BTol`. |
+| `dxf_writer.py` | **Step 6.** `DxfWriter`: document setup (units, linetypes, text style, `$LTSCALE`), layers (hidden ones off), colours (ACI / true colour, ByLayer), polylines, arcs, circles, exact splines, solid and pattern hatches (`_USER` pattern with the measured angle and spacing), measured linetypes `CC_<FAMILY>_<n>`, images (exact placement and orientation), TEXT/MTEXT (cap height), SHX texts, rotated linear, radius, diameter, 3-point angular and arc-length DIMENSIONs with text override (ARC_DIMENSION exploded to its drawing before AutoCAD 2007 and for DWG), standard pattern HATCHes (textures) with the measured scale, angle and origin, MULTILEADER with multi-line notes (LEADER + MTEXT on old versions), rotated / mirrored block inserts, R12 fallbacks; `Transform` (page → DXF). |
 | `pipeline.py` | Orchestration: `convert()` (never raises; progress and cancel callbacks; `.dwg` targets through `_convert_to_dwg`), area clipping, white strokes and masks, per-sheet scale, scanned-page handling, sheet placements for the overlay, output names (`_p2` suffixes in split mode), `convert_folder()` for batch mode. |
-| `dwg.py` | Native DWG output: finds the bundled LibreDWG programs, prepares the DXF for LibreDWG's reader (post-2000 objects removed, MTEXT rotation, AutoCAD's handle numbering, linetype count, complete INSERT scale factors), runs `dxf2dwg`, reads the DWG back with `dwg2dxf` and checks entity count and block references (§5.15). |
+| `dwg.py` | Native DWG output: finds the bundled LibreDWG programs, prepares the DXF for LibreDWG's reader (post-2000 objects removed, MTEXT rotation, AutoCAD's handle numbering, linetype count, complete INSERT scale factors, group 16 of 3-point angular dimensions removed), runs `dxf2dwg`, reads the DWG back with `dwg2dxf` and checks entity count and block references (§5.15). |
 | `report.py` | `ConversionReport`: inputs, options, results per entity type, layers (with block-internal counts), blocks, page notes, warnings, errors, status, duration; rendered as text (`_log.txt`), HTML (interface, translatable) and JSON. |
 | `postprocess.py` | After conversion: `layer_summary()` (rows of the layer table), `apply_layer_edits()` (remove / rename-merge / recolour), `finalize()` (copy to the final path with edits, images and log), `finalize_dwg()` (same, saved as DWG), `needs_reconversion_for_dwg()`, `describe_edits()`. |
 | `presets.py` | Six built-in presets (recommended, architectural, structural, scanned, geometry, CNC) and the functions that apply or store presets without touching drawing-specific values. |
 | `jobs.py` | `JobRunner`: runs `convert` / `convert_folder` in a child process and relays progress, results, errors and cancellation through a queue (§3.2). |
+| `updates.py` | Optional update check (off by default): one request to GitHub's public API for the releases, nothing sent, nothing installed; `check()`, `newest_release()` (the OCR models release is skipped), `is_newer()`, `UpdateError` (§5.18). |
 | `licensing.py` | Licence hook: `check_license()` (called before every conversion) and `license_summary()` (About box). Always permissive; replacing this file adds licence management without touching anything else. |
 
 ### 4.4 `convertcad/ui/` — the desktop interface
@@ -364,15 +367,15 @@ ConvertCAD/
 | File | Content / role |
 |---|---|
 | `__init__.py` | Package docstring. |
-| `app.py` | `run_gui()`: Qt application, high-DPI policy (fractional scaling passed through), Fusion style + theme, language, app icon, logging to `convertcad.log`, global exception dialog, first-launch Terms gate, main window; `_warm_up()` loads the heavy libraries in a background thread once the window is shown; `CONVERTCAD_STARTUP_PROBE=1` prints the start-up time. |
-| `main_window.py` | `MainWindow`: actions and shortcuts, menus, command bar, layout (sheets / viewers + activity / settings-layers-report tabs), status bar, open / inspect / hints, tools (measure, calibrate, select area), calibration and measurement, conversion through `JobRunner`, result loading, overlay check (PDF under the result, opacity slider), stale-options notice, saving DXF or DWG in a background thread (`_SaveThread`), batch, theme and language switching, drag & drop, recent files, window state, close handling. |
-| `cadview.py` | `CadView`, base class of both viewers: CAD navigation (wheel zoom at cursor, middle-button / Space / Pan-tool drag), fit, zoom limits, `view_changed` and `zoom_changed` signals. |
+| `app.py` | `run_gui()`: Qt application, high-DPI policy (fractional scaling passed through), Fusion style + theme, language (right-to-left layout for Arabic), app icon, logging to `convertcad.log`, global exception dialog, first-launch Terms gate, main window; `_warm_up()` loads the heavy libraries in a background thread once the window is shown; `CONVERTCAD_STARTUP_PROBE=1` prints the start-up time. |
+| `main_window.py` | `MainWindow`: actions and shortcuts, menus, command bar, layout (sheets / viewers + activity / settings-layers-report tabs), status bar, open / inspect / hints, tools (measure, calibrate, select area), calibration and measurement, conversion through `JobRunner`, result loading, overlay check (PDF under the result, opacity slider), stale-options notice, saving DXF or DWG in a background thread (`_SaveThread`), batch, theme and language switching (*View > Language*, five languages), entity selection in the result (status text, layer selected), optional update check (`_UpdateThread`, Help menu), tool labels dropped when they do not fit (`_fit_toolbar`), drag & drop, recent files, window state, close handling. |
+| `cadview.py` | `CadView`, base class of both viewers (always left to right, even in Arabic): CAD navigation (wheel zoom at cursor, middle-button / Space / Pan-tool drag), fit, zoom limits, `view_changed` and `zoom_changed` signals. |
 | `pdf_view.py` | `PdfView`: source sheet on a "drafting table" with shadow; sharp at any zoom (base image + high-resolution tile of the visible area); Measure, Calibrate and Select-area tools (area: drag a rectangle, outside dimmed, size label, Esc cancels); snap glyphs and labels; crosshair; measurements drawn as dimension lines with ticks; calibration overlay; `format_length()`. |
-| `dxf_view.py` | `DxfView`: renders the converted DXF with ezdxf's drawing add-on in a background `QThread` (`Recorder`); `merge_recording()` merges the primitives into one `QGraphicsPathItem` per layer set, colour, width, kind and tile (8 × 8), with cosmetic pens — a few hundred items instead of tens of thousands; hiding a layer stays instant; overlay of the PDF sheets (`set_overlay`, `set_overlay_opacity`); theme-aware background. |
+| `dxf_view.py` | `DxfView`: renders the converted DXF with ezdxf's drawing add-on in a background `QThread` (`Recorder`); `merge_recording()` merges the primitives into one `QGraphicsPathItem` per layer set, colour, width, kind and tile (8 × 8), with cosmetic pens — a few hundred items instead of tens of thousands; hiding a layer stays instant; overlay of the PDF sheets (`set_overlay`, `set_overlay_opacity`); theme-aware background; **selection**: a pick index built after the preview is shown (`build_pick_index`, `PickIndex.pick`: nearest stroke within 5 screen px, else the smallest filled area under the cursor), highlight, `selected` signal with `describe_entity()` (type, layer, length, radius, text, block…). |
 | `snap.py` | `SnapEngine` (Qt-free): endpoints, midpoints, intersections and centres computed once per page from PyMuPDF paths, stored in a `GridIndex`; `SnapHit`. |
 | `pages_panel.py` | Sheet list: thumbnails rendered one by one on a timer, include checkbox, Vector / Scan / Empty badge with tooltip, paper size and rotation, selection menu (all, none, vector, scanned, invert), selected-sheets summary. |
 | `options_panel.py` | `OptionsPanel`: preset selector (save / delete user presets), collapsible sections with every option and its tooltip (output format DXF / DWG, area *Select area… / Whole sheet*, OCR languages — installed ones only, a missing choice kept and marked *(not downloaded)* — and OCR accuracy, button *OCR languages and models…*), calibration status, OCR status line, "options changed" notice, conversion to / from `Options`. |
-| `layers_panel.py` | `LayersPanel`: layer table (keep checkbox, bordered colour swatch, name + linetype on two lines, entity count), filter, show / hide all, undo all, kept-layers counter; edits applied at save time. |
+| `layers_panel.py` | `LayersPanel`: layer table (keep checkbox, bordered colour swatch, name + linetype on two lines, entity count), filter, show / hide all, undo all, kept-layers counter, `select_layer()` (the layer of the selected entity); edits applied at save time. |
 | `report_panel.py` | `ReportPanel` (translated HTML report, save as `.txt` / `.html`, copy) and `ActivityPanel` (timestamped session log). |
 | `statusbar.py` | `TitleBlockBar`: status bar drawn like a drawing title block — sheet, paper, scale or calibration, cursor X/Y in real units, snap toggles END/MID/INT/CEN, zoom, message, progress. |
 | `empty_state.py` | Welcome screen: drop zone, *Open PDF…*, *Try the sample plan*, recent drawings, the four workflow steps. |
@@ -387,9 +390,9 @@ ConvertCAD/
 
 | File | Content |
 |---|---|
-| `guide_en.md`, `guide_fr.md` | User guide (Help → User guide, F1): workflow, navigation, snap, what the conversion produces, every setting, batch, checklist, troubleshooting. |
-| `terms_en.md`, `terms_fr.md` | Terms of use shown at first launch (local processing, user's rights, engineering responsibility, no warranty, settings). |
-| `ocr_en.md`, `ocr_fr.md` | OCR guide (Help → OCR guide): languages (built in / downloaded / mixed scripts), accuracy, downloading, models folders per system, offline installation, command line, tips. |
+| `guide_<lang>.md` (en, fr, es, de, ar) | User guide (Help → User guide, F1): workflow, navigation, snap, what the conversion produces, every setting, batch, checklist, troubleshooting. |
+| `terms_<lang>.md` | Terms of use shown at first launch (local processing, user's rights, engineering responsibility, no warranty, settings). |
+| `ocr_<lang>.md` | OCR guide (Help → OCR guide): languages (built in / downloaded / mixed scripts), accuracy, downloading, models folders per system, offline installation, command line, tips. |
 
 Placeholders `{APP_VERSION}`, `{APP_AUTHOR}`, `{APP_YEAR}` are replaced when displayed. The
 folder is bundled into the exe by `ConvertCAD.spec`.
@@ -404,16 +407,18 @@ folder is bundled into the exe by `ConvertCAD.spec`.
 | `test_sheet_features.py` | SHX comments (placed on the letters, strokes hidden; reviewer markups ignored), letter outlines under invisible text, scale reading (ratios, refusals), clipping (segments, polygons, Beziers, pages, pipeline). |
 | `test_dwg.py` | DXF prepared for LibreDWG (handles, no duplicates), missing converter, DWG written and read back by the pipeline, rotated / mirrored blocks identical after the DWG round trip, INSERT scale completion (skipped when LibreDWG is not built). |
 | `test_geometry.py` | Arc and circle fitting, arc merging, exact splines, polylines, duplicates, curve precision. |
-| `test_annotations.py` | Arrow and tick dimensions, extension lines, leaders (text left or right), grid bubbles not taken as values, `DIM_RAW` fallback. |
-| `test_blocks.py` | Repeated symbols become blocks; walls do not glue symbols; sample plan: doors ×3, columns ×20; rotated and mirrored copies (all 8 orientations) give exactly the drawn lines once the INSERTs are exploded. |
+| `test_annotations.py` | Arrow and tick dimensions, extension lines, leaders (text left or right), grid bubbles not taken as values, `DIM_RAW` fallback; radius, diameter, angle and arc length dimensions (values that disagree with the drawing are not rebuilt), written in R2018, R12 and DWG. |
+| `test_textures.py` | Texture hatches recognised exactly (dots, gravel, earth, brick, insulation — scale, angle, pieces replaced), sand on its statistics, text and tile grids left alone, HATCH written with the drawn boundary, R12 keeps the lines, option off. |
+| `test_blocks.py` | Repeated symbols become blocks; walls do not glue symbols; sample plan: doors ×3, columns ×20; rotated and mirrored copies (all 8 orientations) give exactly the drawn lines once the INSERTs are exploded; copies turned by any angle (and mirrored) become one block with the right rotations. |
 | `test_writer.py` | Every DXF version, scale and units, ACI mapping, ByLayer, dimension angles, R12 fallbacks. |
 | `test_pipeline.py` | End-to-end counts on the sample plan, options switched off, multi-page and split output, invalid pages, cancel, password, batch folder, per-sheet automatic scale. |
-| `test_raster.py` | Scan tracing (OpenCV), OCR of the sample scan with the built-in model (skipped without RapidOCR), fallback to the built-in model when a model is missing, no OCR engine, mixed-script merge (Latin + Arabic), large sheets read at 150 dpi with boxes mapped back, engine settings (no orientation classifier for scripts, no 2000-px limit), ONNX Runtime telemetry off. |
+| `test_raster.py` | Scan tracing (OpenCV), arcs traced on a scan (centre, radius, span; a filled disc is not an arc) and written as ARC, OCR of the sample scan with the built-in model (skipped without RapidOCR), fallback to the built-in model when a model is missing, no OCR engine, mixed-script merge (Latin + Arabic), large sheets read at 150 dpi with boxes mapped back, engine settings (no orientation classifier for scripts, no 2000-px limit), ONNX Runtime telemetry off. |
 | `test_ocr_store.py` | OCR catalogue consistency, language keys (including the 1.0 codes), models folder (environment variable, portable mode, Linux), download from a local web server: progress, checksum, fallback address, failure and cancel leave nothing behind; wrong-size files ignored; install from file and remove. |
 | `test_postprocess.py` | Layer edits at save time (remove, rename-merge, recolour), images, log. |
 | `test_cli_and_jobs.py` | Page ranges, CLI single / batch / errors, option mapping (including `--format`, `--area`, `--ocr-lang`, `--ocr-quality`), invalid OCR languages, presets keep the scale, background job runner (convert and cancel), `--scale auto`, `--list-ocr`, `--get-ocr-model`, options of version 1.0. |
-| `test_i18n.py` | Every `tr("…")` string and menu action has a French translation, as do the OCR catalogue names; placeholders survive translation, engine progress messages are translated. |
-| `test_ui_smoke.py` | The real window offscreen: open the sample, convert in the child process, edit layers, save through the real save code, switch theme twice; select an area, convert, overlay on / off, save as DWG (with the automatic re-conversion); OCR languages list and status, *OCR languages and models…* window. |
+| `test_i18n.py` | Every `tr("…")` string and menu action is translated in every language (French, Spanish, German, Arabic), as are the OCR catalogue names; no stale translation; placeholders survive translation; guides and terms exist in every language; Arabic is right to left; engine progress messages are translated. |
+| `test_updates.py` | Version comparison, the check is off by default, one request with nothing about the user, the newest program release chosen (OCR models release, drafts and pre-releases skipped), failures reported. |
+| `test_ui_smoke.py` | The real window offscreen: open the sample, convert in the child process, edit layers, save through the real save code, switch theme twice; select an area, convert, overlay on / off, save as DWG (with the automatic re-conversion); OCR languages list and status, *OCR languages and models…* window; selecting an entity in the result (layer selected, hidden layer clears the selection). |
 
 ### 4.7 `scripts/`
 
@@ -523,8 +528,18 @@ print(report.status_word(), report.stats.total_entities(), report.outputs)
    1 px and `CIRCLE_EXACT` (50 %) exactly (vectorised checks; the exact check rejects the
    false circles that the speckles of poor scans would make). A single full-resolution search over 8–400 px took 4–5 min on an A1
    sheet; this takes seconds.
-5. `HoughLinesP`, then `merge_collinear()` joins overlapping / touching collinear pieces.
-6. `merge_into_page()` adds the results to `PageData` on layers `TRACE_LINES` /
+5. `find_arcs()`: each stroke outline (OpenCV contour, lightly smoothed) is simplified
+   (`ARC_EPS`); runs of corners that bend a little (< `ARC_TURN`), always the same way, are
+   fitted by a circle (algebraic fit + Gauss-Newton; a line leaving the arc on its tangent
+   is trimmed off until the circle fits). An arc is kept only when the other side of the
+   stroke gives the same circle (radius one stroke width apart, `ARC_PAIR`) — the outline
+   of a filled area or a speck never does —, with at least `ARC_MIN_SWEEP`, `ARC_MIN_LEN`,
+   a visible bend (`ARC_SAG`) and a radius of 4 pt or more (not the bowls of letters).
+   Pieces of one circle cut by crossing strokes are joined. Arcs are masked before the
+   line search and enter the page as Beziers (`arc_beziers`), so the rebuild makes them
+   ARCs like vector arcs.
+6. `HoughLinesP`, then `merge_collinear()` joins overlapping / touching collinear pieces.
+7. `merge_into_page()` adds the results to `PageData` on layers `TRACE_LINES` /
    `TRACE_TEXT`, so the rest of the pipeline (polylines, dimensions, blocks) works unchanged.
    The scan itself is kept as an image on the locked `IMG_RASTER` layer.
 
@@ -543,9 +558,12 @@ instead of OCR (`use_pdf_text_layer`).
 - **Splines.** Remaining Beziers that touch end to end (same style) are chained. A chain of
   *n* cubic Beziers is written as one clamped cubic B-spline whose interior knots have
   multiplicity 3 — an **exact** representation, not an approximation.
-- **Dashes and hatch lines first.** After de-duplication, `patterns.merge_dashed_lines()`
-  and `patterns.detect_hatch_patterns()` (§5.13) take the pieces CAD plotters explode, so
-  they are not chained into meaningless polylines.
+- **Textures, dashes and hatch lines first.** After de-duplication, `textures.detect_textures()`
+  (§5.17; the zero-length segments — the dots of dotted patterns — are kept for it), then
+  `patterns.merge_dashed_lines()` and `patterns.detect_hatch_patterns()` (§5.13) take the
+  pieces CAD plotters explode, so they are not chained into meaningless polylines. Once the
+  polylines exist, a closed outline that follows a texture's measured outline becomes its
+  hatch boundary (`snap_boundaries`).
 - **Polylines.** Zero-length and duplicated segments are removed (`dedupe_segments`), then
   segments sharing endpoints and style are chained (`chain_segments`) into LWPOLYLINEs,
   closed when they loop; A→B→A back-tracks collapse; redundant collinear vertices are
@@ -582,6 +600,28 @@ override**.
 **Tick dimensions** (architecture): short oblique strokes (25°–75° to the dimension line)
 at both ends of a line, with a value — same rules, written with architectural ticks.
 
+**Radius and diameter** (`_radial_dimensions`, run first): an arrow whose tip lies on a
+circle or an arc (`ON_CIRCLE`, or 2 % of the radius) and which points along the radius
+(`RADIAL_DEG`), inwards or outwards; its value is an `R…` or `Ø…` text (`RADIUS_RE`,
+`DIAMETER_RE`, also `2xØ12`, `%%c60`) within `RADIAL_TEXT` heights of the radius line, or
+of the line drawn from the arrow (walked like a leader, landing included — its corner is
+kept as `kink`). A diameter consumes the opposite arrow; the plain lines along the radius /
+diameter are consumed, centre lines never. `RadialDimension` → `add_radius_dim` /
+`add_diameter_dim` with the arrow exactly at the PDF tip and the text along the line or
+horizontal as in the PDF.
+
+**Angle and arc length** (`_angular_dimensions`): arrows lying on an arc and pointing
+along it (`TANGENT_DEG`) are grouped by dimension arc (same centre and radius,
+`TRACK_TOL`); two arrows pointing in opposite senses, with the arc drawn under both, give
+two candidate spans (arrows inside: the span between them; arrows outside: the same arc
+seen the other way). A value near the arc decides, and must agree with the drawing —
+never invent: an angle (`45°`, `30°15'`, `ANGLE_RE`) within `ANGLE_AGREE` (2° or 4 %) of
+the span; an arc length written with `⌒`, or a number that matches the arc length
+measured on the concentric arc it dimensions × the page scale (`units_per_pt`) within
+3 %, in mm, cm or m. `AngularDimension` → `add_angular_dim_3p` (extension lines not drawn:
+the PDF ones stay) or `add_arc_dim_3p`. These run before the linear dimensions: two
+nearly opposite arrows on a flat arc would otherwise pass for a linear dimension.
+
 **Leaders**: an arrowhead whose shaft starts at the tip **or at the base** of the arrow
 (plotters often stop the line at the arrow base, `_leader_start`); the shaft is followed
 through up to `LEADER_HOPS` joined pieces (`_walk_leader`); the note is the text sitting
@@ -612,6 +652,15 @@ circle) are not treated as values. Consumed lines, fills and texts are marked so
    definition onto it (`insert_orientation()`, computed in DXF axes: y flipped on both
    sides). Block content keeps its original style layers. `block_rotations = False`
    restricts blocks to identical orientations.
+4. **Any other angle** (`_turned_copies`): the clusters left alone by the fingerprints
+   (fewer than N copies) are described by their key points — polyline vertices, arc
+   centres and ends, circle centres, spline control points, each with its kind, style
+   and radius — around their mean point. Clusters with the same kinds of points and the
+   same sorted distances (± 2 × `TURN_TOL`) are compared: the farthest point of one is laid
+   on each point of the other at the same distance, and the turn (or mirror + turn) that
+   lays every point on a point of the same kind within `TURN_TOL` is refined by least
+   squares on all the points. Groups of N or more become a block whose base point is the
+   mean point; the INSERT rotation is the opposite of the page angle (y flipped).
 
 ### 5.8 Step 6 — `dxf_writer.py`
 
@@ -633,13 +682,23 @@ circle) are not treated as values. Consumed lines, fills and texts are marked so
   Stacked lines of the same style are grouped by `group_text_lines()` into MTEXT
   (attachment top-left).
 - Linear dimensions: `msp.add_linear_dim(base, p1, p2, angle, text=PDF value,
-  dimstyle="Standard", override={arrow/tick size, text height, colours…})`.
+  dimstyle="Standard", override={arrow/tick size, text height, colours…})` — the sizes
+  come from `_dim_override()`, shared by every kind of dimension.
+- Radius / diameter: `add_radius_dim` / `add_diameter_dim` with `location` on the PDF line
+  (text aligned with it, or horizontal with a landing); angle: `add_angular_dim_3p` (the
+  y flip reverses the angles: DXF p1 = PDF end point); arc length: `add_arc_dim_3p`, kept
+  as ARC_DIMENSION from R2007, otherwise exploded to its drawing on layer DIM
+  (`_explode_dimension`; LibreDWG does not know ARC_DIMENSION). A failed ezdxf call leaves
+  nothing behind (`_undo_from`).
+- Texture hatches (`_write_textures`): `set_pattern_fill(name, scale = units per point ×
+  pattern scale, angle, definition = ezdxf's acadiso.pat copy)` and the pattern base
+  points moved to the measured origin.
 - Blocks are defined once and inserted with `add_blockref` (rotation, `xscale = -1` for
   mirrored copies).
 - Images: corners computed from the PDF placement matrix (`_image_corner`), so `u_pixel` /
   `v_pixel` carry rotation and mirror.
 - R12: no LWPOLYLINE (POLYLINE 2D), no SPLINE (approximated polyline), no true colour, no
-  MTEXT, classic LEADER, no pattern HATCH (the lines are kept). R12 and R2000 use ACI
+  MTEXT, classic LEADER, no pattern HATCH and no texture hatch (the lines are kept). R12 and R2000 use ACI
   colours.
 - `WriteStats` counts every entity type and per-layer entities (including entities inside
   block definitions) for the report.
@@ -811,6 +870,62 @@ kept when their origin is inside, images when they overlap. The page then goes t
 normal pipeline: only what is in the area is rebuilt, recognised and written, in the
 sheet's own coordinates.
 
+### 5.17 `textures.py` — texture hatches
+
+AutoCAD plots a pattern hatch as one line per dash and one zero-length line per dot. Sand,
+concrete, gravel, earth, brick, insulation and dotted areas therefore arrive as thousands
+of tiny pieces. `detect_textures(segments)` (called by `geometry.rebuild` before the dashed
+lines) works in page points with y turned up, like the DXF, so angles and the handedness
+of the patterns are the DXF ones:
+
+1. **Groups.** Per style (colour, width, PDF layer), the short pieces (≤ `XTol.SHORT`)
+   and dots are grouped on a coarse raster (connected areas), with a link distance of
+   2.5 × the usual gap between pieces, then 2× and 4× that for sparse patterns (bricks).
+   A group must repeat a few shapes (`_repetitive`: mostly dots, or ≤ 60 distinct dash
+   lengths covering 70 % of the pieces) — text strokes and details do not.
+2. **Area.** The pieces are drawn on a raster, closed (1.6 × the gap) and outlined
+   (`_Region`: outer polygon, holes, "inside, away from the edge" test).
+3. **Candidates.** For each standard pattern of `TEXTURES` (DOTS, AR-SAND, AR-CONC,
+   GRAVEL, EARTH, BRICK, AR-B816, AR-BRSTD, INSUL) whose share of dots fits
+   (`DOT_SHARE`): its reference is drawn once at scale 1 (`reference()`: signature, dash
+   lengths, repeat distance). Scale: the most common PDF dash length ÷ each pattern dash
+   length, refined by all matched dashes (dots: ratio of the gaps). The density must
+   agree. Angle: circular correlation of the direction histograms (dots: directions to
+   the neighbours); the histograms must agree once turned.
+4. **Origin.** On a window around the group's centre, every pair (PDF piece, pattern
+   piece of the same kind) votes for the shift between them; the most voted shift must
+   gather at least half of the pieces.
+5. **Check (never invent).** The pattern is drawn again over the group's box with that
+   scale, angle and origin (ezdxf's `hatching.hatch_entity` on a virtual HATCH); away
+   from the edges, ≥ 90 % of the PDF pieces must be pattern pieces (same middle and
+   direction) and ≥ 85 % of the pattern pieces must be in the PDF (long brick courses:
+   checked along their length, inside the area). Sand and concrete look random and repeat
+   only over long distances: when their exact position cannot be found, their statistics
+   must agree instead (density, share of dots, gaps, lengths, directions) and the report
+   says that their scale and position were estimated.
+6. **Result.** The best pattern gives a `TextureHatch` (name, scale, angle, origin,
+   boundary, holes); its pieces — including the pieces cut by the edge and the brick
+   courses — are removed. `snap_boundaries()` later replaces the measured outline by a
+   closed outline of the drawing that follows it. `XTol.TIME_BUDGET` (8 s per page) stops
+   the search on pathological pages: the rest stays as lines.
+
+The writer turns a `TextureHatch` into a HATCH with the standard pattern (`pattern_type`
+predefined, ezdxf's copy of `acadiso.pat`) at the measured scale and angle, its base
+points moved to the measured origin. R12 has no HATCH: the option is off there and the
+pieces stay lines.
+
+### 5.18 `updates.py` — optional update check
+
+Off by default. *Help > Check for updates…* (or the startup option) calls `check()` in a
+`QThread`: one GET of `https://api.github.com/repos/abdelhaouari-AE/ConvertCAD/releases`
+with only `ConvertCAD/<version>` as User-Agent. `newest_release()` keeps the highest
+version tag (`v1.2.0`) and skips drafts, pre-releases and the OCR models release
+(`ocr-models-v1`, which GitHub may call "latest" — the reason the list is read instead of
+`releases/latest`); that version is compared with `APP_VERSION` (`is_newer`). Nothing is
+downloaded or installed: the interface shows the number and can open the release page.
+Any failure is reported (`UpdateError`), never fatal; while the repository is private the
+API answers 404 ("no published release").
+
 ---
 
 ## 6. The desktop interface (`convertcad/ui`)
@@ -873,6 +988,15 @@ Closing the window or opening another drawing with an unsaved result asks for co
   20–30 ms. Items still know their layers, so unticking a layer hides it immediately. This
   shows the *CAD interpretation* of the file (true dimensions, blocks, linetypes), not the
   PDF.
+- **Selection in the result** (read-only): once the preview is shown, `build_pick_index()`
+  turns the recorded primitives into NumPy arrays of segments and filled areas, each with
+  its top-level entity (`LayerRecorder` notes which entity draws what; dashed lines are
+  added with their true geometry so a click in a gap still hits them). A click (a mouse
+  move of at most 4 px) picks the nearest stroke within 5 screen pixels, else the smallest
+  filled area under the cursor (images last), skipping hidden layers. The entity is
+  highlighted (halo + core pens in the theme's selection colour), the status bar shows its
+  type, layer, length / radius / text / block / pattern and size, and its layer is selected
+  in *Layers*. Hiding its layer clears the selection.
 - **Overlay check** (*Overlay PDF*, O): the source sheets are rendered (at most 4 000 px)
   and laid under the result at the place recorded in `ConversionReport.placements`, with an
   opacity slider; any difference between the PDF and the CAD result shows at once.
@@ -970,14 +1094,14 @@ All options are fields of `convertcad.core.options.Options` (also importable fro
 | `join_splines` | on | Geometry › Join curves into single splines | — | one SPLINE per Bezier chain |
 | `curve_precision` | `normal` | Geometry › Curve precision | `--precision` | arc-fit tolerance ×0.5 / ×1 / ×2 |
 | `hatches` | on | Geometry › Solid fills as hatches | `--no-hatch` | filled areas → HATCH |
-| `hatch_patterns` | on | Geometry › Rebuild hatch patterns | `--no-hatch-patterns` | parallel hatch lines → pattern HATCH (§5.13) |
+| `hatch_patterns` | on | Geometry › Rebuild hatch patterns | `--no-hatch-patterns` | parallel hatch lines → pattern HATCH (§5.13); textures → standard pattern HATCH (§5.17) |
 | `merge_dashes` | on | Geometry › Rebuild dashed lines | `--no-dashes` | separate dashes → one line with a measured linetype |
 | `ignore_white_fills`, `ignore_background_fills` | on | Geometry › Ignore white masks, white lines and page backgrounds | — | skip masks and white elements that would show in CAD |
 | `text_entities` | on | Text › Export text | `--no-text` | TEXT entities |
 | `group_mtext` | on | Text › Group stacked lines (MTEXT) | `--no-mtext` | paragraphs |
 | `text_height_factor` | 0.70 | Text › Text height ratio | — | cap height ÷ font size |
 | `shx_comments` | on | Text › Recover text drawn as strokes or outlines | `--no-shx` | SHX texts on layer `TEXT_SHX` (strokes on the hidden `TEXT_SHX_STROKES`), letter outlines under invisible text removed |
-| `dimensions` | on | Dimensions › Arrow dimensions | `--no-dims` | true DIMENSIONs |
+| `dimensions` | on | Dimensions › Arrow dimensions | `--no-dims` | true DIMENSIONs (linear, radius, diameter, angle, arc length) |
 | `tick_dimensions` | on | Dimensions › Tick dimensions | `--no-ticks` | architectural ticks |
 | `leaders` | on | Dimensions › Leaders | `--no-leaders` | MULTILEADER / LEADER |
 | `use_pdf_layers` | on | Layers › Keep the PDF's layers | `--no-pdf-layers` | OCG names |
@@ -986,8 +1110,8 @@ All options are fields of `convertcad.core.options.Options` (also importable fro
 | `color_mode` | `aci` | Layers › Colours | `--true-color` | ACI or true colour |
 | `block_detection` | on | Layers › Detect repeated symbols | `--no-blocks` | BLOCK + INSERT |
 | `block_min_repeats` | 3 | Layers › Minimum occurrences | `--min-repeats` | threshold |
-| `block_rotations` | on | Layers › Also match rotated and mirrored copies | `--no-block-rotations` | INSERT with rotation / mirror |
-| `raster_mode` | on | Scanned › Trace lines and circles | `--no-raster` | OpenCV tracing |
+| `block_rotations` | on | Layers › Also match rotated and mirrored copies | `--no-block-rotations` | INSERT with rotation (any angle) / mirror |
+| `raster_mode` | on | Scanned › Trace lines, circles and arcs | `--no-raster` | OpenCV tracing |
 | `ocr` | on | Scanned › Read text with OCR | `--no-ocr` | OCR of scanned pages |
 | `ocr_lang` | `latin` | Scanned › OCR languages | `--ocr-lang` | `latin` (English, French…), a script (`arabic`, `cyrillic`, `greek`, `korean`, `devanagari`, `thai`, `tamil`, `telugu`) or `latin+<script>` for mixed drawings (§5.14); 1.0 codes such as `eng+fra+ara` are accepted |
 | `ocr_quality` | `standard` | Scanned › OCR accuracy | `--ocr-quality` | `standard` (built-in model) or `maximum` (larger models, downloaded; 1.0's "Maximum — PaddleOCR" engine maps to it) |
@@ -1015,10 +1139,10 @@ settings files and presets never break after an update.
 | `TEXT` | texts and MTEXT paragraphs |
 | `TEXT_SHX` | texts recovered from AutoCAD SHX comments |
 | `TEXT_SHX_STROKES` (off) | the strokes AutoCAD drew for those texts, kept but hidden |
-| `DIM` | true DIMENSION entities |
+| `DIM` | true DIMENSION entities (and the drawing of arc-length dimensions before DXF 2007 / in DWG) |
 | `DIM_RAW` (red) | measurement texts that matched no dimension — **review them** |
 | `ANNOT_LEADER` | leaders / multileaders |
-| `HATCH` | solid fills and rebuilt hatch patterns |
+| `HATCH` | solid fills; rebuilt hatch patterns and textures stay on the layer of their lines |
 | `BLOCKS` | block references (INSERT); block content keeps its style layers |
 | `TRACE_LINES`, `TRACE_TEXT` | geometry traced and text read on scanned pages |
 | `IMG_RASTER` (locked) | embedded images and original scans, for checking |
@@ -1039,25 +1163,40 @@ Nothing is sent over the network.
 
 ---
 
-## 11. Languages (English / French)
+## 11. Languages (English, French, Spanish, German, Arabic)
 
 - Interface strings are written in English in the code and wrapped in `tr()`:
   `tr("Open PDF…")`, `tr("{n} PDF file(s) found.", n=3)`.
-- The French text lives in the `FR` dictionary at the bottom of `convertcad/i18n.py`.
-  A missing translation shows the English text (the interface never breaks), and
-  `tests/test_i18n.py` fails if a `tr("…")` literal has no French version or if a
-  `{placeholder}` is lost.
+- `i18n.LANGUAGES` lists the languages (code → name in that language, shown in
+  *View → Language*). French lives in the `FR` dictionary at the bottom of
+  `convertcad/i18n.py`; Spanish, German and Arabic in `convertcad/locales/es.py`, `de.py`,
+  `ar.py` (`STRINGS = {English: translation}`), imported when chosen (`i18n.table()`; the
+  PyInstaller spec bundles them with `collect_submodules`). A missing translation shows
+  the English text (the interface never breaks).
+- `tests/test_i18n.py` fails if a `tr("…")` literal or an OCR catalogue name lacks a
+  translation in any language, if a `{placeholder}` is lost, if a translation is no longer
+  used (the French list is the reference), or if a guide is missing.
+- **Arabic** is written right to left: `app.py` sets the application's layout direction
+  (`is_rtl()`), which mirrors menus, panels and dialogs; `CadView` forces left to right so
+  drawings are never mirrored.
+- Lengths are formatted per language by `pdf_view.format_length()` (3,500.0 / 3 500,0 /
+  3.500,0 mm). Toolbar labels that do not fit (German, Spanish) are dropped, the icon and
+  tooltip remain (`MainWindow._fit_toolbar`).
 - The engine (`core`) stays language-neutral: its progress messages are translated in the
   interface by `tr_progress()` (pattern based), paper names by `tr_paper()`, and the HTML
   report by passing `t=tr` to `ConversionReport.to_html()`. The `_log.txt` file is written in
   English so logs can be compared and shared.
-- Long texts are Markdown files in `convertcad/resources` (`guide_*`, `terms_*`, `ocr_*`).
-- The language is chosen in *View → Language* and applies at the next start.
+- Long texts are Markdown files in `convertcad/resources` (`guide_<lang>`, `terms_<lang>`,
+  `ocr_<lang>`); English is the fallback.
+- The language applies at the next start.
+- The Spanish, German and Arabic texts were written without a native-speaker review:
+  corrections only change the translation, never the English key.
 
-**Adding a language** (e.g. Arabic): add a dictionary `AR = {...}` in `i18n.py`, extend
-`set_language()` / `tr()` to use it, add `guide_ar.md`, `terms_ar.md`, `ocr_ar.md`, add the
-menu entry in `MainWindow._build_menus()`, and extend `test_i18n.py`. Right-to-left layout
-needs `QApplication.setLayoutDirection(Qt.RightToLeft)` in `app.py`.
+**Adding a language** (e.g. Italian): add `"it": "Italiano"` to `LANGUAGES`, create
+`convertcad/locales/it.py` with a translation of every key of `FR`, add `guide_it.md`,
+`terms_it.md`, `ocr_it.md`, and a separator rule in `format_length()` if needed; the
+tests then check it automatically. For a right-to-left language add its code to
+`RTL_LANGUAGES`.
 
 ---
 
@@ -1274,7 +1413,7 @@ PACKAGING.md for where to get a certificate), or run from source.
 
 1. Update `APP_VERSION` in `convertcad/__init__.py` (the only place).
 2. Add the version to `CHANGELOG.md`.
-3. Commit, then tag and push: `git tag v1.1.0 && git push origin main --tags`.
+3. Commit, then tag and push: `git tag v1.2.0 && git push origin main --tags`.
 4. The workflow builds the five downloads and attaches them to the release; edit the
    release notes on GitHub (copy from the changelog).
 
@@ -1307,23 +1446,24 @@ entered, add a small dialog in `ui/dialogs.py` and store the key in `Settings`. 
 AGPL licence (§20) lets anyone remove such a check from the source; closed-source
 distribution requires a commercial PyMuPDF licence.
 
-### 17.3 Recognise symbols at any angle
+### 17.3 Add a standard texture pattern
 
-Version 1.0.0 matches copies rotated by multiples of 90° and mirrored (§5.7). For any
-angle, normalise each cluster before fingerprinting: compute its principal axis
-(covariance of the entity points), rotate the coordinates so that axis is horizontal, try
-the mirrored version and keep the smaller fingerprint; quantisation must then tolerate the
-rounding of rotated coordinates. `insert_orientation()` and the writer already accept any
-rotation. Add a test drawing the symbol at 30° and check the exploded INSERTs as in
-`tests/test_blocks.py`.
+Add its name (as in ezdxf's `ezdxf.tools.pattern.ISO_PATTERN`, a copy of AutoCAD's
+`acadiso.pat`) to `textures.TEXTURES`; if it contains dots, add its share of dots to
+`DOT_SHARE`; if it looks random (no short repeat), add it to `RANDOM_LOOKING`. Then add a
+case to `tests/test_textures.py` (`_draw` draws any standard pattern into a PDF the way
+AutoCAD plots it). Patterns that are geometrically identical up to the scale (BRICK and
+AR-B816) are found as the first one listed.
 
-### 17.4 Add another kind of dimension (angular, radial, diameter)
+### 17.4 Add another kind of dimension (ordinate, jogged radius…)
 
-Add a recogniser in `core/annotations.py` that returns a new dataclass (e.g.
-`RadialDimension`), mark the consumed primitives, then emit it in `DxfWriter.write_annotations()`
-with ezdxf (`add_radius_dim`, `add_diameter_dim`, `add_angular_dim_2l`). Follow the safe
-rule: only when the arrow, the geometry and the text agree; otherwise leave the primitives
-alone.
+Add a recogniser in `core/annotations.py` that returns a new dataclass (like
+`RadialDimension` or `AngularDimension`), mark the consumed primitives, call it in
+`reconstruct()` before the linear dimensions if its arrows could pass for a linear
+dimension, then emit it in `DxfWriter.write_annotations()` with ezdxf (sizes from
+`_dim_override()`, `_undo_from()` on failure). Follow the safe rule: only when the arrow,
+the geometry and the text agree; otherwise leave the primitives alone. Check the DWG round
+trip (`dwg.py` may have to adapt the DXF, as for the 3-point angular dimension).
 
 ### 17.5 Add a preset
 
@@ -1389,22 +1529,26 @@ Where the speed comes from:
   vertical text read top-to-bottom may come out with the wrong rotation; the downloaded
   models come from the GitHub release only when the repository is public (otherwise from
   RapidOCR's repository).
-- Blocks: copies rotated by multiples of 90° and mirrored are matched; other angles are not
-  (§17.3).
-- Dimensions: linear (horizontal, vertical, aligned/rotated) only; angular, radial and
-  diameter dimensions remain geometry + text.
-- Scanned drawings: tracing is approximate by nature (lines and circles, no arcs or
+- Blocks: copies at any angle and mirrored are matched; copies at another size are
+  different symbols.
+- Dimensions: linear (aligned/rotated), radius, diameter, angle (3 points) and arc length;
+  ordinate, jogged-radius and 2-line angular dimensions remain geometry + text. Arc length
+  dimensions are written as ARC_DIMENSION from DXF 2007 only (their drawing otherwise).
+- Scanned drawings: tracing is approximate by nature (lines, circles and arcs; no
   splines); always compare with the locked scan layer.
 - Hatch patterns are rebuilt when they are made of straight parallel lines (single
-  direction or crossing grids); dotted, curved or symbol patterns (e.g. concrete aggregate)
-  stay as their geometry.
+  direction or crossing grids) or come from the standard textures of `textures.TEXTURES`;
+  custom patterns, curved patterns and several patterns touching each other stay as their
+  geometry. Sand and concrete are accepted on statistics (estimated scale and position).
+- Interface translations (Spanish, German, Arabic) have not been reviewed by native
+  speakers.
 - One scale per sheet (viewports at different scales on one sheet: convert each area with
   its own calibration, using *Select area*).
 - No macOS build (the code runs on macOS from source, untested).
 
-Ideas for next versions: symbols at any angle, angular/radial dimensions, DWG in newer
-formats when LibreDWG supports them, viewport-aware scales, macOS build, licence management
-(hook ready), automatic update check (opt-in).
+Ideas for next versions: drawing content in model space with the title block in a paper
+space layout, DWG in newer formats when LibreDWG supports them, viewport-aware scales,
+macOS build, licence management (hook ready).
 
 ---
 
@@ -1434,10 +1578,11 @@ All third-party licences: [`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md).
 
 | Version | Date | Highlights |
 |---|---|---|
-| 1.0.0 | 2026-10-29 | First public release: Qt 6 interface (dark/light, EN/FR, review before saving), vector engine (arcs, splines, polylines, dimensions, leaders, blocks with rotations, dashed lines and hatch patterns rebuilt, SHX texts), scanned drawings with three OCR engines, selected-area conversion, overlay check, native DWG output, command line, Windows portable + installer, Linux tar.gz + AppImage + .deb |
+| 1.2.0 | 2026-10-30 | Radius, diameter, angle and arc length dimensions; texture hatches (dots, sand, concrete, gravel, earth, brick, insulation) rebuilt as standard patterns; repeated symbols at any angle; arcs traced on scanned drawings; selection in the result preview; interface in Spanish, German and Arabic (right to left); optional update check (off by default) |
 | 1.1.2 | 2026-10-30 | Select area: the page background is no longer written as a hatch of the area's size |
 | 1.1.1 | 2026-10-29 | Circle search of scanned pages about 30 times faster on large sheets (two radius bands, reduced copy for large circles, vectorised checks) |
 | 1.1.0 | 2026-10-29 | OCR: one built-in PP-OCR model (English, French, Latin-script languages), other scripts and maximum accuracy downloaded from the program (*OCR languages and models…*, `--get-ocr-model`), mixed-script drawings, offline installation from files; Tesseract and the PaddleOCR library removed; smaller downloads |
+| 1.0.0 | 2026-10-29 | First public release: Qt 6 interface (dark/light, EN/FR, review before saving), vector engine (arcs, splines, polylines, dimensions, leaders, blocks with rotations, dashed lines and hatch patterns rebuilt, SHX texts), scanned drawings with three OCR engines, selected-area conversion, overlay check, native DWG output, command line, Windows portable + installer, Linux tar.gz + AppImage + .deb |
 
 The program was developed privately before this release (internal versions 1.x–3.x);
 version numbers restart at 1.0.0 for the public repository. Details:

@@ -1,9 +1,9 @@
-; ===========================================================================
+﻿; ===========================================================================
 ;  ConvertCAD.iss - Inno Setup script for the Windows INSTALLER
 ;
 ;  Build it with scripts\build_installer.bat (recommended): the script builds
 ;  the program first, reads the version and calls the Inno Setup compiler.
-;  By hand:  ISCC.exe /DAppVersion=1.1.2 installer\ConvertCAD.iss
+;  By hand:  ISCC.exe /DAppVersion=1.2.0 installer\ConvertCAD.iss
 ;
 ;  Needs Inno Setup 6.3 or later (free): https://jrsoftware.org/isinfo.php
 ;  Input:   dist\ConvertCAD\           (the portable folder, build_exe.bat)
@@ -18,7 +18,7 @@
 ; ===========================================================================
 
 #ifndef AppVersion
-  #define AppVersion "1.1.2"
+  #define AppVersion "1.2.0"
 #endif
 #ifndef SourceDir
   #define SourceDir "..\dist\ConvertCAD"
@@ -69,13 +69,26 @@ CloseApplications=yes
 ; the uninstaller removes the OCR models downloaded by the user (below)
 UsedUserAreasWarning=no
 
+; This file is UTF-8 with a byte order mark (Spanish, German and Arabic texts below):
+; keep the mark when editing it, Inno Setup reads a file without it as ANSI.
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "french"; MessagesFile: "compiler:Languages\French.isl"
+Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
+Name: "german"; MessagesFile: "compiler:Languages\German.isl"
+; Arabic (right to left) ships with Inno Setup 6.5 and later
+#if FileExists(CompilerPath + "Languages\Arabic.isl")
+Name: "arabic"; MessagesFile: "compiler:Languages\Arabic.isl"
+#endif
 
 [CustomMessages]
 english.SendToTask=Add ConvertCAD to the "Send to" menu (right-click on PDF files)
 french.SendToTask=Ajouter ConvertCAD au menu "Envoyer vers" (clic droit sur les PDF)
+spanish.SendToTask=Añadir ConvertCAD al menú "Enviar a" (clic derecho en los PDF)
+german.SendToTask=ConvertCAD zum Menü "Senden an" hinzufügen (Rechtsklick auf PDF-Dateien)
+#if FileExists(CompilerPath + "Languages\Arabic.isl")
+arabic.SendToTask=إضافة ConvertCAD إلى قائمة "إرسال إلى" (نقر بالزر الأيمن على ملفات PDF)
+#endif
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
