@@ -11,6 +11,11 @@
   Windows (portable or installer) · Linux (AppImage, .deb) · conversions 100 % offline · English · Français · Español · Deutsch · العربية
 </p>
 
+<p align="center">
+  <a href="https://abdelhaouari-ae.github.io/ConvertCAD/"><b>Website and downloads</b></a> ·
+  <a href="https://github.com/abdelhaouari-AE/ConvertCAD/releases">All releases</a>
+</p>
+
 ![ConvertCAD — converted plan with its layers](docs/screenshots/03-result-layers.png)
 
 ---
@@ -190,8 +195,10 @@ option. Exit code: `0` all converted, `1` a conversion failed, `2` bad arguments
 | Windows installer | `scripts\build_installer.bat` (needs [Inno Setup](https://jrsoftware.org/isinfo.php) 6.3+) |
 | Linux tar.gz · AppImage · .deb | `./scripts/build_linux.sh` · `./scripts/build_appimage.sh` · `./scripts/build_deb.sh` |
 
-Pushing a tag such as `v1.2.0` builds **all five** on GitHub Actions and attaches them to
-the release ([`.github/workflows/build.yml`](.github/workflows/build.yml)). The downloadable
+*Actions → build → Run workflow* with **Publish the release** ticked (or pushing a tag such
+as `v1.2.0`) builds **all five** on GitHub Actions and publishes them as the release of the
+version ([`.github/workflows/build.yml`](.github/workflows/build.yml)). The website
+(`site/`, workflow `pages.yml`) always offers the newest release. The downloadable
 OCR models are published once, as the release `ocr-models-v1`, by the workflow
 *OCR models release*. Details, code signing and the release checklist:
 **[docs/PACKAGING.md](docs/PACKAGING.md)**.

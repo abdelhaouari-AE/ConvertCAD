@@ -447,7 +447,8 @@ folder is bundled into the exe by `ConvertCAD.spec`.
 | `packaging/linux/` | `convertcad.desktop` (menu entry) and `AppRun` (AppImage launcher, `--cli` switch). |
 | `vendor/libredwg/` | GNU LibreDWG 0.13.4 source tarball, `patches/` (3 fixes), `win64/` Windows programs, `COPYING`, `README.md`, `SOURCE.txt`; `linux-x86_64/` is built locally (not in Git). |
 | `vendor/ocr_models/` | Only for an offline build: downloadable OCR models bundled with the program (not in Git). |
-| `.github/workflows/` | `tests.yml` (lint + tests, Windows and Linux, Python 3.10 / 3.12 / 3.13, LibreDWG built and cached on Linux), `build.yml` (Windows portable zip + installer, Linux tar.gz + AppImage + .deb, as artifacts and release assets), `ocr-models.yml` (publishes the downloadable OCR models as the release `ocr-models-v1`). |
+| `site/` | The website (GitHub Pages): `index.html` (one static page, its CSS and script inside) and `img/` (screenshots, icon, social preview image). |
+| `.github/workflows/` | `tests.yml` (lint + tests, Windows and Linux, Python 3.10 / 3.12 / 3.13, LibreDWG built and cached on Linux), `build.yml` (Windows portable zip + installer, Linux tar.gz + AppImage + .deb, as artifacts, then one release job), `pages.yml` (publishes the website), `ocr-models.yml` (publishes the downloadable OCR models as the release `ocr-models-v1`). |
 | `.github/` | Issue templates (conversion problem, feature request) and pull-request checklist. |
 | `.vscode/` | `settings.json`, `launch.json` (app, sample, CLI, current-PDF, tests), `tasks.json` (setup, tests, lint, samples, icon, builds), `extensions.json`. |
 
@@ -1383,8 +1384,17 @@ PACKAGING.md for where to get a certificate), or run from source.
   `SIGN_PFX_PASSWORD`), portable zip, installer with Inno Setup (Chocolatey). *Linux job*
   (Ubuntu 22.04): LibreDWG (cached), `build_linux.sh` (tests included), AppImage, .deb,
   smoke test (AppImage → DWG, OCR), and — for information only — an OCR model download from
-  the built program. The five downloads are uploaded as workflow artifacts and attached to
-  the GitHub release of the tag.
+  the built program. The five downloads are uploaded as workflow artifacts. *Release job*
+  (on a tag, or *Run workflow* with **Publish the release** ticked): once both builds have
+  succeeded, creates the release `v<APP_VERSION>` (tag included) with the five files and the
+  CHANGELOG section of the version as notes — one job, so two jobs never create two
+  releases.
+- **`pages.yml`** — when `site/` changes on `main`, or manually: publishes the website
+  (`site/index.html`, images in `site/img/`) on GitHub Pages,
+  https://abdelhaouari-ae.github.io/ConvertCAD/. The page asks GitHub for the newest
+  program release when it opens (the OCR models release is skipped, as in the update
+  check) and fills the five download buttons and their sizes; offline, they lead to the
+  releases page. One-time setting: *Settings → Pages → Source: GitHub Actions*.
 - **`ocr-models.yml`** — manual (*Run workflow*): downloads the downloadable OCR models
   from RapidOCR's repository, checks their SHA-256, test-runs each one and publishes them
   as the release `ocr-models-v1` (not marked *latest*), where the program downloads them
@@ -1413,9 +1423,10 @@ PACKAGING.md for where to get a certificate), or run from source.
 
 1. Update `APP_VERSION` in `convertcad/__init__.py` (the only place).
 2. Add the version to `CHANGELOG.md`.
-3. Commit, then tag and push: `git tag v1.2.0 && git push origin main --tags`.
-4. The workflow builds the five downloads and attaches them to the release; edit the
-   release notes on GitHub (copy from the changelog).
+3. Commit and push to `main`.
+4. *Actions → build → Run workflow*, tick **Publish the release** (or push the tag
+   `v<version>`): the five downloads are built and published as the release, with the
+   changelog section as notes. The website offers the new version at once.
 
 Version numbers follow *major.minor.patch*: patch = fixes, minor = new features compatible
 with existing settings, major = big changes (interface, file formats, dependencies).

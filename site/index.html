@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ConvertCAD — PDF to DXF and DWG, offline</title>
+<meta name="description" content="Free, open-source converter that turns 2D PDF drawings into editable DXF and DWG files with real dimensions, layers, blocks, hatches and text. Runs on your computer, for Windows and Linux.">
+<meta property="og:title" content="ConvertCAD — PDF to DXF and DWG, offline">
+<meta property="og:description" content="Turn PDF drawings into editable CAD files with real dimensions, layers, blocks and hatches. Free, open source, runs on your computer.">
+<meta property="og:image" content="https://abdelhaouari-ae.github.io/ConvertCAD/img/social.png">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/png" href="img/icon-64.png">
+<link rel="apple-touch-icon" href="img/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Semi+Condensed:wght@500;600;700&family=Public+Sans:wght@400;500;600&display=swap">
+<style>
+/* ConvertCAD website — one static page, no framework.
+   Concept: engineering graph paper ("papier millimétré"): 8 px minor squares,
+   a major line every 5 squares. In the hero, a blue light travels ALONG the
+   major grid lines (the page's one animation). Dark theme = CAD model space.
+   Type: Saira Semi Condensed (headings, drafting feel) + Public Sans (text). */
+:root {
+  --paper:   #f6f9fc;   /* page */
+  --sheet:   #ffffff;   /* panels */
+  --ink:     #0f2238;   /* text, deep blue ink */
+  --muted:   #4e6178;
+  --line:    #d6e0eb;   /* panel borders */
+  --minor:   rgba(29, 95, 209, .06);
+  --major:   rgba(29, 95, 209, .12);
+  --accent:  #1d5fd1;   /* plotter blue: buttons, links */
+  --on-accent: #ffffff;
+  --glow:    #2ab3ec;   /* light travelling along the grid */
+  --shade:   rgba(15, 34, 56, .22);
+  --f-head: "Saira Semi Condensed", "Arial Narrow", system-ui, sans-serif;
+  --f-text: "Public Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --f-file: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #0a1626; --sheet: #0f1f33; --ink: #e4edf7; --muted: #9db0c6; --line: #22374f;
+    --minor: rgba(80, 160, 255, .06); --major: rgba(80, 160, 255, .12);
+    --accent: #4c9bff; --on-accent: #06121f; --glow: #3fd0f5; --shade: rgba(0, 0, 0, .5);
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box }
+html { scroll-behavior: smooth }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto } }
+body {
+  margin: 0; color: var(--ink); background-color: var(--paper);
+  font: 17px/1.6 var(--f-text);
+  /* graph paper, fixed to the window */
+  background-image:
+    linear-gradient(var(--major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--major) 1px, transparent 1px),
+    linear-gradient(var(--minor) 1px, transparent 1px),
+    linear-gradient(90deg, var(--minor) 1px, transparent 1px);
+  background-size: 40px 40px, 40px 40px, 8px 8px, 8px 8px;
+  background-position: -1px -1px;
+  background-attachment: fixed;
+}
+img { max-width: 100%; height: auto; display: block }
+a { color: var(--accent); text-underline-offset: 3px }
+:focus-visible { outline: 3px solid var(--glow); outline-offset: 3px; border-radius: 4px }
+h1, h2, h3 { font-family: var(--f-head); line-height: 1.12; margin: 0; text-wrap: balance; letter-spacing: -.005em }
+h1 { font-size: clamp(2.3rem, 5.2vw, 4rem); font-weight: 700 }
+h2 { font-size: clamp(1.7rem, 3.2vw, 2.4rem); font-weight: 700 }
+h3 { font-size: 1.28rem; font-weight: 600 }
+p { margin: 0 }
+
+.wrap {
+  max-width: 1160px; margin: 0 auto;
+  padding-left: max(20px, env(safe-area-inset-left, 0px));
+  padding-right: max(20px, env(safe-area-inset-right, 0px));
+}
+
+/* ---------- header ---------- */
+.top { padding-block: 18px }
+.top .wrap { display: flex; align-items: center; gap: 28px; flex-wrap: wrap }
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink);
+  font: 700 1.3rem var(--f-head) }
+.brand img { width: 30px; height: 30px }
+.top nav { display: flex; gap: 26px; margin-left: auto; flex-wrap: wrap; font-weight: 500 }
+.top nav a { color: var(--muted); text-decoration: none }
+.top nav a:hover { color: var(--ink) }
+
+/* ---------- hero ---------- */
+.hero { padding-block: 56px 0 }
+/* the travelling light: a soft band of colour, visible only through the major
+   grid lines. Grid and light are fixed to the window, so they stay aligned. */
+body::after {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background: linear-gradient(115deg, transparent 40%, var(--glow) 50%, transparent 60%);
+  background-size: 260% 100%; background-position: 120% 0;
+  -webkit-mask-image: linear-gradient(#000 1px, transparent 1px), linear-gradient(90deg, #000 1px, transparent 1px);
+          mask-image: linear-gradient(#000 1px, transparent 1px), linear-gradient(90deg, #000 1px, transparent 1px);
+  -webkit-mask-size: 40px 40px; mask-size: 40px 40px;
+  -webkit-mask-position: -1px -1px; mask-position: -1px -1px;
+  opacity: .8;
+}
+@media (prefers-reduced-motion: no-preference) {
+  body::after { animation: sweep 10s cubic-bezier(.45, .05, .35, 1) .4s infinite }
+}
+@media (prefers-reduced-motion: reduce) { body::after { display: none } }
+@keyframes sweep {
+  0%   { background-position: 120% 0 }
+  65%  { background-position: -20% 0 }
+  100% { background-position: -20% 0 }
+}
+.hero .wrap { position: relative }
+.hero-text { max-width: 760px }
+.lede { font-size: 1.2rem; color: var(--muted); margin-top: 20px; max-width: 40em }
+.actions { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin-top: 32px }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  padding: 14px 24px; border-radius: 8px; font: 600 1rem var(--f-text);
+  text-decoration: none; border: 1px solid transparent; white-space: nowrap;
+}
+.btn-main { background: var(--accent); color: var(--on-accent); box-shadow: 0 8px 22px -10px var(--accent) }
+.btn-main:hover { filter: brightness(1.08) }
+.btn-plain { color: var(--ink); border-color: var(--line); background: var(--sheet) }
+.btn-plain:hover { border-color: var(--accent) }
+.btn svg { width: 18px; height: 18px; flex: none }
+.facts { margin-top: 18px; color: var(--muted); font-size: .95rem }
+
+/* app window with the real screenshots */
+.window {
+  margin-top: 48px; border-radius: 12px 12px 0 0; overflow: hidden;
+  background: #1b2228; border: 1px solid #2a343d; border-bottom: 0;
+  box-shadow: 0 30px 70px -30px var(--shade);
+}
+.window-bar { display: flex; align-items: center; gap: 4px; padding: 8px 10px 0; background: #151b20; flex-wrap: wrap }
+.window-bar button {
+  font: 500 .9rem var(--f-text); color: #9fb0bf; background: transparent; border: 0;
+  padding: 8px 14px 10px; border-bottom: 2px solid transparent; cursor: pointer;
+}
+.window-bar button[aria-selected="true"] { color: #fff; border-bottom-color: #2fb4d9 }
+.window-bar button:hover { color: #fff }
+.window-bar .hint { margin-left: auto; color: #6f8291; font-size: .82rem; padding: 0 6px 6px }
+.shot { position: relative; aspect-ratio: 1600 / 960; background: #1b2228 }
+.shot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top left }
+.shot img[hidden] { display: none }
+
+/* ---------- sections ---------- */
+section { padding-block: 96px 0 }
+.section-head { max-width: 680px }
+.section-head p { color: var(--muted); margin-top: 14px; font-size: 1.08rem }
+
+/* features: two columns of short items, privacy items share the same rhythm */
+.features { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 44px 64px; margin-top: 48px }
+.feature { display: flex; gap: 20px; align-items: flex-start }
+.feature svg { flex: none; width: 48px; height: 48px; color: var(--accent) }
+.feature div { min-width: 0 }
+.feature p { color: var(--muted); margin-top: 6px }
+.feature.private svg { color: var(--glow) }
+
+/* privacy band: the promise in one line, inside the features section */
+.promise {
+  margin-top: 56px; padding: 26px 30px; border-radius: 12px; background: var(--sheet);
+  border: 1px solid var(--line); display: flex; gap: 22px; align-items: center; flex-wrap: wrap;
+}
+.promise svg { width: 40px; height: 40px; color: var(--glow); flex: none }
+.promise div { flex: 1 1 320px; min-width: 0 }
+.promise strong { font: 600 1.25rem var(--f-head); display: block }
+.promise span { color: var(--muted) }
+
+/* ---------- download ---------- */
+.release-line { margin-top: 12px; color: var(--muted) }
+.platforms { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; margin-top: 40px }
+.platform { background: var(--sheet); border: 1px solid var(--line); border-radius: 12px; padding: 26px 28px 22px }
+.platform.yours { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) }
+.platform-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap }
+.platform-head small { color: var(--muted); font-size: .9rem }
+.yours-tag { color: var(--accent); font-weight: 600; font-size: .9rem }
+.files { list-style: none; margin: 18px 0 0; padding: 0 }
+.files li { display: flex; align-items: center; gap: 16px; padding: 14px 0; border-top: 1px solid var(--line) }
+.files .what { flex: 1; min-width: 0 }
+.files .what b { font-weight: 600; display: block }
+.files .what span { color: var(--muted); font-size: .93rem }
+.files .size { color: var(--muted); font-size: .9rem; font-variant-numeric: tabular-nums; white-space: nowrap }
+.files .btn { padding: 10px 18px; font-size: .95rem }
+.note { margin-top: 14px; font-size: .9rem; color: var(--muted) }
+.note code, .file { font-family: var(--f-file); font-size: .86em }
+.more { display: flex; gap: 28px; flex-wrap: wrap; margin-top: 28px; font-weight: 500 }
+
+/* ---------- footer ---------- */
+footer { margin-top: 110px; border-top: 1px solid var(--line); background: var(--paper); padding-block: 32px 40px; color: var(--muted); font-size: .93rem }
+footer .wrap { display: flex; gap: 24px 40px; flex-wrap: wrap; justify-content: space-between }
+footer nav { display: flex; gap: 22px; flex-wrap: wrap }
+footer a { color: var(--muted) }
+footer a:hover { color: var(--ink) }
+
+@media (max-width: 860px) {
+  .features, .platforms { grid-template-columns: 1fr }
+  .top nav { gap: 18px }
+  section { padding-block: 72px 0 }
+}
+@media (max-width: 560px) {
+  body { font-size: 16px }
+  .top nav { margin-left: 0; width: 100% }
+  .window-bar .hint { display: none }
+  .files li { flex-wrap: wrap }
+  .feature svg { width: 40px; height: 40px }
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#top"><img src="img/icon-64.png" alt="" width="30" height="30">ConvertCAD</a>
+    <nav aria-label="Main">
+      <a href="#features">Features</a>
+      <a href="#download">Download</a>
+      <a href="https://github.com/abdelhaouari-AE/ConvertCAD/blob/main/convertcad/resources/guide_en.md">User guide</a>
+      <a href="https://github.com/abdelhaouari-AE/ConvertCAD">Source code</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+  <div class="hero">
+    <div class="wrap">
+      <div class="hero-text">
+        <h1>Turn PDF drawings back into editable CAD files.</h1>
+        <p class="lede">ConvertCAD rebuilds the lines, arcs, dimensions, hatches, blocks and text of a 2D PDF plan as real DXF and DWG entities, on your own computer.</p>
+        <div class="actions">
+          <a class="btn btn-main" id="hero-download" href="#download">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v10m0 0-4-4m4 4 4-4M4 16h12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span id="hero-download-text">Download ConvertCAD</span>
+          </a>
+          <a class="btn btn-plain" href="#download">Windows and Linux versions</a>
+        </div>
+        <p class="facts" id="hero-facts">Free and open source. Windows 10/11 and Linux.</p>
+      </div>
+
+      <div class="window" role="region" aria-label="ConvertCAD screenshots">
+        <div class="window-bar" role="tablist" aria-label="Screenshots">
+          <button role="tab" id="tab-dxf" aria-selected="true" aria-controls="shot-dxf">DXF result</button>
+          <button role="tab" id="tab-pdf" aria-selected="false" aria-controls="shot-pdf">Source PDF</button>
+          <button role="tab" id="tab-report" aria-selected="false" aria-controls="shot-report">Report</button>
+          <span class="hint">Real screenshots of ConvertCAD 1.2</span>
+        </div>
+        <div class="shot">
+          <img id="shot-dxf" role="tabpanel" aria-labelledby="tab-dxf" src="img/dxf-result.webp" srcset="img/dxf-result-800.webp 800w, img/dxf-result.webp 1600w" sizes="(max-width: 1160px) 100vw, 1120px" width="1600" height="960" alt="ConvertCAD showing the converted DXF of a floor plan, with its 17 layers listed on the right">
+          <img id="shot-pdf" role="tabpanel" aria-labelledby="tab-pdf" src="img/source-pdf.webp" srcset="img/source-pdf-800.webp 800w, img/source-pdf.webp 1600w" sizes="(max-width: 1160px) 100vw, 1120px" width="1600" height="960" alt="The source PDF in ConvertCAD, with a 12 m distance measured between two grid lines and an intersection snap" hidden loading="lazy">
+          <img id="shot-report" role="tabpanel" aria-labelledby="tab-report" src="img/report.webp" srcset="img/report-800.webp 800w, img/report.webp 1600w" sizes="(max-width: 1160px) 100vw, 1120px" width="1600" height="960" alt="The conversion report listing what was rebuilt on each sheet" hidden loading="lazy">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <section id="features">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>What ConvertCAD does</h2>
+        <p>It rebuilds the intent of the drawing, not just its strokes, and it never sends your drawings anywhere.</p>
+      </div>
+
+      <div class="features">
+        <div class="feature">
+          <svg viewBox="0 0 48 48" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 14v20M40 14v20M8 24h32"/><path d="M8 24l6-3v6zM40 24l-6-3v6z" fill="currentColor" stroke="none"/><path d="M17 18h14" stroke-width="1.5"/></svg>
+          <div><h3>Real CAD entities</h3>
+          <p>Linear, radius, diameter, angle and arc length dimensions. Blocks for repeated symbols at any angle. Hatches, including sand, concrete and brick. Dashed linetypes and editable text.</p></div>
+        </div>
+        <div class="feature">
+          <svg viewBox="0 0 48 48" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M11 6h18l8 8v28H11z"/><path d="M29 6v8h8"/><path d="M6 27h36" stroke-dasharray="3 3"/><path d="M17 34h14M17 39h9"/></svg>
+          <div><h3>Scanned drawings too</h3>
+          <p>Lines, circles and arcs of a scan are traced, and its text is read in more than 50 languages, including Arabic.</p></div>
+        </div>
+        <div class="feature">
+          <svg viewBox="0 0 48 48" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="10" width="26" height="22" rx="2"/><rect x="16" y="18" width="26" height="22" rx="2" stroke-dasharray="4 3"/><circle cx="31" cy="29" r="3" fill="currentColor" stroke="none"/></svg>
+          <div><h3>Checked before you save</h3>
+          <p>The scale is read from the title block or calibrated on two points. Measure with object snaps, overlay the PDF on the result and read the report. Doubtful values go to a review layer.</p></div>
+        </div>
+        <div class="feature">
+          <svg viewBox="0 0 48 48" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M8 10h32v24H8z"/><path d="M18 40h12M24 34v6"/><path d="M16 22h4m4 0h8"/></svg>
+          <div><h3>DXF and DWG, your way</h3>
+          <p>DXF from R12 to 2018 and DWG. One file or one file per sheet, a selected area only, or a whole folder at once from the command line.</p></div>
+        </div>
+        <div class="feature private">
+          <svg viewBox="0 0 48 48" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M24 5l15 6v11c0 10-6.5 17.5-15 21-8.5-3.5-15-11-15-21V11z"/><path d="M17 24l5 5 9-10" stroke-linecap="round"/></svg>
+          <div><h3>Your drawings stay on your computer</h3>
+          <p>Every conversion runs locally. No account, no upload, no tracking. The program goes online only when you download an OCR language or check for a new version, and the update check is off by default.</p></div>
+        </div>
+        <div class="feature private">
+          <svg viewBox="0 0 48 48" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 14L7 24l10 10M31 14l10 10-10 10M27 10l-6 28"/></svg>
+          <div><h3>Open source, nothing hidden</h3>
+          <p>The full code is public under the GNU AGPL, so anyone can check what the program does. The portable version runs without installation or administrator rights.</p></div>
+        </div>
+      </div>
+
+      <div class="promise">
+        <svg viewBox="0 0 40 40" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="9" y="18" width="22" height="16" rx="2"/><path d="M14 18v-5a6 6 0 0 1 12 0v5"/><circle cx="20" cy="26" r="2" fill="currentColor" stroke="none"/></svg>
+        <div>
+          <strong>Confidential plans can be converted safely.</strong>
+          <span>Client drawings, tender documents and drawings under NDA never leave the computer you convert them on.</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="download">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Download</h2>
+        <p class="release-line" id="release-line">Everything is included: the DWG converter and the text recognition. Nothing else to install.</p>
+      </div>
+
+      <div class="platforms">
+        <div class="platform" id="platform-win">
+          <div class="platform-head">
+            <h3>Windows</h3>
+            <small>Windows 10 and 11, 64-bit</small>
+          </div>
+          <ul class="files">
+            <li>
+              <div class="what"><b>Installer</b><span>Adds ConvertCAD to the Start menu. No administrator rights needed.</span></div>
+              <span class="size" data-size="win-setup"></span>
+              <a class="btn btn-main" data-file="win-setup" href="https://github.com/abdelhaouari-AE/ConvertCAD/releases">Download</a>
+            </li>
+            <li>
+              <div class="what"><b>Portable</b><span>A zip to unpack anywhere, even on a USB stick.</span></div>
+              <span class="size" data-size="win-portable"></span>
+              <a class="btn btn-plain" data-file="win-portable" href="https://github.com/abdelhaouari-AE/ConvertCAD/releases">Download</a>
+            </li>
+          </ul>
+          <p class="note">If Windows shows "Windows protected your PC", click <b>More info</b>, then <b>Run anyway</b>.</p>
+        </div>
+
+        <div class="platform" id="platform-linux">
+          <div class="platform-head">
+            <h3>Linux</h3>
+            <small>64-bit, Ubuntu 22.04 or newer</small>
+          </div>
+          <ul class="files">
+            <li>
+              <div class="what"><b>AppImage</b><span>One file that runs on most distributions.</span></div>
+              <span class="size" data-size="appimage"></span>
+              <a class="btn btn-main" data-file="appimage" href="https://github.com/abdelhaouari-AE/ConvertCAD/releases">Download</a>
+            </li>
+            <li>
+              <div class="what"><b>Debian and Ubuntu package</b><span>Installs with your package manager.</span></div>
+              <span class="size" data-size="deb"></span>
+              <a class="btn btn-plain" data-file="deb" href="https://github.com/abdelhaouari-AE/ConvertCAD/releases">Download</a>
+            </li>
+            <li>
+              <div class="what"><b>Portable archive</b><span>A tar.gz to unpack anywhere.</span></div>
+              <span class="size" data-size="tar"></span>
+              <a class="btn btn-plain" data-file="tar" href="https://github.com/abdelhaouari-AE/ConvertCAD/releases">Download</a>
+            </li>
+          </ul>
+          <p class="note">Make the AppImage executable first: <code>chmod +x ConvertCAD-*.AppImage</code></p>
+        </div>
+      </div>
+
+      <div class="more">
+        <a id="notes-link" href="https://github.com/abdelhaouari-AE/ConvertCAD/blob/main/CHANGELOG.md">What's new</a>
+        <a href="https://github.com/abdelhaouari-AE/ConvertCAD/releases">All versions</a>
+        <a href="https://github.com/abdelhaouari-AE/ConvertCAD/blob/main/convertcad/resources/guide_en.md">User guide</a>
+        <a href="https://github.com/abdelhaouari-AE/ConvertCAD/issues">Report a problem</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>© 2026 abdelhaouari. ConvertCAD is free software under the GNU AGPL-3.0.</span>
+    <nav aria-label="Footer">
+      <a href="https://github.com/abdelhaouari-AE/ConvertCAD">GitHub</a>
+      <a href="https://github.com/abdelhaouari-AE/ConvertCAD/blob/main/LICENSE">Licence</a>
+      <a href="https://github.com/abdelhaouari-AE/ConvertCAD/blob/main/convertcad/resources/terms_en.md">Terms of use</a>
+      <a href="https://github.com/abdelhaouari-AE/ConvertCAD/blob/main/THIRD_PARTY_NOTICES.md">Third-party licences</a>
+    </nav>
+  </div>
+</footer>
+
+<script>
+/* 1. Screenshot tabs (Source PDF / DXF result / Report). */
+(function () {
+  var tabs = document.querySelectorAll('.window-bar [role="tab"]');
+  function show(tab) {
+    tabs.forEach(function (t) {
+      var on = t === tab;
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+      t.tabIndex = on ? 0 : -1;
+      document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
+    });
+  }
+  tabs.forEach(function (t, i) {
+    t.addEventListener('click', function () { show(t); });
+    t.addEventListener('keydown', function (e) {        // arrow keys move between tabs
+      var step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+      if (!step) return;
+      var next = tabs[(i + step + tabs.length) % tabs.length];
+      next.focus(); show(next);
+    });
+  });
+})();
+
+/* 2. The visitor's system: highlight its column, name it on the main button. */
+var OS = /Windows/.test(navigator.userAgent) ? 'win'
+       : (/Linux|X11/.test(navigator.userAgent) && !/Android/.test(navigator.userAgent)) ? 'linux' : '';
+if (OS) {
+  var box = document.getElementById(OS === 'win' ? 'platform-win' : 'platform-linux');
+  box.classList.add('yours');
+  var tag = document.createElement('span');
+  tag.className = 'yours-tag';
+  tag.textContent = 'Your system';
+  box.querySelector('.platform-head small').after(tag);
+  document.getElementById('hero-download-text').textContent =
+    OS === 'win' ? 'Download for Windows' : 'Download for Linux';
+}
+
+/* 3. Download links of the newest release, read from GitHub.
+      The OCR models release ("ocr-models-v1") is not a program version: skipped.
+      If GitHub cannot be reached, the buttons keep pointing to the releases page. */
+(function () {
+  var PATTERNS = {
+    'win-setup':    /-win64-setup\.exe$/,
+    'win-portable': /-win64-portable\.zip$/,
+    'appimage':     /\.AppImage$/,
+    'deb':          /_amd64\.deb$/,
+    'tar':          /-linux-x86_64\.tar\.gz$/
+  };
+  function key(tag) {                                 // "v1.10.2" -> [1, 10, 2, 0]
+    var n = tag.replace(/^v/, '').split('.').map(Number);
+    while (n.length < 4) n.push(0);
+    return n;
+  }
+  function newer(a, b) {
+    var x = key(a.tag_name), y = key(b.tag_name);
+    for (var i = 0; i < 4; i++) if (x[i] !== y[i]) return x[i] > y[i];
+    return false;
+  }
+  fetch('https://api.github.com/repos/abdelhaouari-AE/ConvertCAD/releases?per_page=30')
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (list) {
+      var best = null;
+      list.forEach(function (rel) {
+        if (rel.draft || rel.prerelease || !/^v?\d+(\.\d+)+$/.test(rel.tag_name)) return;
+        if (!best || newer(rel, best)) best = rel;
+      });
+      if (!best) return;
+      var version = best.tag_name.replace(/^v/, '');
+      var date = new Date(best.published_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+      document.getElementById('release-line').textContent =
+        'Version ' + version + ', released ' + date + '. Everything is included: the DWG converter and the text recognition. Nothing else to install.';
+      document.getElementById('hero-facts').textContent =
+        'Version ' + version + '. Free and open source. Windows 10/11 and Linux.';
+      document.getElementById('notes-link').href = best.html_url;
+      Object.keys(PATTERNS).forEach(function (id) {
+        var asset = best.assets.filter(function (a) { return PATTERNS[id].test(a.name); })[0];
+        if (!asset) return;
+        document.querySelectorAll('[data-file="' + id + '"]').forEach(function (a) {
+          a.href = asset.browser_download_url;
+          a.title = asset.name;
+        });
+        var size = document.querySelector('[data-size="' + id + '"]');
+        if (size) size.textContent = Math.round(asset.size / 1048576) + ' MB';
+      });
+      if (OS) {                                       // main button: the recommended file
+        var main = best.assets.filter(function (a) {
+          return PATTERNS[OS === 'win' ? 'win-setup' : 'appimage'].test(a.name);
+        })[0];
+        if (main) document.getElementById('hero-download').href = main.browser_download_url;
+      }
+    })
+    .catch(function () { /* offline or rate-limited: static links stay */ });
+})();
+</script>
+</body>
+</html>

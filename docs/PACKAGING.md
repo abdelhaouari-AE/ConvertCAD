@@ -14,8 +14,12 @@ bundled: users download the ones they need from the program (see *OCR models* be
 | Linux AppImage | `scripts/build_appimage.sh` | same | `ConvertCAD-<v>-x86_64.AppImage` |
 | Debian / Ubuntu package | `scripts/build_deb.sh` | same | `convertcad_<v>_amd64.deb` |
 
-The GitHub workflow `.github/workflows/build.yml` builds all five on every version tag
-(`git tag v1.2.0 && git push --tags`) and attaches them to the GitHub release.
+The GitHub workflow `.github/workflows/build.yml` builds all five and publishes them as the
+GitHub release `v<version>`: *Actions → build → Run workflow* with **Publish the release**
+ticked, or a pushed version tag (`git tag v1.2.0 && git push --tags`). The release is created
+once both builds have succeeded, with the CHANGELOG section of the version as notes. The
+website (https://abdelhaouari-ae.github.io/ConvertCAD/, folder `site/`) reads the newest
+release when it opens, so its download buttons need no change.
 
 ## Windows
 
@@ -143,7 +147,8 @@ Check the current conditions with each provider.
 
 1. Update `APP_VERSION` in `convertcad/__init__.py` and `CHANGELOG.md`.
 2. `python -m pytest -q` and `python -m ruff check .`
-3. Commit, then `git tag v<version> && git push --tags`.
-4. The **build** workflow attaches the five downloads to the release; edit the release
-   notes (copy the CHANGELOG section).
+3. Commit and push to `main`.
+4. *Actions → build → Run workflow*, tick **Publish the release** (or push the tag
+   `v<version>`). The release `v<version>` is created with the five downloads and the
+   CHANGELOG section as notes; the website offers it at once.
 5. Only when `ocr_catalog.py` changed: run the **OCR models release** workflow.
