@@ -1435,6 +1435,7 @@ All third-party licences: [`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md).
 | Version | Date | Highlights |
 |---|---|---|
 | 1.0.0 | 2026-10-29 | First public release: Qt 6 interface (dark/light, EN/FR, review before saving), vector engine (arcs, splines, polylines, dimensions, leaders, blocks with rotations, dashed lines and hatch patterns rebuilt, SHX texts), scanned drawings with three OCR engines, selected-area conversion, overlay check, native DWG output, command line, Windows portable + installer, Linux tar.gz + AppImage + .deb |
+| 1.1.2 | 2026-10-30 | Select area: the page background is no longer written as a hatch of the area's size |
 | 1.1.1 | 2026-10-29 | Circle search of scanned pages about 30 times faster on large sheets (two radius bands, reduced copy for large circles, vectorised checks) |
 | 1.1.0 | 2026-10-29 | OCR: one built-in PP-OCR model (English, French, Latin-script languages), other scripts and maximum accuracy downloaded from the program (*OCR languages and models…*, `--get-ocr-model`), mixed-script drawings, offline installation from files; Tesseract and the PaddleOCR library removed; smaller downloads |
 

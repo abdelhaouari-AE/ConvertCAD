@@ -179,6 +179,30 @@ def test_area_option_in_the_pipeline(pdf_factory, tmp_path):
     assert xs and max(xs) < 260 * 25.4 / 72 + 1e-6
 
 
+def test_area_does_not_keep_the_page_background(pdf_factory, tmp_path):
+    """A coloured page background cut to the selected area must not come
+    back as a hatch of the area's size (it hid the drawing and the overlay
+    check in 1.1); a real coloured fill in the area is still kept."""
+    def draw(p):
+        sh = p.new_shape()
+        sh.draw_rect(p.rect)
+        sh.finish(color=None, fill=(0.15, 0.15, 0.2))    # dark paper
+        sh.commit()
+        sh = p.new_shape()
+        sh.draw_rect((100, 80, 160, 120))
+        sh.finish(color=(1, 1, 1), fill=(0.9, 0.2, 0.2))  # a red fill
+        sh.commit()
+        stroke(p, [("rect", 50, 50, 250, 150)], color=(1, 1, 0))
+    pdf = pdf_factory(draw)
+    for area in (None, [40, 40, 260, 160]):
+        out = tmp_path / f"bg_{bool(area)}.dxf"
+        rep = convert(pdf, str(out), Options(scale_denominator=1,
+                                             clip_rect=area))
+        assert rep.success
+        hatches = list(ezdxf.readfile(str(out)).modelspace().query("HATCH"))
+        assert len(hatches) == 1, (area, len(hatches))    # the red one
+
+
 def test_normalize_rect():
     assert normalize_rect(None) is None
     assert normalize_rect([30, 40, 10, 20]) == [10, 20, 30, 40]

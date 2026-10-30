@@ -28,7 +28,7 @@ import os as _os
 _os.environ["ORT_DISABLE_TELEMETRY"] = "1"
 
 APP_NAME = "ConvertCAD"
-APP_VERSION = "1.1.1"
+APP_VERSION = "1.1.2"
 APP_AUTHOR = "abdelhaouari"
 APP_YEAR = "2026"
 APP_DESCRIPTION = "PDF 2D drawings to editable DXF converter"

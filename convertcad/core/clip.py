@@ -8,7 +8,9 @@ dimensions, blocks, layers) only sees what is inside:
   * straight segments  -> clipped exactly (Liang-Barsky)
   * curves (Bezier)    -> kept when inside; cut ones are split at the edge
                           (de Casteljau subdivision), the outside part dropped
-  * filled areas       -> clipped polygon (Sutherland-Hodgman)
+  * filled areas       -> clipped polygon (Sutherland-Hodgman); the page
+                          background keeps its mark (extractor.py), so the
+                          cut piece is not taken for a coloured fill
   * texts              -> kept when their anchor point is inside
   * images             -> kept when they overlap the area
 
@@ -156,7 +158,8 @@ def clip_page(pd: PageData, rect: Sequence[float]) -> dict:
         poly = clip_polygon(f.points, r)
         if len(poly) >= 3:
             fills.append(RawFill(points=poly, color=f.color,
-                                 pdf_layer=f.pdf_layer))
+                                 pdf_layer=f.pdf_layer,
+                                 background=f.background))
     pd.fills = fills
     pd.texts = [t for t in pd.texts if _inside(t.origin, r)]
     pd.shx_texts = [t for t in pd.shx_texts if _inside(t.origin, r)]

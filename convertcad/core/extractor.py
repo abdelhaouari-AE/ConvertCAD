@@ -17,6 +17,8 @@ from .compat import page_matrix, pymupdf, transform_point, transform_vector
 
 Point = Tuple[float, float]          # page coordinates (y grows DOWNWARD)
 RGB = Tuple[int, int, int]           # 0-255 per channel
+BACKGROUND_SHARE = 0.85              # a fill covering this share of the
+                                     # sheet is the page background
 
 
 # ---------------------------------------------------------------------------
@@ -56,6 +58,10 @@ class RawFill:
     points: List[Point]
     color: RGB
     pdf_layer: str = ""
+    # the page background (a fill covering most of the sheet). Decided when
+    # the page is read, because cutting the page to a selected area makes
+    # it as small as the area (it would then look like a normal fill)
+    background: bool = False
 
     @property
     def area(self) -> float:
@@ -278,6 +284,7 @@ def extract_page(doc, page_index: int, read_shx_comments: bool = True,
 
     data = PageData(number=page_index + 1, width=page.rect.width,
                     height=page.rect.height, rotation=page.rotation % 360)
+    page_area = data.width * data.height
     layer_names = set()
 
     # ---- 1. Vector drawings -------------------------------------------------
@@ -338,8 +345,10 @@ def extract_page(doc, page_index: int, read_shx_comments: bool = True,
                 _extend_outline(outline, pts + [pts[0]])
 
         if fill_rgb is not None and len(outline) >= 3:
-            data.fills.append(RawFill(points=outline, color=fill_rgb,
-                                      pdf_layer=pdf_layer))
+            fill = RawFill(points=outline, color=fill_rgb,
+                           pdf_layer=pdf_layer)
+            fill.background = fill.area > BACKGROUND_SHARE * page_area
+            data.fills.append(fill)
 
     # ---- 2. Native text ------------------------------------------------------
     try:

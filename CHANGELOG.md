@@ -2,6 +2,15 @@
 
 All notable changes to ConvertCAD. Versions follow *major.minor.patch*.
 
+## [1.1.2] — 2026-10-30
+
+### Fixed
+- **Select area**: a coloured page background was cut to the selected area and written as a
+  hatch of the area's size, which hid the drawing in CAD and covered the overlay check. The
+  page background is now recognised when the page is read, before the cut, and left out as
+  on a whole-sheet conversion (a white page background is no longer taken for a text mask
+  either).
+
 ## [1.1.1] — 2026-10-29
 
 ### Fixed

@@ -465,7 +465,8 @@ class DxfWriter:
             if self.s.ignore_white_fills and min(f.color) > 240:
                 self.stats.fills_skipped += 1
                 continue
-            if self.s.ignore_background_fills and f.area > 0.85 * page_area:
+            if self.s.ignore_background_fills and (
+                    f.background or f.area > 0.85 * page_area):
                 self.stats.fills_skipped += 1
                 continue
             candidates.append(f)

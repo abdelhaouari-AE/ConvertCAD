@@ -423,7 +423,8 @@ def _drop_white(pd: PageData, rep: ConversionReport) -> list:
                               f" line(s) or text(s) left out.")
     page_area = pd.width * pd.height
     return [f.points for f in pd.fills
-            if _is_white(f.color) and f.area < 0.5 * page_area]
+            if _is_white(f.color) and not f.background
+            and f.area < 0.5 * page_area]
 
 
 def _rebuild_notes(rp, pno: int, rep: ConversionReport) -> None:
