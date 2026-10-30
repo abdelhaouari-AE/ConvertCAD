@@ -37,3 +37,8 @@ vendor/libredwg/linux-x86_64/
 # (scripts/get_ocr_models.py)
 vendor/ocr_models/
 /release/
+
+# test leftovers at the top level (samples live in samples/)
+/*.pdf
+/*.dxf
+/*.dwg
