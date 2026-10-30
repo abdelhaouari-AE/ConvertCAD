@@ -47,7 +47,7 @@ def log_path() -> str:
 class Settings:
     terms_accepted: bool = False
     theme: str = "dark"                       # dark | light
-    language: str = "en"                      # en | fr
+    language: str = "en"                      # en | fr | es | de | ar
     recent_files: List[str] = field(default_factory=list)
     last_open_dir: str = ""
     last_save_dir: str = ""
@@ -88,7 +88,8 @@ class Settings:
                 pass
         if s.theme not in ("dark", "light"):
             s.theme = "dark"
-        if s.language not in ("en", "fr"):
+        from .i18n import LANGUAGES
+        if s.language not in LANGUAGES:
             s.language = "en"
         return s
 

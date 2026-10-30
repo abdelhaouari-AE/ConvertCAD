@@ -353,8 +353,8 @@ class OptionsPanel(QScrollArea):
     def _dims_section(self, sec):
         self.dims = sec.add(self._check(
             tr("Dimensions with arrows"),
-            tr("Arrow + line + arrow + value becomes a real DIMENSION "
-               "entity.")))
+            tr("Arrows, lines and value become a real DIMENSION entity: "
+               "linear, radius, diameter, angle or arc length.")))
         self.ticks = sec.add(self._check(
             tr("Dimensions with tick marks"),
             tr("Architectural dimensions with oblique ticks become DIMENSION "
@@ -398,13 +398,13 @@ class OptionsPanel(QScrollArea):
         self._row(sec, tr("Minimum occurrences"), self.repeats)
         self.block_rotations = sec.add(self._check(
             tr("Also match rotated and mirrored copies"),
-            tr("A symbol turned by 90, 180 or 270 degrees, or mirrored, uses "
-               "the same block (insertion with rotation / mirroring).")))
+            tr("A symbol turned by any angle, or mirrored, uses the same "
+               "block (insertion with rotation / mirroring).")))
 
     def _scan_section(self, sec):
         self.raster = sec.add(self._check(
-            tr("Trace lines and circles"),
-            tr("Scanned pages are vectorised (lines, circles) on layer "
+            tr("Trace lines, circles and arcs"),
+            tr("Scanned pages are vectorised (lines, circles, arcs) on layer "
                "TRACE_LINES.")))
         self.ocr = sec.add(self._check(
             tr("Read text with OCR"),

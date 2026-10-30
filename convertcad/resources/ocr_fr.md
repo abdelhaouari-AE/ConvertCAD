@@ -1,6 +1,6 @@
 # OCR des PDF scannés
 
-ConvertCAD vectorise les lignes et cercles des plans scannés et **lit leur texte** avec les modèles **PP-OCR** de PaddleOCR, exécutés sur cet ordinateur par RapidOCR et ONNX Runtime. Ils trouvent les lignes de texte entières partout sur la feuille — petites, inclinées, verticales ou traversées par des traits. Aucun plan ne quitte l'ordinateur.
+ConvertCAD vectorise les lignes, cercles et arcs des plans scannés et **lit leur texte** avec les modèles **PP-OCR** de PaddleOCR, exécutés sur cet ordinateur par RapidOCR et ONNX Runtime. Ils trouvent les lignes de texte entières partout sur la feuille — petites, inclinées, verticales ou traversées par des traits. Aucun plan ne quitte l'ordinateur.
 
 ## Langues
 

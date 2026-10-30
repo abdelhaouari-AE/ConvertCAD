@@ -1,34 +1,60 @@
 """
-i18n.py — English / French interface strings.
+i18n.py — interface languages: English, French, Spanish, German, Arabic.
 
 The English text IS the key: write tr("Open PDF…") in the code and add its
-French version to FR below. A missing translation simply shows English, so
-the interface never breaks. The language is chosen in View > Language and
-applies at the next start (the user is told so).
+translations — French in FR below, the others in convertcad/locales/
+(es.py, de.py, ar.py: one dictionary each). A missing translation simply
+shows English, so the interface never breaks (tests/test_i18n.py lists any
+missing one). The language is chosen in View > Language and applies at the
+next start (the user is told so). Arabic is written right to left: the
+whole interface is mirrored, the drawing views are not.
 
-Long texts (user guide, terms of use) live in convertcad/resources as
-guide_en.md / guide_fr.md / terms_en.md / terms_fr.md.
+Long texts (user guide, OCR guide, terms of use) live in
+convertcad/resources as guide_<lang>.md, ocr_<lang>.md, terms_<lang>.md.
 """
 
+import importlib
 import re
 from typing import Dict
 
+# code -> name of the language in that language (View > Language)
+LANGUAGES = {"en": "English", "fr": "Français", "es": "Español",
+             "de": "Deutsch", "ar": "العربية"}
+RTL_LANGUAGES = ("ar",)
+
 _LANG = "en"
+_TABLE: Dict[str, str] = {}
 
 
 def set_language(lang: str) -> None:
-    global _LANG
-    _LANG = lang if lang in ("en", "fr") else "en"
+    global _LANG, _TABLE
+    _LANG = lang if lang in LANGUAGES else "en"
+    _TABLE = table(_LANG)
 
 
 def language() -> str:
     return _LANG
 
 
+def is_rtl() -> bool:
+    """True for a language written right to left (Arabic)."""
+    return _LANG in RTL_LANGUAGES
+
+
+def table(lang: str) -> Dict[str, str]:
+    """The translations of one language ({} for English)."""
+    if lang == "fr":
+        return FR
+    if lang in LANGUAGES and lang != "en":
+        return importlib.import_module(f".locales.{lang}",
+                                       __package__).STRINGS
+    return {}
+
+
 def tr(text: str, **kwargs) -> str:
     """Translate `text` to the current language, then format {placeholders}."""
-    if _LANG == "fr":
-        text = FR.get(text, text)
+    if _TABLE:
+        text = _TABLE.get(text, text)
     if kwargs:
         try:
             return text.format(**kwargs)
@@ -196,7 +222,7 @@ _fr({
         "Détecter les symboles répétés comme blocs",
     "Minimum occurrences": "Occurrences minimales",
     "Scanned pages": "Pages scannées",
-    "Trace lines and circles": "Vectoriser lignes et cercles",
+    "Trace lines, circles and arcs": "Vectoriser lignes, cercles et arcs",
     "Read text with OCR": "Lire le texte par OCR",
     "Scan resolution": "Résolution de lecture",
     "Use the PDF's existing text layer": "Utiliser la couche texte du PDF",
@@ -242,8 +268,9 @@ _fr({
     "AutoCAD stores SHX text as hidden comments; they are placed on layer TEXT_SHX. Positions are approximate.":
         "AutoCAD stocke le texte SHX en commentaires cachés ; ils sont placés "
         "sur le calque TEXT_SHX. Positions approximatives.",
-    "Arrow + line + arrow + value becomes a real DIMENSION entity.":
-        "Flèche + ligne + flèche + valeur devient une vraie entité COTE.",
+    "Arrows, lines and value become a real DIMENSION entity: linear, radius, diameter, angle or arc length.":
+        "Flèches, lignes et valeur deviennent une vraie entité COTE : "
+        "linéaire, rayon, diamètre, angle ou longueur d'arc.",
     "Architectural dimensions with oblique ticks become DIMENSION entities.":
         "Les cotes architecturales à traits obliques deviennent des COTES.",
     "Arrow + line + note becomes a leader.":
@@ -262,9 +289,9 @@ _fr({
         "Les symboles identiques répétés deviennent un BLOC avec insertions.",
     "A symbol must appear at least this many times to become a block.":
         "Nombre minimal d'apparitions pour qu'un symbole devienne un bloc.",
-    "Scanned pages are vectorised (lines, circles) on layer TRACE_LINES.":
-        "Les pages scannées sont vectorisées (lignes, cercles) sur le calque "
-        "TRACE_LINES.",
+    "Scanned pages are vectorised (lines, circles, arcs) on layer TRACE_LINES.":
+        "Les pages scannées sont vectorisées (lignes, cercles, arcs) sur le "
+        "calque TRACE_LINES.",
     "Higher resolution traces finer details but takes longer.":
         "Une résolution plus élevée trace plus de détails mais prend plus de "
         "temps.",
@@ -579,9 +606,9 @@ _fr({
         "TEXT_SHX_STROKES, désactivé.",
     "Also match rotated and mirrored copies":
         "Reconnaître aussi les copies tournées et en miroir",
-    "A symbol turned by 90, 180 or 270 degrees, or mirrored, uses the same block (insertion with rotation / mirroring).":
-        "Un symbole tourné de 90, 180 ou 270 degrés, ou en miroir, utilise "
-        "le même bloc (insertion avec rotation / miroir).",
+    "A symbol turned by any angle, or mirrored, uses the same block (insertion with rotation / mirroring).":
+        "Un symbole tourné d'un angle quelconque, ou en miroir, utilise le "
+        "même bloc (insertion avec rotation / miroir).",
     "File format": "Format de fichier",
     "DWG files are written by the free GNU LibreDWG converter included with ConvertCAD, in the AutoCAD 2000 format that every AutoCAD version opens.":
         "Les fichiers DWG sont écrits par le convertisseur libre GNU "
@@ -694,4 +721,31 @@ _fr({
     "Files copied. A model needs all its files: add the missing ones.":
         "Fichiers copiés. Un modèle a besoin de tous ses fichiers : ajoutez "
         "ceux qui manquent.",
+})
+
+# ---- 1.2: selection in the result preview, update check -------------------
+_fr({
+    "layer {name}": "calque {name}", "length {v}": "longueur {v}",
+    "radius {v}": "rayon {v}", "dimension {v}": "cote {v}",
+    "block {v}": "bloc {v}", "pattern {v}": "motif {v}",
+    "{n} vertices": "{n} sommets", "size {w} × {h}": "taille {w} × {h}",
+    "Check for updates…": "Rechercher une mise à jour…",
+    "Ask GitHub whether a newer ConvertCAD exists (nothing is sent, nothing is installed)":
+        "Demander à GitHub si une version plus récente de ConvertCAD existe "
+        "(rien n'est envoyé, rien n'est installé)",
+    "Check for updates at startup":
+        "Rechercher les mises à jour au démarrage",
+    "Checking for updates…": "Recherche d'une mise à jour…",
+    "Update check failed: {e}": "Recherche de mise à jour impossible : {e}",
+    "The latest version could not be checked: {e}.":
+        "La dernière version n'a pas pu être vérifiée : {e}.",
+    "ConvertCAD is up to date ({v}).": "ConvertCAD est à jour ({v}).",
+    "ConvertCAD {v} is available.": "ConvertCAD {v} est disponible.",
+    "ConvertCAD {v} is available (this one is {c}).":
+        "ConvertCAD {v} est disponible (celle-ci est la {c}).",
+    "Nothing is installed automatically: download it from its release page.":
+        "Rien n'est installé automatiquement : téléchargez-la depuis sa page "
+        "de publication.",
+    "Open the release page": "Ouvrir la page de publication",
+    "Later": "Plus tard",
 })

@@ -86,8 +86,10 @@ def run_gui(argv=None) -> int:
     app.setOrganizationName(APP_NAME)
 
     settings = Settings.load()
-    from ..i18n import set_language, tr
+    from ..i18n import is_rtl, set_language, tr
     set_language(settings.language)
+    if is_rtl():                       # Arabic: the interface right to left
+        app.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
     from . import theme
     theme.apply_theme(app, settings.theme)
     from .icons import app_icon

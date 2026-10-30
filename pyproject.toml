@@ -63,6 +63,7 @@ ignore = ["B905"]                       # zip(strict=...) not wanted here
 
 [tool.ruff.lint.per-file-ignores]
 "convertcad/i18n.py" = ["E501"]         # translation keys are whole sentences
+"convertcad/locales/*.py" = ["E501"]    # (same, for the other languages)
 "convertcad/ui/icons.py" = ["E501"]     # SVG path data
 
 [tool.ruff.lint.flake8-bugbear]

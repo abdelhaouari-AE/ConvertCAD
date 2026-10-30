@@ -80,7 +80,9 @@ _ocr_modules = (
     + ["onnxruntime", "bidi", "bidi.algorithm",
        "certifi"])                  # HTTPS certificates (model downloads)
 hiddenimports = (collect_submodules("ezdxf.addons.drawing")
-                 + _ocr_modules + ["PySide6.QtSvg"])
+                 + _ocr_modules + ["PySide6.QtSvg"]
+                 # interface languages, loaded by name (i18n.table)
+                 + collect_submodules("convertcad.locales"))
 
 # ---- things ConvertCAD never uses -----------------------------------------
 # Some libraries import these *optionally* (e.g. pandas): if

@@ -33,13 +33,19 @@ SNAP_NAMES = {"end": "Endpoint", "mid": "Midpoint", "int": "Intersection",
               "cen": "Center"}
 
 
+# thousands and decimal separators of each interface language (French:
+# narrow no-break space)
+_SEPARATORS = {"fr": ("\u202f", ","), "es": (".", ","), "de": (".", ",")}
+
+
 def format_length(value: float, unit: str) -> str:
-    """'3 500.0 mm' (French) / '3,500.0 mm' (English); m with 3 decimals."""
+    """'3,500.0 mm' (English, Arabic), '3 500,0 mm' (French), '3.500,0 mm'
+    (Spanish, German); m with 3 decimals."""
     decimals = {"mm": 1, "cm": 2, "m": 3}.get(unit, 2)
     s = f"{value:,.{decimals}f}"
-    if language() == "fr":
-        s = s.replace(",", " ").replace(".", ",")
-    return f"{s} {unit}"
+    thousands, decimal = _SEPARATORS.get(language(), (",", "."))
+    s = s.replace(",", "\x00").replace(".", decimal)
+    return f"{s.replace(chr(0), thousands)} {unit}"
 
 
 class PdfView(CadView):

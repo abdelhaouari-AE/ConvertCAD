@@ -1,6 +1,6 @@
 # OCR for scanned PDFs
 
-ConvertCAD traces the lines and circles of scanned drawings and **reads their text** with PaddleOCR's **PP-OCR** models, run on this computer by RapidOCR and ONNX Runtime. They find whole text lines anywhere on the sheet — small, rotated, vertical or crossed by lines. No drawing ever leaves the computer.
+ConvertCAD traces the lines, circles and arcs of scanned drawings and **reads their text** with PaddleOCR's **PP-OCR** models, run on this computer by RapidOCR and ONNX Runtime. They find whole text lines anywhere on the sheet — small, rotated, vertical or crossed by lines. No drawing ever leaves the computer.
 
 ## Languages
 

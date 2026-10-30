@@ -3,7 +3,7 @@
 **ConvertCAD {APP_VERSION}** — please read before using the application.
 
 ### 1. Local processing
-All conversions run on this computer. No drawing, file or data is uploaded or sent anywhere. The application connects to the internet only when you ask it to download an OCR language or model (*Settings > Scanned pages > OCR languages and models…*): it then receives that file and sends nothing else.
+All conversions run on this computer. No drawing, file or data is uploaded or sent anywhere. The application connects to the internet only when you ask it to download an OCR language or model (*Settings > Scanned pages > OCR languages and models…*) — it then receives that file — or to check for updates (*Help > Check for updates…*, or at startup if you switched that on; off by default) — it then reads the number of the latest version. It sends nothing else.
 
 ### 2. Your right to convert
 You are responsible for having the right to convert and edit the PDF drawings you open (client agreements, confidentiality clauses, intellectual property of the original author).

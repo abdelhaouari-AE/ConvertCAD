@@ -45,7 +45,7 @@ from ..core.constants import UNITS
 from ..core.jobs import JobRunner
 from ..core.report import ConversionReport
 from ..core.units import compute_scale, effective_denominator
-from ..i18n import tr, tr_paper, tr_progress
+from ..i18n import LANGUAGES, tr, tr_paper, tr_progress
 from . import theme
 from .batch_dialog import BatchDialog
 from .dialogs import (AboutDialog, CalibrateDialog, GuideDialog,
@@ -268,8 +268,8 @@ class MainWindow(QMainWindow):
         self.a_light = tm.addAction(tr("Light"),
                                     lambda: self.set_theme("light"))
         lm = v.addMenu(tr("Language"))
-        lm.addAction("English", lambda: self.set_language("en"))
-        lm.addAction("Français", lambda: self.set_language("fr"))
+        for code, name in LANGUAGES.items():
+            lm.addAction(name, lambda c=code: self.set_language(c))
         t = mb.addMenu(tr("&Tools"))
         for a in (self.a_pan, self.a_cal, self.a_meas, self.a_area):
             t.addAction(a)
@@ -318,11 +318,19 @@ class MainWindow(QMainWindow):
         self.btn_open.setMenu(open_menu)
         tb.addWidget(self.btn_open)
         tb.addSeparator()
+        # buttons that drop their label when the window is too narrow for
+        # the labels of the chosen language (_fit_toolbar)
+        self._compact_buttons = []
         for a in (self.a_pan, self.a_cal, self.a_meas, self.a_area):
-            tb.addWidget(self._tool_button(a))
+            b = self._tool_button(a)
+            self._compact_buttons.append(b)
+            tb.addWidget(b)
         tb.addSeparator()
         for a in (self.a_fit, self.a_zout, self.a_zin):
-            tb.addWidget(self._tool_button(a, text_beside=a is self.a_fit))
+            b = self._tool_button(a, text_beside=a is self.a_fit)
+            if a is self.a_fit:
+                self._compact_buttons.append(b)
+            tb.addWidget(b)
         spacer = QWidget()
         spacer.setSizePolicy(QSizePolicy.Policy.Expanding,
                              QSizePolicy.Policy.Preferred)
@@ -332,6 +340,7 @@ class MainWindow(QMainWindow):
         self.btn_batch = self._tool_button(self.a_batch)
         for b in (self.btn_convert, self.btn_save, self.btn_batch):
             tb.addWidget(b)
+        self._compact_buttons.append(self.btn_batch)
         tb.addSeparator()
         tb.addWidget(self._tool_button(self.a_theme, text_beside=False))
         help_btn = QToolButton()
@@ -339,8 +348,8 @@ class MainWindow(QMainWindow):
         help_btn.setIconSize(icon_size(18))
         help_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         hm = QMenu(help_btn)
-        for a in (self.a_guide, self.a_keys, self.a_ocr, self.a_terms,
-                  self.a_about):
+        for a in (self.a_guide, self.a_keys, self.a_ocr, self.a_updates,
+                  self.a_terms, self.a_about):
             hm.addAction(a)
         help_btn.setMenu(hm)
         help_btn.setProperty("iconName", "help")
@@ -1327,6 +1336,23 @@ class MainWindow(QMainWindow):
         super().resizeEvent(event)
         if self.toast.isVisible():
             self.toast._place()
+        self._fit_toolbar()
+
+    def _fit_toolbar(self) -> None:
+        """Tool labels shown when they fit; otherwise the tools show their
+        icon only (their name stays in the tooltip). German or Spanish
+        labels are longer than English ones."""
+        buttons = getattr(self, "_compact_buttons", [])
+        if not buttons:
+            return
+        beside = Qt.ToolButtonStyle.ToolButtonTextBesideIcon
+        for b in buttons:
+            b.setToolButtonStyle(beside)
+        need = sum(w.sizeHint().width() for w in self.toolbar.findChildren(
+            QToolButton) if w.objectName() != "qt_toolbar_ext_button") + 120
+        if need > self.width():
+            for b in buttons:
+                b.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
 
     def open_ocr_models(self) -> None:
         """Settings > Scanned pages > OCR languages and models…"""

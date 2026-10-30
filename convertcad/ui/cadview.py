@@ -24,6 +24,9 @@ class CadView(QGraphicsView):
 
     def __init__(self, parent=None, flip_y: bool = False):
         super().__init__(parent)
+        # a drawing is never mirrored, even when the interface is written
+        # right to left (Arabic)
+        self.setLayoutDirection(Qt.LayoutDirection.LeftToRight)
         self.flip_y = flip_y
         self.setScene(QGraphicsScene(self))
         self.setFrameShape(QFrame.Shape.NoFrame)

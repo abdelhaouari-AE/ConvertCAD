@@ -1,6 +1,7 @@
 """
-Interface language: every interface string has its French version, the
-{placeholders} survive translation, and the engine progress messages are
+Interface languages (French, Spanish, German, Arabic): every interface
+string is translated, the {placeholders} survive translation, the long
+texts exist in every language, and the engine progress messages are
 translated for the activity log.
 """
 
@@ -56,29 +57,67 @@ def _tr_literals():
                     yield text, f"{rel}:{node.lineno}"
 
 
-def test_every_interface_string_has_a_french_version():
+LANGS = [code for code in i18n.LANGUAGES if code != "en"]
+
+
+@pytest.mark.parametrize("lang", LANGS)
+def test_every_interface_string_is_translated(lang):
+    table = i18n.table(lang)
     missing = sorted({f"{loc}  {text!r}" for text, loc in _tr_literals()
-                      if text and text not in i18n.FR})
-    assert not missing, "Add these to FR in convertcad/i18n.py:\n" + \
-        "\n".join(missing)
+                      if text and text not in table})
+    where = "FR in convertcad/i18n.py" if lang == "fr" else \
+        f"convertcad/locales/{lang}.py"
+    assert not missing, f"Add these to {where}:\n" + "\n".join(missing)
 
 
-def test_ocr_catalogue_and_choices_are_translated():
+@pytest.mark.parametrize("lang", LANGS)
+def test_ocr_catalogue_and_choices_are_translated(lang):
     """The OCR model names and languages are shown with tr(variable)."""
     from convertcad.core.constants import OCR_QUALITIES
     from convertcad.core.ocr_catalog import PACKS
     texts = [p.label for p in PACKS] + [p.languages for p in PACKS] + \
         [p.short for p in PACKS if p.short] + list(OCR_QUALITIES.values())
-    missing = [t for t in texts if t not in i18n.FR]
+    missing = [t for t in texts if t not in i18n.table(lang)]
     assert not missing, missing
+
+
+@pytest.mark.parametrize("lang", LANGS)
+def test_no_stale_translations(lang):
+    """Every translated text is still used (the French list is the
+    reference: the other languages translate exactly its texts)."""
+    extra = set(i18n.table(lang)) - set(i18n.FR)
+    assert not extra, sorted(extra)
+
+
+@pytest.mark.parametrize("lang", ["en"] + LANGS)
+@pytest.mark.parametrize("stem", ["guide", "terms", "ocr"])
+def test_long_texts_exist_in_every_language(lang, stem):
+    path = os.path.join(PKG, "resources", f"{stem}_{lang}.md")
+    with open(path, encoding="utf-8") as fh:
+        text = fh.read()
+    assert text.startswith("# ") and len(text) > 500
+
+
+def test_arabic_is_right_to_left():
+    try:
+        i18n.set_language("ar")
+        assert i18n.is_rtl() and i18n.tr("Convert") == "تحويل"
+        i18n.set_language("de")
+        assert not i18n.is_rtl() and i18n.tr("Convert") == "Konvertieren"
+        i18n.set_language("xx")                     # unknown -> English
+        assert i18n.language() == "en" and i18n.tr("Convert") == "Convert"
+    finally:
+        i18n.set_language("en")
 
 
 def _fields(text):
     return {f for _, f, _, _ in string.Formatter().parse(text) if f}
 
 
-def test_placeholders_are_kept_in_translations():
-    bad = [k for k, v in i18n.FR.items() if _fields(k) != _fields(v)]
+@pytest.mark.parametrize("lang", LANGS)
+def test_placeholders_are_kept_in_translations(lang):
+    bad = [k for k, v in i18n.table(lang).items()
+           if _fields(k) != _fields(v)]
     assert not bad, bad
 
 
