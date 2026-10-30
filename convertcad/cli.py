@@ -120,7 +120,8 @@ def build_parser() -> argparse.ArgumentParser:
             ("--no-mtext", "group_mtext", "no paragraph grouping"),
             ("--no-hatch", "hatches", "do not export solid fills"),
             ("--no-hatch-patterns", "hatch_patterns",
-             "keep hatch patterns as separate lines"),
+             "keep hatch patterns (parallel lines, sand, brick...) as "
+             "separate lines"),
             ("--no-dashes", "merge_dashes",
              "keep dashed lines as separate dashes"),
             ("--no-block-rotations", "block_rotations",

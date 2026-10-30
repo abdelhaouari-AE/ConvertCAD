@@ -438,6 +438,15 @@ def _rebuild_notes(rp, pno: int, rep: ConversionReport) -> None:
         rep.page_notes.append(
             f"Page {pno}: {len(rp.hatch_patterns)} hatch pattern(s) rebuilt "
             f"from {rp.hatch_segments} parallel lines.")
+    if rp.texture_hatches:
+        names = sorted({t.name for t in rp.texture_hatches})
+        rough = [t.name for t in rp.texture_hatches if not t.exact]
+        rep.page_notes.append(
+            f"Page {pno}: {len(rp.texture_hatches)} pattern hatch(es) "
+            f"({', '.join(names)}) rebuilt from {rp.texture_pieces} dashes "
+            f"and dots" + (f"; {', '.join(sorted(set(rough)))}: scale and "
+                           f"position estimated (random-looking pattern)"
+                           if rough else "") + ".")
 
 
 def _page_scale(pd: PageData, opt: Options, default: float,

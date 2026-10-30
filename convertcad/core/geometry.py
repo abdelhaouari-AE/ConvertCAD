@@ -22,6 +22,7 @@ import numpy as np
 
 from .extractor import PageData, Point, RawBezier, RawSegment, Style
 from .patterns import HatchPattern, detect_hatch_patterns, merge_dashed_lines
+from .textures import TextureHatch, detect_textures, snap_boundaries
 
 
 class Tol:
@@ -95,6 +96,8 @@ class RebuiltPage:
     circles: List[ECircle] = field(default_factory=list)
     splines: List[ESpline] = field(default_factory=list)
     hatch_patterns: List[HatchPattern] = field(default_factory=list)
+    texture_hatches: List[TextureHatch] = field(default_factory=list)
+    texture_pieces: int = 0          # dashes and dots they replace
     duplicates_removed: int = 0
     dashed_lines: int = 0            # dashed lines rebuilt from pieces
     dash_pieces: int = 0             # ...pieces they replace
@@ -104,7 +107,8 @@ class RebuiltPage:
         return ([p.style for p in self.polylines] + [a.style for a in self.arcs]
                 + [c.style for c in self.circles]
                 + [s.style for s in self.splines]
-                + [h.style for h in self.hatch_patterns])
+                + [h.style for h in self.hatch_patterns]
+                + [h.style for h in self.texture_hatches])
 
 
 def style_key(s: Style) -> tuple:
@@ -369,6 +373,19 @@ def dedupe_segments(segments: List[RawSegment]) -> Tuple[List[RawSegment], int]:
     return out, removed
 
 
+def _dots(segments: List[RawSegment]) -> List[RawSegment]:
+    """Zero-length segments (dots of a dotted pattern), one per place."""
+    seen = set()
+    out = []
+    for s in segments:
+        if s.p1 == s.p2:
+            key = (style_key(s.style), round(s.p1[0], 2), round(s.p1[1], 2))
+            if key not in seen:
+                seen.add(key)
+                out.append(s)
+    return out
+
+
 def chain_segments(segments: List[RawSegment]) -> List[EPolyline]:
     """Join segments sharing endpoints AND style into polylines; merge
     collinear runs; closed chains become closed LWPOLYLINEs."""
@@ -499,6 +516,14 @@ def rebuild(page: PageData, fit_arcs: bool = True,
     # 3. Segments: remove duplicates, rebuild exploded linetypes and hatch
     #    patterns, then chain what is left into polylines.
     segments, rp.duplicates_removed = dedupe_segments(page.segments)
+    if hatch_patterns:
+        # textures (sand, gravel, brick...) first: their dots and dashes must
+        # not become dotted or dashed lines. Dots are zero-length segments.
+        dots = _dots(page.segments)
+        found = detect_textures(segments + dots)
+        segments = [s for s in found.segments if s.p1 != s.p2]
+        rp.texture_hatches = found.hatches
+        rp.texture_pieces = found.pieces
     if merge_dashes:
         segments, rp.dashed_lines, rp.dash_pieces = \
             merge_dashed_lines(segments)
@@ -512,4 +537,13 @@ def rebuild(page: PageData, fit_arcs: bool = True,
     else:
         rp.polylines = [EPolyline(points=[s.p1, s.p2], closed=False,
                                   style=s.style) for s in segments]
+    if rp.texture_hatches:
+        # the boundary drawn around a texture becomes its hatch boundary
+        snap_boundaries(rp.texture_hatches,
+                        [pl.points for pl in rp.polylines if pl.closed]
+                        + [[(c.center[0] + c.radius * math.cos(a / 18.0
+                                                               * math.pi),
+                             c.center[1] + c.radius * math.sin(a / 18.0
+                                                               * math.pi))
+                            for a in range(36)] for c in rp.circles])
     return rp

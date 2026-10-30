@@ -553,10 +553,12 @@ _fr({
         "Converti en {s} s : {n} entités sur {l} calques. Vérifiez le "
         "résultat, puis enregistrez-le.",
     "Rebuild hatch patterns": "Reconstruire les motifs de hachure",
-    "CAD programs print hatches as hundreds of parallel lines: they become one pattern HATCH (angle and spacing measured).":
-        "Les logiciels de CAO impriment les hachures en centaines de traits "
-        "parallèles : ils redeviennent une HATCH à motif (angle et "
-        "espacement mesurés).",
+    "CAD programs print hatches as hundreds of separate lines, dashes and dots: they become one pattern HATCH — parallel lines, or the standard pattern they come from (sand, concrete, gravel, earth, brick, insulation, dots) at its measured scale and angle.":
+        "Les logiciels de CAO impriment les hachures en centaines de traits, "
+        "tirets et points séparés : ils redeviennent une HATCH à motif — "
+        "traits parallèles, ou le motif standard d'origine (sable, béton, "
+        "gravier, terre, brique, isolant, points) à son échelle et son angle "
+        "mesurés.",
     "Rebuild dashed lines": "Reconstruire les lignes pointillées",
     "CAD programs print axes and hidden lines as separate dashes: they become one line with its linetype (dash lengths measured).":
         "Les logiciels de CAO impriment les axes et lignes cachées en tirets "

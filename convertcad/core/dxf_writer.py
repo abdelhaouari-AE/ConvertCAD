@@ -496,7 +496,10 @@ class DxfWriter:
     def write_pattern_hatches(self, rp: RebuiltPage, tr) -> None:
         """Hatch patterns rebuilt from parallel lines (patterns.py) ->
         user-defined pattern HATCH (angle + spacing, like AutoCAD's
-        "User defined" hatch), on the layer of the original lines."""
+        "User defined" hatch), on the layer of the original lines.
+        Textures (textures.py) -> HATCH with the standard pattern."""
+        if rp.texture_hatches and not self.r12:
+            self._write_textures(rp, tr)
         if not rp.hatch_patterns:
             return
         if self.r12:
@@ -538,6 +541,41 @@ class DxfWriter:
                 self._count(layer)
             except Exception as exc:
                 self._warn_once("pattern", f"Some hatch patterns were "
+                                f"skipped: {exc}")
+
+    def _write_textures(self, rp: RebuiltPage, tr) -> None:
+        """Standard pattern HATCH (AR-SAND, GRAVEL, BRICK...) at the scale,
+        angle and origin measured on the PDF (textures.py works in page
+        points with y up: x DXF = s * x + dx, y DXF = s * y + h * s)."""
+        from ezdxf import const
+        from ezdxf.math import Vec2
+        from ezdxf.tools.pattern import ISO_PATTERN
+        for t in rp.texture_hatches:
+            try:
+                layer = self._layer_of(t.style)
+                ca = self._color_attribs(t.style.color, layer)
+                hatch = self.msp.add_hatch(color=ca.get("color", 256),
+                                           dxfattribs={"layer": layer})
+                hatch.set_pattern_fill(
+                    t.name, color=ca.get("color", 256), angle=t.angle,
+                    scale=tr.length(t.scale), style=0, pattern_type=1,
+                    definition=ISO_PATTERN[t.name])
+                shift = Vec2(tr.pt((t.origin[0], -t.origin[1])))
+                for line in hatch.pattern.lines:
+                    line.base_point = Vec2(line.base_point) + shift
+                if "true_color" in ca:
+                    hatch.dxf.true_color = ca["true_color"]
+                hatch.paths.add_polyline_path(
+                    [tr.pt(p) for p in t.boundary], is_closed=True,
+                    flags=const.BOUNDARY_PATH_EXTERNAL)
+                for hole in t.holes:
+                    hatch.paths.add_polyline_path(
+                        [tr.pt(p) for p in hole], is_closed=True,
+                        flags=const.BOUNDARY_PATH_DEFAULT)
+                self.stats.pattern_hatches += 1
+                self._count(layer)
+            except Exception as exc:
+                self._warn_once("texture", f"Some hatch patterns were "
                                 f"skipped: {exc}")
 
     # ---- images -----------------------------------------------------------------
