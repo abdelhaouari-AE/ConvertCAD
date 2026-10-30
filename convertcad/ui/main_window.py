@@ -432,6 +432,7 @@ class MainWindow(QMainWindow):
         self.pdf_view.measurement_added.connect(self._on_measured)
         self.pdf_view.area_selected.connect(self._on_area_selected)
         self.dxf_view.loaded.connect(self._on_dxf_loaded)
+        self.dxf_view.selected.connect(self._on_entity_selected)
         self.pdf_view.tool_changed.connect(self._on_tool_changed)
         self.dxf_view.loading.connect(
             lambda on: self.status(tr("Rendering the DXF preview…")) if on
@@ -481,6 +482,42 @@ class MainWindow(QMainWindow):
         self.status(msg)
         self.activity.log(msg)
         self.toast.show_message(msg, level)
+
+    def _on_entity_selected(self, info) -> None:
+        """An entity was clicked in the DXF preview: show its layer."""
+        if not info:
+            self.layers_panel.table.clearSelection()
+            self.status("")
+            return
+        if self.layers_panel.select_layer(info.get("layer", "")):
+            self.right_tabs.setCurrentWidget(self.layers_panel)
+        self.status(self.entity_text(info))
+
+    def entity_text(self, info: dict) -> str:
+        """'LINE — layer GEO_BLACK_035 — length 2,500.0 mm — size …'."""
+        u = self.units()
+        parts = [info.get("type", "?"),
+                 tr("layer {name}", name=info.get("layer", "0"))]
+        if "length" in info:
+            parts.append(tr("length {v}", v=format_length(info["length"], u)))
+        if "radius" in info:
+            parts.append(tr("radius {v}", v=format_length(info["radius"], u)))
+        if "measurement" in info:
+            parts.append(tr("dimension {v}",
+                            v=format_length(info["measurement"], u)))
+        if info.get("text"):
+            parts.append("« " + info["text"][:60] + " »")
+        if info.get("block"):
+            parts.append(tr("block {v}", v=info["block"]))
+        if info.get("pattern"):
+            parts.append(tr("pattern {v}", v=info["pattern"]))
+        if info.get("vertices"):
+            parts.append(tr("{n} vertices", n=info["vertices"]))
+        bb = info.get("bbox")
+        if bb and info.get("type") not in ("TEXT", "MTEXT"):
+            parts.append(tr("size {w} × {h}", w=format_length(bb[2] - bb[0], u),
+                            h=format_length(bb[3] - bb[1], u)))
+        return "  —  ".join(parts)
 
     def current_view(self):
         return self.view_stack.currentWidget()

@@ -221,3 +221,55 @@ def test_ocr_languages_and_models(qapp, tmp_path, monkeypatch):
             assert panel.ocr_status.property("role") == "ok"
     finally:
         w.close()
+
+
+def test_select_an_entity_in_the_preview(qapp, sample_plan, tmp_path):
+    """A click on a line selects that DXF entity (highlight + its layer);
+    a click on empty space clears the selection; hidden layers are not
+    selectable. Read-only: the file is not changed."""
+    import ezdxf
+    from PySide6.QtCore import QPointF
+
+    from convertcad.core import Options, convert
+    from convertcad.ui.dxf_view import DxfView
+
+    out = tmp_path / "plan.dxf"
+    assert convert(sample_plan, str(out), Options(scale_denominator=100,
+                                                  pages=[1])).success
+    doc = ezdxf.readfile(str(out))
+    line = next(e for e in doc.modelspace().query("LINE")
+                if (e.dxf.end - e.dxf.start).magnitude > 500)
+    view = DxfView()
+    view.resize(900, 700)
+    view.show()
+    got = []
+    view.loaded.connect(got.append)
+    view.load(str(out))
+    t0 = time.time()
+    while not (got and view.selection_ready()) and time.time() - t0 < 120:
+        _pump(50)
+    assert got == [""] and view.selection_ready()
+    picked = []
+    view.selected.connect(picked.append)
+    mid = (line.dxf.start + line.dxf.end) / 2
+    view.centerOn(mid.x, mid.y)
+    view.set_scale(view.current_scale() * 4,
+                   QPointF(view.mapFromScene(mid.x, mid.y)))
+    _pump(50)
+    pos = QPointF(view.mapFromScene(mid.x, mid.y))
+    assert view.select_at(pos) >= 0
+    info = picked[-1]
+    assert info["handle"] == line.dxf.handle and info["type"] == "LINE"
+    assert info["layer"] == line.dxf.layer and info["length"] > 500
+    assert view.selected_index() >= 0
+    # hidden layer: not selectable
+    view.set_hidden_layers({line.dxf.layer})
+    assert view.selected_index() == -1 and picked[-1] is None
+    assert view.select_at(pos) == -1 or \
+        picked[-1]["layer"] != line.dxf.layer
+    view.set_hidden_layers(set())
+    # far outside the drawing: nothing
+    view.select_at(pos)
+    view.select_at(QPointF(2, 2))
+    assert picked[-1] is None and view.selected_index() == -1
+    view.close()

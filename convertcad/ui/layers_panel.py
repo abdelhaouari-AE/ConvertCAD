@@ -350,6 +350,25 @@ class LayersPanel(QFrame):
         self.model.load([])
         self.stack.setCurrentIndex(0)
 
+    def select_layer(self, name: str) -> bool:
+        """Highlight and show the row of a layer (an entity was selected in
+        the DXF preview). Returns False when the layer is not listed."""
+        want = (name or "").upper()
+        for row, r in enumerate(self.model.rows):
+            if r.name.upper() != want:
+                continue
+            index = self.proxy.mapFromSource(self.model.index(row, COL_NAME))
+            if not index.isValid():                 # hidden by the filter
+                self.filter.clear()
+                index = self.proxy.mapFromSource(
+                    self.model.index(row, COL_NAME))
+            self.table.selectRow(index.row())
+            self.table.scrollTo(index,
+                                QAbstractItemView.ScrollHint.PositionAtCenter)
+            return True
+        self.table.clearSelection()
+        return False
+
     def _on_click(self, index) -> None:
         src = self.proxy.mapToSource(index)
         if src.column() != COL_COLOR:

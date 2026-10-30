@@ -21,12 +21,20 @@ at the exact place and scale of the conversion) to compare both at a glance.
 
 Each item remembers the layer(s) it belongs to, so switching a layer off in
 the Layers panel hides it instantly.
+
+Selection: a click (without dragging) on a line, text, hatch… selects the
+DXF entity under the cursor — it is highlighted and `selected` tells the
+window its type, layer and main dimension (read-only: nothing is edited).
+The merged items cannot tell entities apart, so the render thread also keeps
+a light "pick index": every primitive segment and filled outline, with the
+top-level entity it comes from.
 """
 
+import math
 import os
 from typing import Dict, FrozenSet, List, Optional, Set, Tuple
 
-from PySide6.QtCore import QRectF, Qt, QThread, Signal
+from PySide6.QtCore import QPointF, QRectF, Qt, QThread, Signal
 from PySide6.QtGui import (QBrush, QColor, QFont, QPainter, QPainterPath, QPen,
                            QPixmap, QTransform)
 from PySide6.QtWidgets import QGraphicsPathItem, QGraphicsPixmapItem
@@ -37,6 +45,8 @@ from .cadview import CadView
 
 LAYERS_ROLE = int(Qt.ItemDataRole.UserRole) + 40
 TILES = 8                                   # screen tiles per side (culling)
+PICK_PIXELS = 5                             # click tolerance (screen pixels)
+CLICK_MOVE = 4                              # more movement = a pan, not a click
 
 
 def _make_recorder_class():
@@ -48,8 +58,13 @@ def _make_recorder_class():
         def __init__(self):
             super().__init__()
             self._stack: List[str] = []
+            self.entities: List[dict] = []      # top-level entities
+            self._top = -1                      # index of the current one
 
         def enter_entity(self, entity, properties) -> None:
+            if not self._stack:                 # a model-space entity
+                self.entities.append(describe_entity(entity))
+                self._top = len(self.entities) - 1
             try:
                 self._stack.append(entity.dxf.layer.upper())
             except Exception:
@@ -64,8 +79,63 @@ def _make_recorder_class():
             layers = {n for n in self._stack[:-1] if n and n != "0"}
             layers.add((properties.layer or "0").upper())
             record.vis_layers = frozenset(layers)
+            record.owner = self._top
 
     return LayerRecorder
+
+
+def describe_entity(entity) -> dict:
+    """What the window shows about a selected entity (read-only)."""
+    info = {"handle": "", "type": "", "layer": "0"}
+    try:
+        info.update(handle=entity.dxf.handle or "", type=entity.dxftype(),
+                    layer=entity.dxf.get("layer", "0"))
+        kind = info["type"]
+        if kind == "LINE":
+            info["length"] = (entity.dxf.end - entity.dxf.start).magnitude
+        elif kind in ("CIRCLE", "ARC"):
+            info["radius"] = float(entity.dxf.radius)
+        elif kind == "TEXT":
+            info["text"] = entity.dxf.text
+        elif kind == "MTEXT":
+            info["text"] = entity.plain_text().split("\n")[0]
+        elif kind == "DIMENSION":
+            override = entity.dxf.get("text", "")
+            if override and override not in ("<>", " "):
+                info["text"] = override.replace("<>", "").strip() or override
+            else:
+                info["measurement"] = float(entity.get_measurement() or 0.0)
+        elif kind == "INSERT":
+            info["block"] = entity.dxf.name
+        elif kind == "HATCH":
+            info["pattern"] = entity.dxf.pattern_name
+        elif kind == "LWPOLYLINE":
+            info["vertices"] = len(entity)
+        if kind in _GEOMETRY_TYPES:
+            info["geom"] = _true_geometry(entity)
+    except Exception:                                      # pragma: no cover
+        pass
+    return info
+
+
+# entities selectable along their whole geometry, not only where ink is
+# drawn (the gaps of a dashed or centre line belong to the line too)
+_GEOMETRY_TYPES = {"LINE", "ARC", "CIRCLE", "LWPOLYLINE", "POLYLINE",
+                   "SPLINE", "ELLIPSE"}
+
+
+def _true_geometry(entity) -> List[List[Tuple[float, float]]]:
+    from ezdxf import path as ezpath
+    pth = ezpath.make_path(entity)
+    pts = list(pth.control_vertices())
+    if not pts:
+        return []
+    xs, ys = [v.x for v in pts], [v.y for v in pts]
+    size = max(max(xs) - min(xs), max(ys) - min(ys), 1e-9)
+    out = []
+    for sub in pth.sub_paths():
+        out.append([(v.x, v.y) for v in sub.flattening(size / 200.0)])
+    return out
 
 
 def _pen_width(lineweight_mm: float) -> float:
@@ -170,8 +240,244 @@ def merge_recording(recorder) -> dict:
     return {"groups": groups, "images": images, "extents": ex}
 
 
+class _PickBuilder:
+    """Collects, for selection, every drawn segment and filled outline with
+    the index of the model-space entity it belongs to (numpy arrays: a
+    click is answered in a few milliseconds even on 50 000 entities)."""
+
+    def __init__(self, entities: List[dict], size: float):
+        self.entities = entities
+        self.flat = max(size, 1e-9) / 4000.0     # curve flattening (units)
+        self.seg_chunks: list = []               # (N x 4) arrays
+        self.owner_chunks: list = []
+        self.polys: List[tuple] = []             # (owner, Nx2 array, area)
+        self.layers: Dict[int, set] = {}
+
+    def _lines(self, owner: int, pts) -> None:
+        """A polyline (N x 2 array or list of points) -> N-1 segments."""
+        import numpy as np
+        arr = np.asarray(pts, dtype=np.float64).reshape(-1, 2)
+        if len(arr) < 2:
+            return
+        self.seg_chunks.append(np.hstack([arr[:-1], arr[1:]]))
+        self.owner_chunks.append(np.full(len(arr) - 1, owner, np.int64))
+
+    def _poly(self, owner: int, pts) -> None:
+        import numpy as np
+        arr = np.asarray(pts, dtype=np.float64).reshape(-1, 2)
+        if len(arr) < 3:
+            return
+        x, y = arr[:, 0], arr[:, 1]                     # shoelace formula
+        area = 0.5 * abs(float(np.dot(x[:-1], y[1:]) - np.dot(y[:-1], x[1:])
+                               + x[-1] * y[0] - y[-1] * x[0]))
+        self.polys.append((owner, arr, area))
+
+    def _path_arrays(self, path) -> list:
+        import numpy as np
+        subs = path.sub_paths() if path.has_sub_paths else [path]
+        out = []
+        for sub in subs:
+            if not sub.has_curves:
+                out.append(sub.np_vertices()[:, :2])
+                continue
+            try:
+                out.append(np.array([(v.x, v.y)
+                                     for v in sub.flattening(self.flat)]))
+            except Exception:                              # pragma: no cover
+                out.append(sub.np_vertices()[:, :2])
+        return out
+
+    def add(self, record) -> None:
+        import numpy as np
+        (FilledPathsRecord, ImageRecord, PathRecord, PointsRecord,
+         SolidLinesRecord) = _record_types()
+        owner = getattr(record, "owner", -1)
+        if owner < 0:
+            return
+        self.layers.setdefault(owner, set()).update(
+            getattr(record, "vis_layers", ()))
+        try:
+            if isinstance(record, PointsRecord):
+                v = record.points.np_vertices()[:, :2]
+                if len(v) > 2:
+                    self._poly(owner, v)
+                    self._lines(owner, np.vstack([v, v[:1]]))
+                elif len(v) == 2:
+                    self._lines(owner, v)
+                elif len(v):
+                    self._lines(owner, np.vstack([v, v]))
+            elif isinstance(record, SolidLinesRecord):
+                v = record.lines.np_vertices()[:, :2]
+                n = len(v) // 2
+                if n:
+                    self.seg_chunks.append(v[:2 * n].reshape(n, 4))
+                    self.owner_chunks.append(np.full(n, owner, np.int64))
+            elif isinstance(record, PathRecord):
+                for arr in self._path_arrays(record.path):
+                    self._lines(owner, arr)
+            elif isinstance(record, FilledPathsRecord):
+                for path in record.paths:
+                    for arr in self._path_arrays(path):
+                        self._poly(owner, arr)
+                        if len(arr):
+                            self._lines(owner, np.vstack([arr, arr[:1]]))
+            elif isinstance(record, ImageRecord):
+                bb = record.bbox()
+                if bb.has_data:
+                    x0, y0, x1, y1 = (bb.extmin.x, bb.extmin.y, bb.extmax.x,
+                                      bb.extmax.y)
+                    self._poly(owner, [(x0, y0), (x1, y0), (x1, y1),
+                                       (x0, y1)])
+                    self.entities[owner]["image"] = True
+        except Exception:                                  # pragma: no cover
+            pass
+
+    def finish(self) -> "PickIndex":
+        import numpy as np
+        for i, e in enumerate(self.entities):          # whole true geometry
+            for pts in e.pop("geom", None) or ():
+                self._lines(i, pts)
+        if self.seg_chunks:
+            segs = np.vstack(self.seg_chunks)
+            owners = np.concatenate(self.owner_chunks)
+        else:
+            segs, owners = np.zeros((0, 4)), np.zeros(0, np.int64)
+        for i, e in enumerate(self.entities):
+            e["layers"] = frozenset(self.layers.get(i, {e["layer"].upper()}))
+        return PickIndex(self.entities, segs, owners, self.polys)
+
+
+_RECORD_TYPES: tuple = ()
+
+
+def _record_types() -> tuple:
+    global _RECORD_TYPES
+    if not _RECORD_TYPES:
+        from ezdxf.addons.drawing.recorder import (FilledPathsRecord,
+                                                   ImageRecord, PathRecord,
+                                                   PointsRecord,
+                                                   SolidLinesRecord)
+        _RECORD_TYPES = (FilledPathsRecord, ImageRecord, PathRecord,
+                         PointsRecord, SolidLinesRecord)
+    return _RECORD_TYPES
+
+
+def build_pick_index(recorder, extents) -> "PickIndex":
+    """The selection index of a recorded drawing (run in the background,
+    after the preview is shown)."""
+    size = max(extents[2] - extents[0], extents[3] - extents[1]) \
+        if extents else 1.0
+    pick = _PickBuilder(getattr(recorder, "entities", []), size)
+    for record, _props in recorder.player().recordings():
+        pick.add(record)
+    return pick.finish()
+
+
+class PickIndex:
+    """Finds the entity under a point (drawing coordinates)."""
+
+    def __init__(self, entities, segs, owners, polys):
+        import numpy as np
+        self.entities = entities
+        self.segs, self.owners, self.polys = segs, owners, polys
+        if len(segs):
+            self._lo = np.minimum(segs[:, 0:2], segs[:, 2:4])
+            self._hi = np.maximum(segs[:, 0:2], segs[:, 2:4])
+
+    def pick(self, x: float, y: float, tol: float,
+             hidden: FrozenSet[str] = frozenset()) -> int:
+        """Index of the entity at (x, y), or -1. Lines and texts within
+        `tol` win (the nearest); else the smallest filled area containing
+        the point (hatches); images only when nothing else is there."""
+        import numpy as np
+
+        def visible(i: int) -> bool:
+            return not (self.entities[i]["layers"] & hidden)
+        if len(self.segs):
+            near = np.nonzero((self._lo[:, 0] - tol <= x)
+                              & (x <= self._hi[:, 0] + tol)
+                              & (self._lo[:, 1] - tol <= y)
+                              & (y <= self._hi[:, 1] + tol))[0]
+            if len(near):
+                s = self.segs[near]
+                dx, dy = s[:, 2] - s[:, 0], s[:, 3] - s[:, 1]
+                ll = dx * dx + dy * dy
+                t = np.where(ll > 0, ((x - s[:, 0]) * dx + (y - s[:, 1]) * dy)
+                             / np.where(ll > 0, ll, 1.0), 0.0)
+                t = np.clip(t, 0.0, 1.0)
+                d = np.hypot(s[:, 0] + t * dx - x, s[:, 1] + t * dy - y)
+                for k in np.argsort(d):
+                    if d[k] > tol:
+                        break
+                    owner = int(self.owners[near[k]])
+                    if visible(owner) and \
+                            not self.entities[owner].get("image"):
+                        return owner
+        best, best_area = -1, math.inf
+        images = []
+        for owner, arr, area in self.polys:
+            if area >= best_area or not visible(owner):
+                continue
+            if not (arr[:, 0].min() <= x <= arr[:, 0].max()
+                    and arr[:, 1].min() <= y <= arr[:, 1].max()):
+                continue
+            if not _inside(arr, x, y):
+                continue
+            if self.entities[owner].get("image"):
+                images.append((area, owner))
+                continue
+            best, best_area = owner, area
+        if best < 0 and images:
+            best = min(images)[1]
+        return best
+
+    def outline(self, owner: int) -> QPainterPath:
+        """The drawn geometry of one entity (for the highlight)."""
+        import numpy as np
+        path = QPainterPath()
+        for x0, y0, x1, y1 in self.segs[np.nonzero(self.owners == owner)[0]]:
+            path.moveTo(x0, y0)
+            path.lineTo(x1, y1)
+        return path
+
+    def fills(self, owner: int) -> QPainterPath:
+        path = QPainterPath()
+        for o, arr, _a in self.polys:
+            if o != owner:
+                continue
+            path.moveTo(QPointF(arr[0, 0], arr[0, 1]))
+            for px, py in arr[1:]:
+                path.lineTo(QPointF(px, py))
+            path.closeSubpath()
+        path.setFillRule(Qt.FillRule.OddEvenFill)
+        return path
+
+    def bbox(self, owner: int) -> Optional[Tuple[float, float, float, float]]:
+        import numpy as np
+        sel = self.segs[np.nonzero(self.owners == owner)[0]]
+        pts = [sel[:, 0:2], sel[:, 2:4]] if len(sel) else []
+        pts += [arr for o, arr, _a in self.polys if o == owner]
+        if not pts:
+            return None
+        allp = np.vstack(pts)
+        return (float(allp[:, 0].min()), float(allp[:, 1].min()),
+                float(allp[:, 0].max()), float(allp[:, 1].max()))
+
+
+def _inside(poly, x: float, y: float) -> bool:
+    """Even-odd point-in-polygon test (ray casting), numpy."""
+    import numpy as np
+    xs, ys = poly[:, 0], poly[:, 1]
+    xj, yj = np.roll(xs, 1), np.roll(ys, 1)
+    cross = ((ys > y) != (yj > y))
+    with np.errstate(divide="ignore", invalid="ignore"):
+        xi = (xj - xs) * (y - ys) / (yj - ys) + xs
+    return bool(np.count_nonzero(cross & (x < xi)) % 2)
+
+
 class _RenderThread(QThread):
     done = Signal(object)
+    pick_ready = Signal(object)             # PickIndex, after `done`
 
     def __init__(self, path: str, bg: str, parent=None):
         super().__init__(parent)
@@ -192,9 +498,15 @@ class _RenderThread(QThread):
             ctx = RenderContext(doc)
             Frontend(ctx, rec, config=cfg).draw_layout(doc.modelspace(),
                                                        finalize=True)
-            self.done.emit({"merged": merge_recording(rec), "error": ""})
+            merged = merge_recording(rec)
+            self.done.emit({"merged": merged, "error": ""})
         except Exception as exc:                           # pragma: no cover
             self.done.emit({"merged": None, "error": str(exc)})
+            return
+        try:                                 # selection: ready a moment later
+            self.pick_ready.emit(build_pick_index(rec, merged["extents"]))
+        except Exception:                                  # pragma: no cover
+            self.pick_ready.emit(None)
 
 
 def _lines_path(lines, points) -> QPainterPath:
@@ -228,12 +540,17 @@ def _image_item(image_data) -> QGraphicsPixmapItem:
 class DxfView(CadView):
     loading = Signal(bool)
     loaded = Signal(str)                      # error text ('' when fine)
+    selected = Signal(object)                 # entity info dict, or None
 
     def __init__(self, parent=None):
         super().__init__(parent, flip_y=True)
         self.path = ""
         self._thread: Optional[_RenderThread] = None
         self._hidden: Set[str] = set()
+        self._pick: Optional[PickIndex] = None
+        self._selected = -1
+        self._highlight: List[QGraphicsPathItem] = []
+        self._press = None                    # where the left button went down
         self._busy = False
         self._has_content = False
         self._overlay: List[QGraphicsPixmapItem] = []
@@ -251,6 +568,8 @@ class DxfView(CadView):
     # ---- loading ------------------------------------------------------------------
     def load(self, path: str) -> None:
         self.path = path
+        self._forget_selection()
+        self._pick = None
         self.scene().clear()
         self._overlay = []
         self._has_content = False
@@ -261,6 +580,7 @@ class DxfView(CadView):
             return
         if self._thread is not None and self._thread.isRunning():
             self._thread.done.disconnect()
+            self._thread.pick_ready.disconnect()
             self._thread.wait(50)
         self._busy = True
         self._message = tr("Rendering the DXF preview…")
@@ -268,6 +588,7 @@ class DxfView(CadView):
         self.viewport().update()
         self._thread = _RenderThread(path, theme.tok("model_space"), self)
         self._thread.done.connect(self._on_rendered)
+        self._thread.pick_ready.connect(self._on_pick_ready)
         self._thread.start()
 
     def clear(self) -> None:
@@ -285,8 +606,10 @@ class DxfView(CadView):
             self.viewport().update()
             self.loaded.emit(self._message)
             return
+        self._forget_selection()
         self.scene().clear()
         self._overlay = []
+        self._pick = None                      # see _on_pick_ready
         self.setUpdatesEnabled(False)
         try:
             self._build_items(merged)
@@ -296,6 +619,12 @@ class DxfView(CadView):
         self._apply_visibility()
         self.fit()
         self.loaded.emit("")
+
+    def _on_pick_ready(self, pick) -> None:
+        self._pick = pick
+
+    def selection_ready(self) -> bool:
+        return self._pick is not None
 
     def _build_items(self, merged: dict) -> None:
         from ezdxf.npshapes import to_qpainter_path
@@ -381,6 +710,85 @@ class DxfView(CadView):
             layers: FrozenSet[str] = item.data(LAYERS_ROLE)
             if layers:
                 item.setVisible(not (layers & hidden))
+        if self._selected >= 0 and self._pick is not None and \
+                self._pick.entities[self._selected]["layers"] & hidden:
+            self.clear_selection()                # its layer was hidden
+
+    # ---- selection (read-only) -------------------------------------------------------
+    def mousePressEvent(self, event) -> None:
+        self._press = (event.position()
+                       if event.button() == Qt.MouseButton.LeftButton
+                       else None)
+        super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event) -> None:
+        press, self._press = self._press, None
+        super().mouseReleaseEvent(event)
+        if press is not None and event.button() == Qt.MouseButton.LeftButton:
+            d = event.position() - press
+            if abs(d.x()) + abs(d.y()) <= CLICK_MOVE:   # a click, not a pan
+                self.select_at(event.position())
+
+    def select_at(self, view_pos) -> int:
+        """Select the entity under a viewport position (or clear the
+        selection on empty space). Returns its index, -1 when none."""
+        if self._pick is None or not self._has_content:
+            return -1
+        p = self.mapToScene(QPointF(view_pos).toPoint())
+        tol = PICK_PIXELS / max(self.current_scale(), 1e-12)
+        idx = self._pick.pick(p.x(), p.y(), tol, frozenset(self._hidden))
+        if idx < 0:
+            self.clear_selection()
+        else:
+            self.select_index(idx)
+        return idx
+
+    def select_index(self, idx: int) -> None:
+        self._forget_selection()
+        self._selected = idx
+        color = theme.qcolor("selection")
+        halo = QColor(color)
+        halo.setAlpha(90)
+        fills = self._pick.fills(idx)
+        if not fills.isEmpty():
+            fill_item = QGraphicsPathItem(fills)
+            fill_item.setPen(QPen(Qt.PenStyle.NoPen))
+            tint = QColor(color)
+            tint.setAlpha(60)
+            fill_item.setBrush(QBrush(tint))
+            self._highlight.append(fill_item)
+        outline = self._pick.outline(idx)
+        for width, c in ((7.0, halo), (2.0, color)):
+            item = QGraphicsPathItem(outline)
+            pen = QPen(c, width)
+            pen.setCosmetic(True)
+            pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+            pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+            item.setPen(pen)
+            self._highlight.append(item)
+        for z, item in enumerate(self._highlight):
+            item.setZValue(1000 + z)
+            self.scene().addItem(item)
+        info = dict(self._pick.entities[idx])
+        info["bbox"] = self._pick.bbox(idx)
+        info.pop("layers", None)
+        self.selected.emit(info)
+
+    def clear_selection(self) -> None:
+        had = self._selected >= 0
+        self._forget_selection()
+        if had:
+            self.selected.emit(None)
+
+    def _forget_selection(self) -> None:
+        for item in self._highlight:
+            if item.scene() is self.scene():
+                self.scene().removeItem(item)
+        self._highlight = []
+        self._selected = -1
+
+    def selected_index(self) -> int:
+        return self._selected
 
     def item_count(self) -> int:
         return len(self.scene().items())
@@ -404,4 +812,5 @@ def overlay_scale(width_pt: float, scale: float, pixels: int) -> float:
     return (width_pt * scale) / max(pixels, 1)
 
 
-__all__ = ["DxfView", "merge_recording", "overlay_scale", "LAYERS_ROLE"]
+__all__ = ["DxfView", "PickIndex", "build_pick_index", "describe_entity",
+           "merge_recording", "overlay_scale", "LAYERS_ROLE"]
