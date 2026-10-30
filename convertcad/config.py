@@ -61,6 +61,7 @@ class Settings:
     snap_center: bool = True
     open_folder_after_save: bool = False
     show_activity: bool = True
+    check_updates: bool = False               # opt-in: ask GitHub at startup
     window_geometry: str = ""                 # base64 (Qt saveGeometry)
     window_state: str = ""                    # base64 (Qt saveState)
 

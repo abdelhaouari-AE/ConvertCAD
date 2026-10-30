@@ -1,5 +1,7 @@
 """Step 5 — repeated symbols become BLOCK definitions + INSERTs."""
 
+import math
+
 from conftest import stroke
 from convertcad.core.blocks import detect_blocks
 from convertcad.core.compat import pymupdf
@@ -149,3 +151,54 @@ def test_rotations_can_be_switched_off(pdf_factory):
     assert len(detect_blocks(rp, 3, rotations=False).inserts[0]) == 3
     rp = rebuild(extract_page(pymupdf.open(pdf_factory(draw)), 0))
     assert len(detect_blocks(rp, 3, rotations=True).inserts[0]) == 4
+
+
+def _draw_turned(page, x, y, degrees, mirror=False):
+    """The F shape and a small arc, turned by any angle (page, y down)."""
+    from conftest import arc
+    t = math.radians(degrees)
+    c, s = math.cos(t), math.sin(t)
+
+    def at(p):
+        px = -p[0] if mirror else p[0]
+        return (x + c * px - s * p[1], y + s * px + c * p[1])
+    stroke(page, [("line", at(p), at(q)) for p, q in _F_SHAPE], width=0.35)
+    centre = at((3, 12))
+    a0 = (180.0 if mirror else 0.0) + degrees
+    arc(page, centre, 2.0, a0 - 60 if mirror else a0, a0 if mirror
+        else a0 + 60, width=0.35)
+
+
+def test_copies_turned_by_any_angle(pdf_factory, tmp_path):
+    import ezdxf
+
+    from convertcad.core.pipeline import Options, convert
+    angles = [0, 30, 75, 133, 210, 301]
+
+    def draw(page):
+        for k, a in enumerate(angles):
+            _draw_turned(page, 60 + 60 * k, 80, a)
+        _draw_turned(page, 200, 180, 50, mirror=True)
+    pdf = pdf_factory(draw, width=500, height=260)
+    rp = rebuild(extract_page(pymupdf.open(pdf), 0))
+    br = detect_blocks(rp, min_repeats=3)
+    assert len(br.definitions) == 1 and len(br.inserts[0]) == 7
+    opt = dict(scale_denominator=50, dimensions=False, leaders=False,
+               merge_dashes=False, hatch_patterns=False, write_log=False)
+    rep = convert(pdf, str(tmp_path / "b.dxf"), Options(**opt))
+    assert rep.stats.blocks_defined == 1 and rep.stats.blocks_inserted == 7
+    convert(pdf, str(tmp_path / "n.dxf"),
+            Options(block_detection=False, **opt))
+    msp = ezdxf.readfile(str(tmp_path / "b.dxf")).modelspace()
+    rots = sorted(round(i.dxf.rotation) % 360 for i in msp.query("INSERT")
+                  if i.dxf.xscale > 0)
+    # page angles turn clockwise on the sheet: DXF angles are opposite
+    assert rots == sorted((-a) % 360 for a in angles)
+    assert sum(1 for i in msp.query("INSERT") if i.dxf.xscale < 0) == 1
+    # the exploded copies lie on the lines written without blocks (0.05 mm)
+    with_b = _segments(ezdxf.readfile(str(tmp_path / "b.dxf")))
+    without = _segments(ezdxf.readfile(str(tmp_path / "n.dxf")))
+    assert sum(with_b.values()) == sum(without.values()) == 21
+    for (a, b) in with_b:
+        assert any(math.dist(a, p) < 0.2 and math.dist(b, q) < 0.2
+                   for p, q in without), (a, b)

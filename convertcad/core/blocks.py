@@ -20,7 +20,12 @@ orientations a symbol can take on a drawing (0, 90, 180, 270 degrees, each
 also mirrored) and the smallest one is kept, so a door hinged left and the
 same door hinged right share one block; each INSERT then carries the
 rotation and the mirroring (X scale -1) that reproduce its copy exactly.
-Other angles (a symbol turned 30 degrees) are not matched.
+
+Any other angle (a valve on a pipe at 30 degrees): the clusters left alone
+by the fingerprints are compared by their key points (vertices, centres,
+arc ends) seen from their mean point — the same distances, then the same
+points once turned (and mirrored) — and the copies found get the measured
+rotation.
 """
 
 import math
@@ -45,6 +50,8 @@ class BTol:
                              # must not glue neighbouring symbols together
     CHUNK = 12.0             # long segments are cut into pieces of this size
     MAX_CLUSTER = 1500       # entities; larger groups are layout, not symbols
+    TURN_TOL = 0.35          # turned copies: key points agree within (pt)
+    TURN_MAX_KEYS = 300      # symbols with more key points: not compared
 
 
 @dataclass
@@ -291,6 +298,12 @@ def detect_blocks(rp: RebuiltPage, min_repeats: int = BTol.MIN_REPEATS,
     for cl in clusters:
         by_fp.setdefault(cl.fingerprint, []).append(cl)
 
+    leftovers = []
+    for group in list(by_fp.values()):
+        if len(group) < max(2, min_repeats):
+            leftovers += group
+    if rotations and leftovers:
+        _turned_copies(leftovers, max(2, min_repeats), res)
     for group in by_fp.values():
         if len(group) < max(2, min_repeats):
             continue
@@ -307,6 +320,167 @@ def detect_blocks(rp: RebuiltPage, min_repeats: int = BTol.MIN_REPEATS,
             for e in cl.entities():
                 e.consumed = True
     return res
+
+
+# ---------------------------------------------------------------------------
+# Copies turned by any angle
+# ---------------------------------------------------------------------------
+@dataclass
+class _Keys:
+    """Key points of a cluster around their mean point (page coordinates):
+    xy (n x 2), the kind of each point, its size (radius) and distance."""
+    cluster: Cluster
+    mean: Point
+    xy: list
+    kind: list
+    size: list
+    dist: list
+    profile: list = field(default_factory=list)    # sorted distances
+
+
+def _key_points(cl: Cluster) -> _Keys:
+    pts, kinds, sizes = [], [], []
+    for pl in cl.polylines:
+        for p in pl.points:
+            pts.append(p)
+            kinds.append(("P", pl.closed, _style_sig(pl)))
+            sizes.append(0.0)
+    for a in cl.arcs:
+        lab = ("A", _style_sig(a))
+        pts.append(a.center)
+        kinds.append(lab + ("c",))
+        sizes.append(a.radius)
+        for ang in (a.start_angle, a.end_angle, a.start_angle + a.sweep / 2):
+            t = math.radians(ang)
+            pts.append((a.center[0] + a.radius * math.cos(t),
+                        a.center[1] + a.radius * math.sin(t)))
+            kinds.append(lab + ("e",))
+            sizes.append(a.radius)
+    for c in cl.circles:
+        pts.append(c.center)
+        kinds.append(("C", _style_sig(c)))
+        sizes.append(c.radius)
+    for sp in cl.splines:
+        for p in sp.control_points:
+            pts.append(p)
+            kinds.append(("S", _style_sig(sp)))
+            sizes.append(0.0)
+    mx = sum(p[0] for p in pts) / len(pts)
+    my = sum(p[1] for p in pts) / len(pts)
+    xy = [(p[0] - mx, p[1] - my) for p in pts]
+    return _Keys(cl, (mx, my), xy, kinds, sizes,
+                 [math.hypot(x, y) for x, y in xy])
+
+
+def _turn(xy, theta: float, mirror: bool):
+    c, s = math.cos(theta), math.sin(theta)
+    out = []
+    for x, y in xy:
+        if mirror:
+            x = -x
+        out.append((c * x - s * y, s * x + c * y))
+    return out
+
+
+def _align(ref: _Keys, mem: _Keys):
+    """Rotation (radians, page coordinates) and mirroring that lay the key
+    points of `ref` on those of `mem`, or None."""
+    tol = BTol.TURN_TOL
+    far = max(range(len(ref.xy)), key=lambda i: ref.dist[i])
+    if ref.dist[far] < 4 * tol:
+        return None                              # a dot: no angle
+    by_kind: Dict[tuple, List[int]] = {}
+    for j, k in enumerate(mem.kind):
+        by_kind.setdefault(k, []).append(j)
+    for mirror in (False, True):
+        fx, fy = ref.xy[far]
+        a0 = math.atan2(fy, -fx if mirror else fx)
+        for j in by_kind.get(ref.kind[far], ()):
+            if abs(mem.dist[j] - ref.dist[far]) > tol or \
+                    abs(mem.size[j] - ref.size[far]) > tol:
+                continue
+            theta = math.atan2(mem.xy[j][1], mem.xy[j][0]) - a0
+            turned = _turn(ref.xy, theta, mirror)
+            pairs = []
+            for i, (x, y) in enumerate(turned):
+                q = next((q for q in by_kind.get(ref.kind[i], ())
+                          if abs(mem.xy[q][0] - x) <= tol
+                          and abs(mem.xy[q][1] - y) <= tol
+                          and abs(mem.size[q] - ref.size[i]) <= tol), None)
+                if q is None:
+                    break
+                pairs.append((i, q))
+            else:
+                # best angle from all the points (least squares)
+                flat = _turn(ref.xy, 0.0, mirror)
+                sc = sum(flat[i][0] * mem.xy[q][1] - flat[i][1] * mem.xy[q][0]
+                         for i, q in pairs)
+                cc = sum(flat[i][0] * mem.xy[q][0] + flat[i][1] * mem.xy[q][1]
+                         for i, q in pairs)
+                return math.atan2(sc, cc), mirror
+    return None
+
+
+def _turned_copies(clusters: List[Cluster], min_repeats: int,
+                   res: "BlockResult") -> None:
+    """Group the clusters that are copies of each other turned by any angle
+    (see the module docstring); groups of min_repeats or more become
+    blocks. Their base point is the mean of the key points."""
+    keys = []
+    for cl in clusters:
+        k = _key_points(cl)
+        if 2 <= len(k.xy) <= BTol.TURN_MAX_KEYS:
+            keys.append(k)
+    # quick filter: same kinds of points, same distances to the mean
+    buckets: Dict[tuple, List[_Keys]] = {}
+    for k in keys:
+        sig = tuple(sorted((repr(x), keys_count) for x, keys_count in
+                           _count(k.kind).items()))
+        buckets.setdefault(sig, []).append(k)
+    tol = BTol.TURN_TOL
+    for group in buckets.values():
+        if len(group) < min_repeats:
+            continue
+        for k in group:
+            k.profile = sorted(k.dist)
+        done = [False] * len(group)
+        for i, ref in enumerate(group):
+            if done[i]:
+                continue
+            found = [(ref, 0.0, False)]
+            for j in range(i + 1, len(group)):
+                mem = group[j]
+                if done[j] or any(abs(a - b) > 2 * tol for a, b in
+                                  zip(ref.profile, mem.profile)):
+                    continue
+                al = _align(ref, mem)
+                if al is not None:
+                    found.append((mem, al[0], al[1]))
+                    done[j] = True
+            if len(found) < min_repeats:
+                continue
+            done[i] = True
+            ref.cluster.centroid = ref.mean
+            res.definitions.append(ref.cluster)
+            inserts = []
+            for mem, theta, mirror in found:
+                mem.cluster.centroid = mem.mean
+                # page (y down) -> DXF (y up): the angle changes sign
+                rot = round(-math.degrees(theta) % 360.0, 6)
+                inserts.append((mem.mean, rot, mirror) if (rot or mirror)
+                               else mem.mean)
+            res.inserts.append(inserts)
+            res.members.append([m.cluster for m, _, _ in found])
+            for m, _, _ in found:
+                for e in m.cluster.entities():
+                    e.consumed = True
+
+
+def _count(items: list) -> Dict:
+    out: Dict = {}
+    for x in items:
+        out[x] = out.get(x, 0) + 1
+    return out
 
 
 def _symbol_candidates(pool: list, rotations: bool, max_size: float

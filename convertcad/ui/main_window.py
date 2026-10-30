@@ -82,6 +82,19 @@ class _SaveThread(QThread):
             self.done.emit(saved, str(exc))
 
 
+class _UpdateThread(QThread):
+    """Asks GitHub for the latest release (core/updates.py), off the
+    interface thread."""
+    done = Signal(object, str)                 # UpdateInfo or None, error
+
+    def run(self) -> None:
+        from ..core import updates
+        try:
+            self.done.emit(updates.check(), "")
+        except Exception as exc:                # UpdateError, or anything
+            self.done.emit(None, str(exc))
+
+
 class MainWindow(QMainWindow):
     def __init__(self, settings):
         super().__init__()
@@ -107,6 +120,7 @@ class MainWindow(QMainWindow):
         self._run_counter = 0
         self._pending_save = ""                 # DWG save waiting for a run
         self._save_thread: Optional[_SaveThread] = None
+        self._update_thread: Optional[_UpdateThread] = None
 
         self._build_actions()
         self._build_menus()
@@ -116,6 +130,8 @@ class MainWindow(QMainWindow):
         self._restore_layout()
         self._update_state()
         self.activity.log(f"{APP_NAME} {APP_VERSION} — " + tr("Ready"))
+        if self.settings.check_updates:          # opt-in, off by default
+            QTimer.singleShot(4000, lambda: self.check_updates(quiet=True))
 
     # =====================================================================
     # Construction
@@ -206,6 +222,12 @@ class MainWindow(QMainWindow):
         self.a_terms = A("Terms of use",
                          lambda: TermsDialog(self, gate=False).exec())
         self.a_about = A("About ConvertCAD", lambda: AboutDialog(self).exec())
+        self.a_updates = A("Check for updates…", self.check_updates,
+                           tip="Ask GitHub whether a newer ConvertCAD exists "
+                               "(nothing is sent, nothing is installed)")
+        self.a_updates_auto = A("Check for updates at startup",
+                                self._toggle_update_check, checkable=True)
+        self.a_updates_auto.setChecked(bool(self.settings.check_updates))
         self.a_settings_dir = A("Open the settings folder",
                                 lambda: open_folder(settings_dir()))
 
@@ -265,6 +287,9 @@ class MainWindow(QMainWindow):
         h = mb.addMenu(tr("&Help"))
         for a in (self.a_guide, self.a_keys, self.a_ocr):
             h.addAction(a)
+        h.addSeparator()
+        h.addAction(self.a_updates)
+        h.addAction(self.a_updates_auto)
         h.addSeparator()
         h.addAction(self.a_terms)
         h.addAction(self.a_settings_dir)
@@ -1210,6 +1235,56 @@ class MainWindow(QMainWindow):
             self.settings.save()
             QMessageBox.information(self, APP_NAME, tr(
                 "Language changed. Restart ConvertCAD to apply it."))
+
+    # ---- updates (opt-in) ---------------------------------------------------
+    def _toggle_update_check(self, on: bool) -> None:
+        self.settings.check_updates = bool(on)
+        self.settings.save()
+
+    def check_updates(self, quiet: bool = False) -> None:
+        """Ask GitHub for the latest version (one request, nothing sent).
+        quiet (startup check): only a newer version is shown."""
+        if self._update_thread is not None and self._update_thread.isRunning():
+            return
+        self._update_quiet = quiet
+        self._update_thread = _UpdateThread(self)
+        self._update_thread.done.connect(self._on_update_checked)
+        self._update_thread.start()
+        if not quiet:
+            self.status(tr("Checking for updates…"))
+
+    def _on_update_checked(self, info, error: str) -> None:
+        quiet = getattr(self, "_update_quiet", False)
+        if info is None:
+            self.activity.log(tr("Update check failed: {e}", e=error))
+            if not quiet:
+                QMessageBox.warning(self, APP_NAME, tr(
+                    "The latest version could not be checked: {e}.",
+                    e=error))
+            return
+        if not info.newer:
+            self.activity.log(tr("ConvertCAD is up to date ({v}).",
+                                 v=info.current))
+            if not quiet:
+                QMessageBox.information(self, APP_NAME, tr(
+                    "ConvertCAD is up to date ({v}).", v=info.current))
+            return
+        self.activity.log(tr("ConvertCAD {v} is available.", v=info.latest))
+        box = QMessageBox(self)
+        box.setWindowTitle(APP_NAME)
+        box.setIcon(QMessageBox.Icon.Information)
+        box.setText(tr("ConvertCAD {v} is available (this one is {c}).",
+                       v=info.latest, c=info.current))
+        box.setInformativeText(tr("Nothing is installed automatically: "
+                                  "download it from its release page."))
+        go = box.addButton(tr("Open the release page"),
+                           QMessageBox.ButtonRole.AcceptRole)
+        box.addButton(tr("Later"), QMessageBox.ButtonRole.RejectRole)
+        box.exec()
+        if box.clickedButton() is go:
+            from PySide6.QtCore import QUrl
+            from PySide6.QtGui import QDesktopServices
+            QDesktopServices.openUrl(QUrl(info.url))
 
     def _fill_recent(self, menu: QMenu = None) -> None:
         menu = menu or self.recent_menu
