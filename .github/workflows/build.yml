@@ -6,9 +6,11 @@
 # install nothing else. Other OCR languages are downloaded from the program
 # (their files: workflow "OCR models release").
 #
-#  - manually: Actions tab > build > Run workflow
+#  - manually: Actions tab > build > Run workflow. Tick "Publish the release"
+#    to also create the GitHub release v<version> (version read from
+#    convertcad/__init__.py) with the five files and the CHANGELOG notes.
 #  - automatically when a version tag is pushed:  git tag v1.2.0 && git push --tags
-#    (the files are then attached to the GitHub release of that tag)
+#    (the release of that tag is created the same way)
 #
 # Optional code signing (Windows): add the repository secrets
 #   SIGN_PFX_BASE64    the .pfx certificate, base64-encoded
@@ -20,6 +22,11 @@ on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      release:
+        description: "Publish the release v<version> with the five files"
+        type: boolean
+        default: false
 
 permissions:
   contents: write                       # needed to attach files to a release
@@ -103,14 +110,6 @@ jobs:
             dist/ConvertCAD-*-win64-setup.exe
           retention-days: 30
 
-      - name: Attach to the GitHub release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            dist/ConvertCAD-*-win64-portable.zip
-            dist/ConvertCAD-*-win64-setup.exe
-
   linux:
     # Built on the oldest supported Ubuntu: the programs then run on newer
     # distributions too (glibc is backward compatible only).
@@ -177,11 +176,42 @@ jobs:
             dist/convertcad_*_amd64.deb
           retention-days: 30
 
-      - name: Attach to the GitHub release
-        if: startsWith(github.ref, 'refs/tags/v')
+  # One release, created once both builds have succeeded.
+  release:
+    needs: [windows, linux]
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Version and release notes
+        id: v
+        run: |
+          # version written in the program (APP_VERSION = "1.2.0")
+          v=$(sed -n 's/^APP_VERSION = "\(.*\)"/\1/p' convertcad/__init__.py)
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then tag="${GITHUB_REF_NAME}"; else tag="v$v"; fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          # the CHANGELOG section of this version becomes the release notes
+          awk -v v="$v" '$0 ~ "^## \\[" v "\\]" {on=1; next} /^## \[/ {on=0} on' CHANGELOG.md > notes.md
+          test -s notes.md || echo "ConvertCAD $v" > notes.md
+
+      - uses: actions/download-artifact@v7
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Publish the release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.v.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: ConvertCAD ${{ steps.v.outputs.version }}
+          body_path: notes.md
+          make_latest: true
           files: |
-            dist/ConvertCAD-*-linux-x86_64.tar.gz
+            dist/ConvertCAD-*-win64-setup.exe
+            dist/ConvertCAD-*-win64-portable.zip
             dist/ConvertCAD-*-x86_64.AppImage
             dist/convertcad_*_amd64.deb
+            dist/ConvertCAD-*-linux-x86_64.tar.gz
