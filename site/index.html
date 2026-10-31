@@ -96,7 +96,7 @@ p { margin: 0 }
 body::after {
   content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
   background: radial-gradient(230px circle at var(--mx, -400px) var(--my, -400px),
-              var(--glow) 0%, var(--glow) 22%, transparent 78%);
+              var(--glow) 0%, transparent 70%);
   -webkit-mask-image:
     linear-gradient(#000 1px, transparent 1px), linear-gradient(90deg, #000 1px, transparent 1px),
     linear-gradient(rgba(0,0,0,.5) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,.5) 1px, transparent 1px);
@@ -108,7 +108,7 @@ body::after {
   -webkit-mask-position: -1px -1px; mask-position: -1px -1px;
   opacity: 0; transition: opacity .4s ease;
 }
-body.pointer-in::after { opacity: .9 }
+body.pointer-in::after { opacity: .35 }   /* subtle: never competes with the text */
 @media (prefers-reduced-motion: reduce) { body::after { transition: none } }
 .hero .wrap { position: relative }
 .hero-text { max-width: 760px }
@@ -297,7 +297,7 @@ footer a:hover { color: var(--ink) }
         <svg viewBox="0 0 40 40" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="9" y="18" width="22" height="16" rx="2"/><path d="M14 18v-5a6 6 0 0 1 12 0v5"/><circle cx="20" cy="26" r="2" fill="currentColor" stroke="none"/></svg>
         <div>
           <strong>Confidential plans can be converted safely.</strong>
-          <span>Client drawings, tender documents and drawings under NDA never leave the computer you convert them on.</span>
+          <span>Client drawings, tender documents and drawings under NDA never leave the computer you convert them on. You remain responsible for converting only documents their owner allows you to convert, and for respecting any confidentiality agreement (NDA) that covers them.</span>
         </div>
       </div>
     </div>
