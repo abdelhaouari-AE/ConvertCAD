@@ -186,3 +186,25 @@ class Toast(QLabel):
             pass
         if self._effect.opacity() < 0.05:
             self.hide()
+
+
+def yes_no_box(parent, title: str, text: str):
+    """The question box of ask_yes_no, and its Yes button (not shown)."""
+    from PySide6.QtWidgets import QMessageBox
+    from ..i18n import tr
+    box = QMessageBox(QMessageBox.Icon.Question, title, text,
+                      QMessageBox.StandardButton.NoButton, parent)
+    yes = box.addButton(tr("Yes"), QMessageBox.ButtonRole.YesRole)
+    no = box.addButton(tr("No"), QMessageBox.ButtonRole.NoRole)
+    box.setDefaultButton(no)
+    box.setEscapeButton(no)
+    return box, yes
+
+
+def ask_yes_no(parent, title: str, text: str) -> bool:
+    """Yes / No question with buttons in the interface language (Qt's own
+    QMessageBox.question shows English "Yes" and "No"). No is the default:
+    Enter or Esc never confirms by accident."""
+    box, yes = yes_no_box(parent, title, text)
+    box.exec()
+    return box.clickedButton() is yes

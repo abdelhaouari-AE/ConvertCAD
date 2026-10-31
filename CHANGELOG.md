@@ -2,6 +2,34 @@
 
 All notable changes to ConvertCAD. Versions follow *major.minor.patch*.
 
+## [1.2.1] — 2026-10-31
+
+### Fixed
+- **Accented letters in DWG files** (é, è, à, ç…) came out as "?": the drawing passed to
+  the DWG converter was read with the wrong character encoding.
+- **Text size**: each font now keeps its own capital height (Courier New text was about
+  25 % too big, Times New Roman about 7 %).
+- **Report in the interface language**: conversion options, page notes and the block list
+  were in English.
+- **Yes / No buttons** of questions (quitting with an unsaved result…) were in English;
+  Qt's own dialogs (OK, Cancel, file dialogs) now follow the interface language too.
+
+### Added
+- **Text keeps its font, length and alignment**: the DXF text style uses the PDF font
+  (Arial, Arial Narrow, Times New Roman, Courier New, Calibri, Verdana, Tahoma, Segoe UI,
+  Georgia, Trebuchet MS, ISOCPEUR, bold and italic); a width factor keeps the length of
+  condensed text; paragraphs stay left-aligned, centred or right-aligned like the PDF
+  (title blocks). Fonts not recognised are shown with Arial at the PDF length.
+- **Imperial units**: inches and feet, imperial scales (1/4" = 1'-0", 1" = 20'…) in the
+  scale list and read from title blocks; the DXF is marked imperial ($MEASUREMENT 0).
+- **Collapsible side panels**, like AutoCAD palettes: click the bar on the window edge,
+  or Ctrl+0 to collapse both.
+- **DXF preview on an AutoCAD-like model space**: dark blue-grey background with a grid
+  (major line every 5) and the X / Y axes.
+
+### Changed
+- *Convert a folder* moved next to *Open PDF* in the toolbar.
+
 ## [1.2.0] — 2026-10-30
 
 ### Added

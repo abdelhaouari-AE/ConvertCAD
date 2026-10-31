@@ -129,15 +129,18 @@ class ConversionReport:
             fh.write(self.render())
 
     # ------------------------------------------------------------------ html --
-    def to_html(self, dark: bool = False, t=None) -> str:
+    def to_html(self, dark: bool = False, t=None, note=None) -> str:
         """Styled HTML for the interface report panel / HTML export.
 
         ``t`` is an optional translation function (the interface passes its
         ``tr``) so the report panel follows the interface language. The core
         stays independent of the UI: without ``t`` the report is in English.
         """
-        t = t or (lambda text: text)
+        t = t or (lambda text, **kw: text.format(**kw) if kw else text)
+        note = note or (lambda text: text)       # translates engine messages
         s = self.stats
+        src = getattr(self, "source_options", None)
+        options = src.describe(t) if src is not None else self.options
         e = html.escape
         fg, mut, bd, ok, warn, err, card = (
             ("#e6e8eb", "#9aa3ad", "#2c3238", "#4ade80", "#fbbf24", "#f87171",
@@ -163,12 +166,12 @@ class ConversionReport:
             f"<tr><td>{e(n)}</td><td align='right'>{_layer_cell(n)}"
             f"</td></tr>" for n in sorted(s.layers))
         opts = "".join(f"<tr><td>{e(k)}</td><td>{e(str(v))}</td></tr>"
-                       for k, v in self.options.items())
-        warns = "".join(f"<li>{e(w)}</li>" for w in self.all_warnings())
-        errs = "".join(f"<li>{e(x)}</li>" for x in self.errors)
-        notes = "".join(f"<li>{e(n)}</li>" for n in self.page_notes)
+                       for k, v in options.items())
+        warns = "".join(f"<li>{e(note(w))}</li>" for w in self.all_warnings())
+        errs = "".join(f"<li>{e(note(x))}</li>" for x in self.errors)
+        notes = "".join(f"<li>{e(note(n))}</li>" for n in self.page_notes)
         outs = "<br>".join(e(p) for p in (self.outputs or [self.dxf_path]))
-        blocks = "".join(f"<li>{e(b)}</li>" for b in s.block_report)
+        blocks = "".join(f"<li>{e(note(b))}</li>" for b in s.block_report)
         none = f"<div class='muted'>{e(t('none'))}</div>"
         css = (f"body{{color:{fg};font-size:10pt}} h2{{margin:2px 0 6px}}"
                f"h3{{margin:14px 0 4px;color:{mut};font-size:9pt;"

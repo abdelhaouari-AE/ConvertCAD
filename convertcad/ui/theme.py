@@ -26,7 +26,7 @@ TOKENS = {
         "accent": "#2BB3C0", "accent_hover": "#45C5D1",
         "accent_press": "#1F9AA6", "on_accent": "#04262A",
         "ok": "#59C08A", "warn": "#E3A33E", "err": "#EE6A5A",
-        "model_space": "#1E2329", "selection": "#2BB3C0",
+        "model_space": "#212830", "selection": "#2BB3C0",
     },
     "light": {
         "bg": "#E9EDF0", "panel": "#F7F8F9", "panel_alt": "#E3E8EC",
@@ -36,7 +36,7 @@ TOKENS = {
         "accent": "#0E7490", "accent_hover": "#0B6178",
         "accent_press": "#094F62", "on_accent": "#FFFFFF",
         "ok": "#1D8A57", "warn": "#B26A00", "err": "#C23A2B",
-        "model_space": "#FFFFFF", "selection": "#0E7490",
+        "model_space": "#212830", "selection": "#2BB3C0",
     },
 }
 

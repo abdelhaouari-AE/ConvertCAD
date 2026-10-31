@@ -57,10 +57,11 @@ from .layers_panel import LayersPanel
 from .ocr_models_dialog import OcrModelsDialog, stop_downloads
 from .options_panel import OptionsPanel
 from .pages_panel import PagesPanel
+from .side_panel import STRIP_WIDTH, SidePanel
 from .pdf_view import PdfView, format_length
 from .report_panel import ActivityPanel, ReportPanel
 from .statusbar import TitleBlockBar
-from .widgets import Toast, restyle
+from .widgets import Toast, ask_yes_no, restyle
 
 
 class _SaveThread(QThread):
@@ -262,6 +263,11 @@ class MainWindow(QMainWindow):
         for a in (self.a_show_pages, self.a_show_right, self.a_show_activity):
             a.setCheckable(True)
             a.setChecked(True)
+        panels.addSeparator()
+        # Ctrl+0 like AutoCAD's "Clean screen": both side panels collapse
+        self.a_clean = panels.addAction(tr("Collapse both side panels"))
+        self.a_clean.setShortcut("Ctrl+0")
+        self.a_clean.triggered.connect(self._clean_screen)
         v.addSeparator()
         tm = v.addMenu(tr("Theme"))
         self.a_dark = tm.addAction(tr("Dark"), lambda: self.set_theme("dark"))
@@ -317,10 +323,13 @@ class MainWindow(QMainWindow):
         open_menu.aboutToShow.connect(lambda: self._fill_recent(open_menu))
         self.btn_open.setMenu(open_menu)
         tb.addWidget(self.btn_open)
-        tb.addSeparator()
         # buttons that drop their label when the window is too narrow for
         # the labels of the chosen language (_fit_toolbar)
         self._compact_buttons = []
+        self.btn_batch = self._tool_button(self.a_batch)   # next to Open
+        tb.addWidget(self.btn_batch)
+        self._compact_buttons.append(self.btn_batch)
+        tb.addSeparator()
         for a in (self.a_pan, self.a_cal, self.a_meas, self.a_area):
             b = self._tool_button(a)
             self._compact_buttons.append(b)
@@ -337,10 +346,8 @@ class MainWindow(QMainWindow):
         tb.addWidget(spacer)
         self.btn_convert = self._tool_button(self.a_convert)
         self.btn_save = self._tool_button(self.a_save)
-        self.btn_batch = self._tool_button(self.a_batch)
-        for b in (self.btn_convert, self.btn_save, self.btn_batch):
+        for b in (self.btn_convert, self.btn_save):
             tb.addWidget(b)
-        self._compact_buttons.append(self.btn_batch)
         tb.addSeparator()
         tb.addWidget(self._tool_button(self.a_theme, text_beside=False))
         help_btn = QToolButton()
@@ -369,9 +376,10 @@ class MainWindow(QMainWindow):
         root.addWidget(self.statusbar)
         self.setCentralWidget(central)
 
-        # left: sheets
+        # left: sheets (collapses to a thin bar, like an AutoCAD palette)
         self.pages_panel = PagesPanel()
-        self.main_split.addWidget(self.pages_panel)
+        self.left_side = SidePanel(self.pages_panel, tr("Sheets"), "left")
+        self.main_split.addWidget(self.left_side)
 
         # centre: views + activity
         self.center_split = QSplitter(Qt.Orientation.Vertical)
@@ -438,7 +446,10 @@ class MainWindow(QMainWindow):
         self.right_tabs.addTab(self.layers_panel, tr("Layers"))
         self.right_tabs.addTab(self.report_panel, tr("Report"))
         self.right_tabs.setMinimumWidth(330)
-        self.main_split.addWidget(self.right_tabs)
+        self.right_side = SidePanel(
+            self.right_tabs, f"{tr('Settings')}  ·  {tr('Layers')}  ·  "
+            f"{tr('Report')}", "right")
+        self.main_split.addWidget(self.right_side)
         self.main_split.setStretchFactor(0, 0)
         self.main_split.setStretchFactor(1, 1)
         self.main_split.setStretchFactor(2, 0)
@@ -483,8 +494,15 @@ class MainWindow(QMainWindow):
         self.layers_panel.edits_changed.connect(self._on_layer_edits)
         self.report_panel.message.connect(self.notify)
         self.statusbar.snap_toggled.connect(self._on_snap_toggled)
-        self.a_show_pages.toggled.connect(self.pages_panel.setVisible)
-        self.a_show_right.toggled.connect(self.right_tabs.setVisible)
+        # View > Panels: ticked = open, unticked = collapsed to its bar
+        self.a_show_pages.toggled.connect(
+            lambda on: self.left_side.set_collapsed(not on))
+        self.a_show_right.toggled.connect(
+            lambda on: self.right_side.set_collapsed(not on))
+        self.left_side.collapsed_changed.connect(
+            lambda c: self._on_side_collapsed(self.left_side, 0, c))
+        self.right_side.collapsed_changed.connect(
+            lambda c: self._on_side_collapsed(self.right_side, 2, c))
         self.a_show_activity.toggled.connect(self.activity.setVisible)
         snaps = {"end": self.settings.snap_end, "mid": self.settings.snap_mid,
                  "int": self.settings.snap_int,
@@ -502,9 +520,41 @@ class MainWindow(QMainWindow):
                 if len(sizes) == 5:
                     self.main_split.setSizes(sizes[:3])
                     self.center_split.setSizes(sizes[3:])
+                    self._side_widths = {0: sizes[0], 2: sizes[2]}
         except Exception:
             pass
         self.a_show_activity.setChecked(self.settings.show_activity)
+        self.a_show_pages.setChecked(not self.settings.sheets_panel_collapsed)
+        self.a_show_right.setChecked(not self.settings.settings_panel_collapsed)
+
+    # ---- collapsible side panels --------------------------------------------
+    def _on_side_collapsed(self, panel, index: int, collapsed: bool) -> None:
+        """Keep the menu ticks in step; reopen a panel at its last width."""
+        widths = getattr(self, "_side_widths", {})
+        sizes = self.main_split.sizes()
+        if collapsed:
+            if sizes[index] > STRIP_WIDTH + 40:
+                widths[index] = sizes[index]
+            sizes[1] += sizes[index] - STRIP_WIDTH     # the view takes the room
+            sizes[index] = STRIP_WIDTH
+            self.main_split.setSizes(sizes)
+        else:
+            want = widths.get(index, 210 if index == 0 else 370)
+            grow = want - sizes[index]
+            if sizes[1] - grow > 200:                 # keep room for the view
+                sizes[index] = want
+                sizes[1] -= grow
+                self.main_split.setSizes(sizes)
+        self._side_widths = widths
+        action = self.a_show_pages if index == 0 else self.a_show_right
+        if action.isChecked() == collapsed:
+            action.setChecked(not collapsed)
+
+    def _clean_screen(self) -> None:
+        """Ctrl+0: collapse both side panels, or open them again."""
+        both = self.left_side.collapsed and self.right_side.collapsed
+        self.left_side.set_collapsed(not both)
+        self.right_side.set_collapsed(not both)
 
     # =====================================================================
     # Helpers
@@ -649,8 +699,7 @@ class MainWindow(QMainWindow):
     def _confirm_discard(self, question: str) -> bool:
         if self.result and self.result.get("outputs") and \
                 not self.result.get("saved"):
-            r = QMessageBox.question(self, APP_NAME, tr(question))
-            return r == QMessageBox.StandardButton.Yes
+            return ask_yes_no(self, APP_NAME, tr(question))
         return True
 
     def open_dialog(self) -> None:
@@ -1129,11 +1178,10 @@ class MainWindow(QMainWindow):
                 return
             from ..core.postprocess import needs_reconversion_for_dwg
             if needs_reconversion_for_dwg(outputs[0]):
-                r = QMessageBox.question(self, APP_NAME, tr(
-                    "A DWG needs AutoCAD 2000 entities (classic leaders, "
-                    "colour index...). ConvertCAD converts the drawing once "
-                    "more for the DWG, then saves it. Continue?"))
-                if r != QMessageBox.StandardButton.Yes:
+                if not ask_yes_no(self, APP_NAME, tr(
+                        "A DWG needs AutoCAD 2000 entities (classic leaders, "
+                        "colour index...). ConvertCAD converts the drawing "
+                        "once more for the DWG, then saves it. Continue?")):
                     return
                 self.options_panel.output_format.setCurrentIndex(
                     self.options_panel.output_format.findData("dwg"))
@@ -1365,9 +1413,8 @@ class MainWindow(QMainWindow):
         if self._save_thread is not None:
             self._save_thread.wait(60000)            # let the save finish
         if self._busy:
-            r = QMessageBox.question(self, APP_NAME, tr(
-                "The conversion is still running. Quit anyway?"))
-            if r != QMessageBox.StandardButton.Yes:
+            if not ask_yes_no(self, APP_NAME, tr(
+                    "The conversion is still running. Quit anyway?")):
                 event.ignore()
                 return
         elif not self._confirm_discard("The result has not been saved. Quit "
@@ -1379,8 +1426,15 @@ class MainWindow(QMainWindow):
         self.options_panel.save_to_settings()
         self.settings.window_geometry = bytes(
             self.saveGeometry().toBase64()).decode()
+        sizes = self.main_split.sizes()
+        widths = getattr(self, "_side_widths", {})
+        for i, side in ((0, self.left_side), (2, self.right_side)):
+            if side.collapsed:                 # remember the open width
+                sizes[i] = widths.get(i, 210 if i == 0 else 370)
         self.settings.window_state = ",".join(
-            str(x) for x in self.main_split.sizes() + self.center_split.sizes())
+            str(x) for x in sizes + self.center_split.sizes())
+        self.settings.sheets_panel_collapsed = self.left_side.collapsed
+        self.settings.settings_panel_collapsed = self.right_side.collapsed
         self.settings.show_activity = self.a_show_activity.isChecked()
         self.settings.save()
         if self.doc is not None:

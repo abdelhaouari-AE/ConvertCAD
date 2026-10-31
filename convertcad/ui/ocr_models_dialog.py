@@ -20,7 +20,7 @@ from PySide6.QtCore import Qt, QThread, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QDialog,
                                QDialogButtonBox, QFileDialog, QHBoxLayout,
-                               QHeaderView, QMessageBox, QProgressBar,
+                               QHeaderView, QProgressBar,
                                QPushButton, QTableWidget, QTableWidgetItem,
                                QVBoxLayout)
 
@@ -29,7 +29,7 @@ from ..core.ocr_catalog import (BUILTIN_SIZE, BY_ID, MODELS_RELEASE,
                                 PACKS, RELEASE_PAGE, OcrPack)
 from ..i18n import tr
 from .icons import icon
-from .widgets import label
+from .widgets import ask_yes_no, label
 
 # downloads still running after their window was closed (kept alive until
 # they stop, otherwise Qt would destroy a running thread)
@@ -313,11 +313,10 @@ class OcrModelsDialog(QDialog):
         p = self._selected_pack()
         if p is None:
             return
-        ans = QMessageBox.question(
-            self, tr("Remove"), tr("Remove {name} from this computer? It can "
-                                   "be downloaded again later.",
-                                   name=tr(p.label)))
-        if ans != QMessageBox.StandardButton.Yes:
+        if not ask_yes_no(
+                self, tr("Remove"), tr("Remove {name} from this computer? It "
+                                       "can be downloaded again later.",
+                                       name=tr(p.label))):
             return
         try:
             ocr_store.remove_pack(p.id)

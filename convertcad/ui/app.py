@@ -69,6 +69,28 @@ def _startup_probe(app) -> None:
     app.quit()
 
 
+def _install_qt_translation(app, lang: str) -> None:
+    """Qt's own texts (OK / Cancel buttons, file dialogs, text field menus)
+    in the interface language, from the translations shipped with Qt."""
+    if not lang or lang == "en":
+        return
+    try:
+        import PySide6
+        from PySide6.QtCore import QLibraryInfo, QTranslator
+        here = os.path.dirname(PySide6.__file__)
+        folders = [QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath),
+                   os.path.join(here, "translations"),           # bundled app
+                   os.path.join(here, "Qt", "translations")]     # pip wheel
+        tr_qt = QTranslator(app)
+        for folder in folders:
+            if folder and tr_qt.load(f"qtbase_{lang}", folder):
+                app.installTranslator(tr_qt)
+                app._qt_translator = tr_qt             # keep it alive
+                break
+    except Exception:                                  # pragma: no cover
+        logging.exception("Qt translation not loaded")
+
+
 def run_gui(argv=None) -> int:
     argv = list(argv or [])
     _setup_logging()
@@ -90,6 +112,7 @@ def run_gui(argv=None) -> int:
     set_language(settings.language)
     if is_rtl():                       # Arabic: the interface right to left
         app.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+    _install_qt_translation(app, settings.language)
     from . import theme
     theme.apply_theme(app, settings.theme)
     from .icons import app_icon

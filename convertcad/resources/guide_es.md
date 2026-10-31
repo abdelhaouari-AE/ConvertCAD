@@ -16,6 +16,7 @@ ConvertCAD convierte dibujos PDF 2D en **archivos DXF o DWG editables, creados c
 | Zoom en el cursor | Rueda del ratón |
 | Desplazar la vista | Arrastrar con el botón central, Espacio + arrastrar, o arrastrar con la herramienta Desplazar |
 | Ajustar la hoja | F |
+| Contraer / abrir un panel lateral | Hacer clic en su barra en el borde de la ventana; Ctrl+0 contrae los dos (como *Limpiar pantalla* de AutoCAD) |
 | Hoja siguiente / anterior | Av Pág / Re Pág |
 | Cancelar una herramienta | Escape (el clic derecho cancela el primer punto) |
 
@@ -43,7 +44,7 @@ F3 activa o desactiva la referencia.
 | Áreas rellenas | **HATCH** sólido en la capa HATCH |
 | Sombreado dibujado como muchas líneas paralelas | Un **HATCH** con patrón (ángulo y separación del PDF) |
 | Arena, hormigón, grava, tierra, ladrillo, aislante o puntos dibujados como muchos trazos y puntos | Un **HATCH** con el patrón estándar (AR-SAND, AR-CONC, GRAVEL, EARTH, BRICK, INSUL, DOTS…) a la escala y con el ángulo medidos en el PDF |
-| Texto | **TEXT**; las líneas apiladas forman un párrafo **MTEXT** |
+| Texto | **TEXT** con la fuente del PDF (Arial, Times New Roman, Courier New, Calibri…, negrita y cursiva), su tamaño y su longitud; las líneas apiladas forman un párrafo **MTEXT**, alineado a la izquierda, centrado o a la derecha como en el PDF |
 | Texto SHX de AutoCAD dibujado como trazos | **TEXT** real en la capa TEXT_SHX (los trazos se conservan en la capa oculta TEXT_SHX_STROKES) |
 | Flecha + línea + flecha + valor | **DIMENSION** verdadera (capa DIM) — el valor conserva el texto del PDF |
 | Trazos oblicuos + línea + valor | **DIMENSION** verdadera con trazos arquitectónicos |
@@ -58,11 +59,11 @@ Los textos de medida que no corresponden a ninguna cota se colocan en la capa **
 
 ## Los ajustes
 
-**Escala, unidades y área** — escala del dibujo (1:N) y unidad del DXF (mm, cm, m); *Seleccionar área… / Hoja completa* (solo se convierte el área, en las coordenadas propias de la hoja; el área se aplica a cada hoja convertida). *Leer la escala escrita en cada hoja* sirve para juegos de planos con escalas distintas (planta a 1:100, detalles a 1:20): cada hoja usa la escala de su cajetín, y la escala de arriba se usa cuando una hoja no indica ninguna o indica varias; el informe dice qué escala recibió cada hoja. La calibración sustituye a ambas; el panel muestra la escala equivalente («aprox. 1:100,2») como comprobación.
+**Escala, unidades y área** — escala del dibujo (1:N, o 1/4" = 1'-0" y 1" = 20' en pulgadas y pies) y unidad del DXF (mm, cm, m, pulgadas, pies); *Seleccionar área… / Hoja completa* (solo se convierte el área, en las coordenadas propias de la hoja; el área se aplica a cada hoja convertida). *Leer la escala escrita en cada hoja* sirve para juegos de planos con escalas distintas (planta a 1:100, detalles a 1:20): cada hoja usa la escala de su cajetín, y la escala de arriba se usa cuando una hoja no indica ninguna o indica varias; el informe dice qué escala recibió cada hoja. La calibración sustituye a ambas; el panel muestra la escala equivalente («aprox. 1:100,2») como comprobación.
 
 **Geometría** — reconstruir arcos y círculos; unir segmentos en polilíneas; unir curvas en splines únicas; *precisión de las curvas* (Fina / Normal / Holgada) fija con qué rigor una curva debe coincidir con un círculo; rellenos sólidos como sombreados; *reconstruir los patrones de sombreado* (líneas paralelas → HATCH con patrón; arena, hormigón, grava, tierra, ladrillo, aislante, puntos → el patrón estándar; la arena y el hormigón tienen aspecto aleatorio, por eso su escala y su posición son estimadas y el informe lo indica); *reconstruir las líneas discontinuas* (trazos sueltos → una línea con su tipo de línea); ignorar máscaras blancas, líneas blancas y fondos de página (ocultarían el dibujo en CAD).
 
-**Texto** — exportar el texto; agrupar las líneas apiladas en párrafos MTEXT; *relación de altura del texto* (altura de mayúsculas ÷ tamaño de fuente del PDF, 0,70 conviene a la mayoría de las fuentes); *recuperar el texto dibujado como trazos o contornos*: el texto SHX de AutoCAD vuelve a ser texto real (capa TEXT_SHX) gracias a los comentarios ocultos que AutoCAD añade a sus PDF, y el texto TrueType dibujado como contornos rellenos se sustituye por su texto real.
+**Texto** — exportar el texto; agrupar las líneas apiladas en párrafos MTEXT; *relación de altura del texto* (altura de mayúsculas ÷ tamaño de fuente del PDF) para las fuentes que ConvertCAD no reconoce — las fuentes reconocidas conservan su propio tamaño; si se cambia, se aplica a todos los textos; *recuperar el texto dibujado como trazos o contornos*: el texto SHX de AutoCAD vuelve a ser texto real (capa TEXT_SHX) gracias a los comentarios ocultos que AutoCAD añade a sus PDF, y el texto TrueType dibujado como contornos rellenos se sustituye por su texto real.
 
 **Cotas y directrices** — reconstruir las cotas con flechas (lineales, radio, diámetro, ángulo, longitud de arco) y/o con trazos oblicuos; reconstruir las directrices.
 

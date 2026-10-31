@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (QFileDialog, QFrame, QHBoxLayout,
                                QTextBrowser, QVBoxLayout, QWidget)
 
 from ..core.report import ConversionReport
-from ..i18n import tr
+from ..i18n import tr, tr_note
 from . import theme
 from .icons import icon
 from .widgets import PanelHeader, label, small_button
@@ -70,7 +70,8 @@ class ReportPanel(QFrame):
         if rep is None:
             self.stack.setCurrentIndex(0)
             return
-        self.browser.setHtml(rep.to_html(dark=theme.current() == "dark", t=tr))
+        self.browser.setHtml(rep.to_html(dark=theme.current() == "dark", t=tr,
+                                         note=tr_note))
         self.stack.setCurrentIndex(1)
 
     def refresh(self) -> None:
@@ -98,7 +99,7 @@ class ReportPanel(QFrame):
         path = self._ask(tr("HTML page (*.html)"), "_report.html")
         if path:
             with open(path, "w", encoding="utf-8") as fh:
-                fh.write(self.report.to_html(dark=False, t=tr))
+                fh.write(self.report.to_html(dark=False, t=tr, note=tr_note))
             self.message.emit(tr("Saved {name}.", name=path))
 
     def copy(self) -> None:

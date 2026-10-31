@@ -37,7 +37,7 @@ ConvertCAD rebuilds the **intent** of the drawing:
 | Arrow on a circle + "R…" / "Ø…"; two arrows on an arc + "45°" or an arc length | Real **RADIUS**, **DIAMETER**, **ANGULAR** and **ARC LENGTH** dimensions |
 | Arrow + polyline + note | **MULTILEADER** (classic **LEADER** for older DXF versions) |
 | The same symbol repeated (columns, doors, bolts…), even turned by any angle or mirrored | One **BLOCK** + one **INSERT** per occurrence |
-| Stacked text lines | One **MTEXT** paragraph |
+| Text, stacked text lines | **TEXT** / **MTEXT** in the PDF's font (Arial, Times New Roman, Courier New…), with its size, length and alignment |
 | Solid fills · hatching drawn as hundreds of parallel lines | **HATCH** (solid · pattern with its angle and spacing) |
 | Sand, concrete, gravel, earth, brick, insulation, dots plotted as thousands of dashes and dots | One **HATCH** with the standard AutoCAD pattern (AR-SAND, AR-CONC, GRAVEL, EARTH, BRICK, INSUL, DOTS…) at its measured scale and angle |
 | AutoCAD SHX text plotted as strokes | Real **TEXT** with the original string |
@@ -59,7 +59,7 @@ texts that matched nothing go to the red layer `DIM_RAW` for review. Nothing is 
 - **Convert only an area** — draw a rectangle on the sheet (*A*): only that part is converted.
 - **Overlay check** — the PDF shown under the converted drawing with adjustable
   transparency (*O*): differences are seen at a glance.
-- **Scale tools** — scale read from the title block, *Calibrate* on two points of known
+- **Scale tools** — metric (1:100) or imperial (1/4" = 1'-0", inches and feet) scale read from the title block, *Calibrate* on two points of known
   distance, *Measure* any distance, with **object snap** (END / MID / INT / CEN) like AutoCAD.
   Sheets with different scales in one set: *read the scale written on each sheet*.
 - **Review before saving** — preview of the DXF as CAD software will read it (click an

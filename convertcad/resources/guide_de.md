@@ -16,6 +16,7 @@ ConvertCAD wandelt 2D-PDF-Zeichnungen in **bearbeitbare DXF- oder DWG-Dateien au
 | Zoom am Cursor | Mausrad |
 | Ansicht verschieben | Ziehen mit der mittleren Taste, Leertaste + Ziehen, oder Ziehen mit dem Werkzeug Verschieben |
 | Blatt einpassen | F |
+| Seitenleiste ein- / ausklappen | Auf ihre Leiste am Fensterrand klicken; Strg+0 klappt beide ein (wie *Bildschirm bereinigen* in AutoCAD) |
 | Nächstes / vorheriges Blatt | Bild ab / Bild auf |
 | Ein Werkzeug abbrechen | Escape (Rechtsklick verwirft den ersten Punkt) |
 
@@ -43,7 +44,7 @@ F3 schaltet den Fang ein oder aus.
 | Gefüllte Flächen | Volle **HATCH** auf dem Layer HATCH |
 | Als viele parallele Linien gezeichnete Schraffur | Eine Muster-**HATCH** (Winkel und Abstand des PDF) |
 | Sand, Beton, Kies, Erde, Ziegel, Dämmung oder Punkte, als viele Striche und Punkte gezeichnet | Eine **HATCH** mit dem Standardmuster (AR-SAND, AR-CONC, GRAVEL, EARTH, BRICK, INSUL, DOTS…) mit dem auf dem PDF gemessenen Maßstab und Winkel |
-| Text | **TEXT**; gestapelte Zeilen werden ein **MTEXT**-Absatz |
+| Text | **TEXT** in der Schrift des PDFs (Arial, Times New Roman, Courier New, Calibri…, fett und kursiv), mit ihrer Größe und Länge; gestapelte Zeilen werden ein **MTEXT**-Absatz, links, zentriert oder rechts ausgerichtet wie im PDF |
 | Als Striche gezeichneter AutoCAD-SHX-Text | Echter **TEXT** auf dem Layer TEXT_SHX (die Striche bleiben auf dem ausgeblendeten Layer TEXT_SHX_STROKES) |
 | Pfeil + Linie + Pfeil + Wert | Echte **DIMENSION** (Layer DIM) — der Wert behält den PDF-Text |
 | Schrägstriche + Linie + Wert | Echte **DIMENSION** mit Architekturstrichen |
@@ -58,11 +59,11 @@ Maßtexte, die zu keiner Bemaßung passen, kommen auf den Layer **DIM_RAW** (rot
 
 ## Die Einstellungen
 
-**Maßstab, Einheiten und Bereich** — Zeichnungsmaßstab (1:N) und DXF-Einheit (mm, cm, m); *Bereich wählen… / Ganzes Blatt* (nur der Bereich wird konvertiert, in den eigenen Koordinaten des Blatts; der Bereich gilt für jedes konvertierte Blatt). *Den auf jedem Blatt angegebenen Maßstab lesen* ist für Plansätze mit unterschiedlichen Maßstäben (Grundriss 1:100, Details 1:20): jedes Blatt verwendet den Maßstab seines Schriftfelds, und der obige Maßstab gilt, wenn ein Blatt keinen oder mehrere angibt; der Bericht nennt den Maßstab jedes Blatts. Die Kalibrierung ersetzt beides; der Bereich zeigt den entsprechenden Maßstab („etwa 1:100,2“) zur Kontrolle.
+**Maßstab, Einheiten und Bereich** — Zeichnungsmaßstab (1:N, oder 1/4" = 1'-0" und 1" = 20' in Zoll und Fuß) und DXF-Einheit (mm, cm, m, Zoll, Fuß); *Bereich wählen… / Ganzes Blatt* (nur der Bereich wird konvertiert, in den eigenen Koordinaten des Blatts; der Bereich gilt für jedes konvertierte Blatt). *Den auf jedem Blatt angegebenen Maßstab lesen* ist für Plansätze mit unterschiedlichen Maßstäben (Grundriss 1:100, Details 1:20): jedes Blatt verwendet den Maßstab seines Schriftfelds, und der obige Maßstab gilt, wenn ein Blatt keinen oder mehrere angibt; der Bericht nennt den Maßstab jedes Blatts. Die Kalibrierung ersetzt beides; der Bereich zeigt den entsprechenden Maßstab („etwa 1:100,2“) zur Kontrolle.
 
 **Geometrie** — Bögen und Kreise rekonstruieren; Segmente zu Polylinien verbinden; Kurven zu einzelnen Splines verbinden; *Kurvengenauigkeit* (Fein / Normal / Grob) legt fest, wie genau eine Kurve einem Kreis entsprechen muss; volle Füllungen als Schraffuren; *Schraffurmuster rekonstruieren* (parallele Linien → Muster-HATCH; Sand, Beton, Kies, Erde, Ziegel, Dämmung, Punkte → das Standardmuster; Sand und Beton wirken zufällig, daher werden ihr Maßstab und ihre Lage geschätzt, und der Bericht sagt es); *gestrichelte Linien rekonstruieren* (einzelne Striche → eine Linie mit Linientyp); weiße Masken, weiße Linien und Seitenhintergründe ignorieren (sie würden die Zeichnung im CAD verdecken).
 
-**Text** — Text exportieren; gestapelte Zeilen zu MTEXT-Absätzen gruppieren; *Verhältnis der Texthöhe* (Großbuchstabenhöhe ÷ PDF-Schriftgröße, 0,70 passt zu den meisten Schriften); *als Striche oder Umrisse gezeichneten Text wiederherstellen*: AutoCAD-SHX-Text wird dank der versteckten Kommentare, die AutoCAD seinen PDFs hinzufügt, wieder zu echtem Text (Layer TEXT_SHX), und als gefüllte Umrisse gezeichneter TrueType-Text wird durch seinen echten Text ersetzt.
+**Text** — Text exportieren; gestapelte Zeilen zu MTEXT-Absätzen gruppieren; *Verhältnis der Texthöhe* (Großbuchstabenhöhe ÷ PDF-Schriftgröße) für Schriften, die ConvertCAD nicht erkennt — erkannte Schriften behalten ihre eigene Größe; eine Änderung gilt für alle Texte; *als Striche oder Umrisse gezeichneten Text wiederherstellen*: AutoCAD-SHX-Text wird dank der versteckten Kommentare, die AutoCAD seinen PDFs hinzufügt, wieder zu echtem Text (Layer TEXT_SHX), und als gefüllte Umrisse gezeichneter TrueType-Text wird durch seinen echten Text ersetzt.
 
 **Bemaßungen und Führungslinien** — Bemaßungen mit Pfeilen (linear, Radius, Durchmesser, Winkel, Bogenlänge) und/oder mit Schrägstrichen rekonstruieren; Führungslinien rekonstruieren.
 

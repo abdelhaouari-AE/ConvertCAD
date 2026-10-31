@@ -1,10 +1,10 @@
 # ConvertCAD — Development guide
 
-Complete technical description of **ConvertCAD 1.2.0**: the programming language and
+Complete technical description of **ConvertCAD 1.2.1**: the programming language and
 tools, the architecture and data flow, the content of every file, the algorithms, the
 options, the tests, the build and release process, and how to extend the application.
 
-*Author: abdelhaouari · Last update: 30 October 2026 · Applies to version 1.2.0*
+*Author: abdelhaouari · Last update: 31 October 2026 · Applies to version 1.2.1*
 
 How to build the downloads (portable, installer, AppImage, .deb) and sign them:
 [PACKAGING.md](PACKAGING.md).
@@ -309,7 +309,7 @@ ConvertCAD/
 | `requirements.txt` | Runtime dependencies with minimum versions and a comment on each. |
 | `requirements-dev.txt` | Runtime + development tools (pytest, PyInstaller, Ruff). |
 | `README.md` | GitHub home page: features, screenshots, install, use, build, licence, French summary. |
-| `CHANGELOG.md` | Version history (1.0.0 first public release, 1.1.0 OCR models, 1.2.0 curved dimensions, textures, five languages). |
+| `CHANGELOG.md` | Version history (1.0.0 first public release, 1.1.0 OCR models, 1.2.0 curved dimensions, textures, five languages, 1.2.1 text fonts, imperial units). |
 | `LICENSE` | GNU Affero General Public License v3.0 (full text). |
 | `THIRD_PARTY_NOTICES.md` | Licences of every library used or bundled. |
 | `.gitignore` | Files Git must ignore: caches, `.venv/`, `build/`, `dist/`, test outputs (`*.dxf`, `*.dwg`, `*_log.txt`), the Linux LibreDWG build and the OCR models of an offline build (`vendor/ocr_models`). |
@@ -325,7 +325,7 @@ ConvertCAD/
 | `cli.py` | Command-line tool: argument parser (presets, every option, `--scale N\|auto`, pages, `--area`, `--format dxf\|dwg`, DXF version, `--ocr-lang`, `--ocr-quality`, `--list-ocr`, `--get-ocr-model`, JSON report, batch, quiet), `options_from_args()`, `parse_area()`, progress printers, exit codes 0/1/2. |
 | `config.py` | `Settings` dataclass saved as JSON (theme, language — one of `i18n.LANGUAGES` —, recent files, folders, last options, user presets, snap modes, window layout, `check_updates`, off by default). Location: `~/.convertcad/` or `settings/` next to the exe in portable mode; atomic save; tolerant load; migration of the v1/v2 terms flag. |
 | `launcher.py` | Start-up checks when running from source, standard library only: Python version, missing libraries (offers to install `requirements.txt` with pip, in the console or through a dialog under `pythonw`), and keeps a double-clicked console window open so messages can be read. Not used inside the exe. |
-| `i18n.py` | Interface languages (§11): `LANGUAGES` (en, fr, es, de, ar), `tr()` (English text is the key; French in the `FR` dictionary, the other languages in `locales/`), `table(lang)`, `is_rtl()` (Arabic), `tr_progress()` (translates engine progress messages), `tr_paper()` (paper names), `set_language()`. |
+| `i18n.py` | Interface languages (§11): `LANGUAGES` (en, fr, es, de, ar), `tr()` (English text is the key; French in the `FR` dictionary, the other languages in `locales/`), `table(lang)`, `is_rtl()` (Arabic), `tr_progress()` (translates engine progress messages), `tr_note()` + `NOTE_TEMPLATES` (translates the report's page notes and block list), `tr_paper()` (paper names), `set_language()`. |
 | `locales/` | `es.py`, `de.py`, `ar.py`: one `STRINGS` dictionary {English text: translation} per language, loaded when the language is chosen. |
 | `samples.py` | Draws the demonstration PDFs with PyMuPDF: an A3 formwork plan (*plan de coffrage*) at 1:100 with grid axes, columns, doors, tank, curved wall, spline, arrow and tick dimensions, leaders, notes, hatch, title block, plus a rotated second sheet; and a scanned version. Used by the welcome screen, the tests and `scripts/make_samples.py`. |
 
@@ -334,12 +334,12 @@ ConvertCAD/
 | File | Content / role |
 |---|---|
 | `__init__.py` | Re-exports `convert`, `convert_folder`, `Options`, `Cancelled`, `ConversionReport`, `find_pdfs` — **lazily** (PEP 562 `__getattr__`): importing a light module such as `constants` does not load PyMuPDF, NumPy and ezdxf. |
-| `constants.py` | Plain data shared by everything: point→mm factor, units table (`$INSUNITS` codes), paper scales offered, DXF versions, output formats, reserved layer names, layer naming modes, page modes, curve precision factors, OCR accuracy choices, scan resolutions. |
-| `options.py` | `Options` — every option and its default (standard library only, so the settings panel builds at start-up without the conversion libraries); `from_dict()` (tolerant: old or partial presets never break), `writer_dxf_version()` (AutoCAD 2000 DXF for a DWG), `describe()` (options block of the log), `normalize_rect()`. |
+| `constants.py` | Plain data shared by everything: point→mm factor, units table (mm, cm, m, in, ft with their `$INSUNITS` codes; inches and feet marked imperial), paper scales offered (metric 1:N and `IMPERIAL_SCALES` such as 1/4" = 1'-0"), DXF versions, output formats, reserved layer names, layer naming modes, page modes, curve precision factors, OCR accuracy choices, scan resolutions. |
+| `options.py` | `Options` — every option and its default (standard library only, so the settings panel builds at start-up without the conversion libraries); `from_dict()` (tolerant: old or partial presets never break), `writer_dxf_version()` (AutoCAD 2000 DXF for a DWG), `describe(t=None)` (options block of the log in English; with a translation function, the report's options in the interface language), `normalize_rect()`. |
 | `units.py`, `stats.py`, `paths.py`, `layer_edits.py` | Light modules shared by the engine and the interface: `compute_scale()` / `effective_denominator()`; `WriteStats` (entity counters); `find_pdfs()` / `output_paths()`; `LayerEdit` / `LayerRow` / protected layers. |
 | `compat.py` | Single import point for PyMuPDF (`import pymupdf`); blocks PyMuPDF 2.x's optional `pymupdf.layout` / `pymupdf4llm` add-ons (≈ 0.6 s faster start); `page_matrix()` (rotation), point/vector transforms, `library_versions()` for the About box and the log. |
 | `spatial.py` | `GridIndex` (uniform-grid spatial index; `insert_path()` registers an arc or a circle along its outline only) and geometry helpers: point–segment and point–line distances, segment intersection, angles. Makes neighbourhood searches O(n) instead of O(n²). |
-| `pdfinfo.py` | Quick inspection before converting: page kind (vector / scanned / empty) from path counts and image coverage, ISO paper size name, rotation, metadata, password, `detect_scale()` (reads "Echelle : 1/100", "SCALE 1:50", "Ech. 2.5:1000" → 1:400, a ratio alone above a scale bar; refuses fractions and sheets with several scales), thumbnails. |
+| `pdfinfo.py` | Quick inspection before converting: page kind (vector / scanned / empty) from path counts and image coverage, ISO paper size name, rotation, metadata, password, `detect_scale()` (reads "Echelle : 1/100", "SCALE 1:50", "Ech. 2.5:1000" → 1:400, a ratio alone above a scale bar; imperial scales by `parse_imperial_scale()`: 1/4" = 1'-0" → 1:48, 1" = 20' → 1:240; refuses fractions and sheets with several scales), thumbnails. |
 | `extractor.py` | **Step 1.** Reads one page with PyMuPDF into raw dataclasses (`Style`, `RawSegment`, `RawBezier`, `RawFill`, `RawText`, `RawImage` with its placement matrix, `PageData`) in displayed coordinates; linetype classification from dash arrays; page classification; SHX texts placed on their letters (strokes moved to the hidden layer `TEXT_SHX_STROKES`); letter outlines lying under invisible text removed (`_drop_text_outlines`). |
 | `raster.py` | **Step 1b.** Scanned pages: render, OCR through `ocr.py` (text-line boxes, horizontal or vertical, confidence and noise filters, text masking), adaptive binarisation, Hough circles validated against ink, arcs fitted on stroke outlines (`find_arcs`), Hough lines merged collinearly. |
 | `ocr.py` | The OCR (PP-OCR models run by RapidOCR + ONNX Runtime, offline): `make_plan(languages, quality)` turns the user's choice into the models to run, falling back to the built-in model with a note for the report when a model is missing; `recognize(img, plan)`; `merge_script()` keeps, line by line, the reading of each script for mixed drawings (Latin + Arabic…); `available()`, `pack_usable()`, `language_choices()` (installed languages for the interface). |
@@ -352,10 +352,11 @@ ConvertCAD/
 | `layers.py` | **Step 3.** Layer naming rules: native PDF layer names, role layers, style fingerprints (`GEO_BLACK_050_CENTER`), readable colour names (HSV), lineweight mapping, name sanitising. |
 | `annotations.py` | **Step 4.** Recognises dimensions — radius and diameter (arrow on a circle along its radius + R/Ø value), angle and arc length (two arrows along an arc + a value that agrees with it), linear (arrowheads or oblique ticks + line + value, extension lines) — and leaders (arrow + polyline + note); safe fallback to `DIM_RAW`; tolerances in `ATol`. |
 | `blocks.py` | **Step 5.** Clusters touching entities per layer (long lines cut into chunks, long elements excluded), computes fingerprints in the 8 orientations of a square (rotations by 90° and mirror images, `D4`), turns symbols repeated ≥ N times into block definitions + insertions with rotation / mirror (`insert_orientation()`); copies turned by any other angle matched by their key points (`_turned_copies`); tolerances in `BTol`. |
-| `dxf_writer.py` | **Step 6.** `DxfWriter`: document setup (units, linetypes, text style, `$LTSCALE`), layers (hidden ones off), colours (ACI / true colour, ByLayer), polylines, arcs, circles, exact splines, solid and pattern hatches (`_USER` pattern with the measured angle and spacing), measured linetypes `CC_<FAMILY>_<n>`, images (exact placement and orientation), TEXT/MTEXT (cap height), SHX texts, rotated linear, radius, diameter, 3-point angular and arc-length DIMENSIONs with text override (ARC_DIMENSION exploded to its drawing before AutoCAD 2007 and for DWG), standard pattern HATCHes (textures) with the measured scale, angle and origin, MULTILEADER with multi-line notes (LEADER + MTEXT on old versions), rotated / mirrored block inserts, R12 fallbacks; `Transform` (page → DXF). |
+| `dxf_writer.py` | **Step 6.** `DxfWriter`: document setup (units, linetypes, text style, `$LTSCALE`), layers (hidden ones off), colours (ACI / true colour, ByLayer), polylines, arcs, circles, exact splines, solid and pattern hatches (`_USER` pattern with the measured angle and spacing), measured linetypes `CC_<FAMILY>_<n>`, images (exact placement and orientation), TEXT/MTEXT in the PDF's font (one text style per font, capital height of that font, width factor keeping the PDF length, paragraphs left / centre / right aligned), SHX texts, rotated linear, radius, diameter, 3-point angular and arc-length DIMENSIONs with text override (ARC_DIMENSION exploded to its drawing before AutoCAD 2007 and for DWG), standard pattern HATCHes (textures) with the measured scale, angle and origin, MULTILEADER with multi-line notes (LEADER + MTEXT on old versions), rotated / mirrored block inserts, R12 fallbacks; `Transform` (page → DXF). |
+| `fonts.py` | Which CAD text style shows a PDF text like the original: `resolve()` maps the PDF font name and flags to a `CadFont` (Windows TrueType file, bold / italic file, capital height ratio, base font for widths); `natural_width()`, `width_factor()` (keeps the PDF length). |
 | `pipeline.py` | Orchestration: `convert()` (never raises; progress and cancel callbacks; `.dwg` targets through `_convert_to_dwg`), area clipping, white strokes and masks, per-sheet scale, scanned-page handling, sheet placements for the overlay, output names (`_p2` suffixes in split mode), `convert_folder()` for batch mode. |
-| `dwg.py` | Native DWG output: finds the bundled LibreDWG programs, prepares the DXF for LibreDWG's reader (post-2000 objects removed, MTEXT rotation, AutoCAD's handle numbering, linetype count, complete INSERT scale factors, group 16 of 3-point angular dimensions removed), runs `dxf2dwg`, reads the DWG back with `dwg2dxf` and checks entity count and block references (§5.15). |
-| `report.py` | `ConversionReport`: inputs, options, results per entity type, layers (with block-internal counts), blocks, page notes, warnings, errors, status, duration; rendered as text (`_log.txt`), HTML (interface, translatable) and JSON. |
+| `dwg.py` | Native DWG output: finds the bundled LibreDWG programs, prepares the DXF for LibreDWG's reader (post-2000 objects removed, MTEXT rotation, AutoCAD's handle numbering, linetype count, complete INSERT scale factors, group 16 of 3-point angular dimensions removed; the file is read and written byte for byte in latin-1, because ezdxf writes a DXF 2000 in the drawing code page cp1252 — reading it as UTF-8 turned accents into "?"), runs `dxf2dwg`, reads the DWG back with `dwg2dxf` and checks entity count and block references (§5.15). |
+| `report.py` | `ConversionReport`: inputs, options, results per entity type, layers (with block-internal counts), blocks, page notes, warnings, errors, status, duration; rendered as text (`_log.txt`, English), HTML (interface: options, page notes and blocks translated through `t` and `note`) and JSON. |
 | `postprocess.py` | After conversion: `layer_summary()` (rows of the layer table), `apply_layer_edits()` (remove / rename-merge / recolour), `finalize()` (copy to the final path with edits, images and log), `finalize_dwg()` (same, saved as DWG), `needs_reconversion_for_dwg()`, `describe_edits()`. |
 | `presets.py` | Six built-in presets (recommended, architectural, structural, scanned, geometry, CNC) and the functions that apply or store presets without touching drawing-specific values. |
 | `jobs.py` | `JobRunner`: runs `convert` / `convert_folder` in a child process and relays progress, results, errors and cancellation through a queue (§3.2). |
@@ -368,12 +369,13 @@ ConvertCAD/
 |---|---|
 | `__init__.py` | Package docstring. |
 | `app.py` | `run_gui()`: Qt application, high-DPI policy (fractional scaling passed through), Fusion style + theme, language (right-to-left layout for Arabic), app icon, logging to `convertcad.log`, global exception dialog, first-launch Terms gate, main window; `_warm_up()` loads the heavy libraries in a background thread once the window is shown; `CONVERTCAD_STARTUP_PROBE=1` prints the start-up time. |
-| `main_window.py` | `MainWindow`: actions and shortcuts, menus, command bar, layout (sheets / viewers + activity / settings-layers-report tabs), status bar, open / inspect / hints, tools (measure, calibrate, select area), calibration and measurement, conversion through `JobRunner`, result loading, overlay check (PDF under the result, opacity slider), stale-options notice, saving DXF or DWG in a background thread (`_SaveThread`), batch, theme and language switching (*View > Language*, five languages), entity selection in the result (status text, layer selected), optional update check (`_UpdateThread`, Help menu), tool labels dropped when they do not fit (`_fit_toolbar`), drag & drop, recent files, window state, close handling. |
+| `main_window.py` | `MainWindow`: actions and shortcuts, menus, command bar, layout (sheets / viewers + activity / settings-layers-report tabs), status bar, open / inspect / hints, tools (measure, calibrate, select area), calibration and measurement, conversion through `JobRunner`, result loading, overlay check (PDF under the result, opacity slider), stale-options notice, saving DXF or DWG in a background thread (`_SaveThread`), batch, theme and language switching (*View > Language*, five languages), entity selection in the result (status text, layer selected), optional update check (`_UpdateThread`, Help menu), tool labels dropped when they do not fit (`_fit_toolbar`), drag & drop, recent files, window state, close handling; collapsible side panels (`SidePanel`, View > Panels, Ctrl+0 collapses both, state saved), *Convert a folder* next to *Open PDF*. |
 | `cadview.py` | `CadView`, base class of both viewers (always left to right, even in Arabic): CAD navigation (wheel zoom at cursor, middle-button / Space / Pan-tool drag), fit, zoom limits, `view_changed` and `zoom_changed` signals. |
 | `pdf_view.py` | `PdfView`: source sheet on a "drafting table" with shadow; sharp at any zoom (base image + high-resolution tile of the visible area); Measure, Calibrate and Select-area tools (area: drag a rectangle, outside dimmed, size label, Esc cancels); snap glyphs and labels; crosshair; measurements drawn as dimension lines with ticks; calibration overlay; `format_length()`. |
-| `dxf_view.py` | `DxfView`: renders the converted DXF with ezdxf's drawing add-on in a background `QThread` (`Recorder`); `merge_recording()` merges the primitives into one `QGraphicsPathItem` per layer set, colour, width, kind and tile (8 × 8), with cosmetic pens — a few hundred items instead of tens of thousands; hiding a layer stays instant; overlay of the PDF sheets (`set_overlay`, `set_overlay_opacity`); theme-aware background; **selection**: a pick index built after the preview is shown (`build_pick_index`, `PickIndex.pick`: nearest stroke within 5 screen px, else the smallest filled area under the cursor), highlight, `selected` signal with `describe_entity()` (type, layer, length, radius, text, block…). |
+| `dxf_view.py` | `DxfView`: renders the converted DXF with ezdxf's drawing add-on in a background `QThread` (`Recorder`); `merge_recording()` merges the primitives into one `QGraphicsPathItem` per layer set, colour, width, kind and tile (8 × 8), with cosmetic pens — a few hundred items instead of tens of thousands; hiding a layer stays instant; overlay of the PDF sheets (`set_overlay`, `set_overlay_opacity`); AutoCAD-like model space in both themes (RGB 33 40 48) with an adaptive grid drawn in `drawBackground` — lines every 1, 2 or 5 × 10^k units at least 14 px apart, a major line every 5, X / Y axes in red / green; **selection**: a pick index built after the preview is shown (`build_pick_index`, `PickIndex.pick`: nearest stroke within 5 screen px, else the smallest filled area under the cursor), highlight, `selected` signal with `describe_entity()` (type, layer, length, radius, text, block…). |
 | `snap.py` | `SnapEngine` (Qt-free): endpoints, midpoints, intersections and centres computed once per page from PyMuPDF paths, stored in a `GridIndex`; `SnapHit`. |
 | `pages_panel.py` | Sheet list: thumbnails rendered one by one on a timer, include checkbox, Vector / Scan / Empty badge with tooltip, paper size and rotation, selection menu (all, none, vector, scanned, invert), selected-sheets summary. |
+| `side_panel.py` | `SidePanel`: wraps the Sheets panel and the Settings / Layers / Report tabs; collapses to a 22 px bar on the window edge (chevron + vertical name, like an AutoCAD palette), `collapsed_changed` signal. |
 | `options_panel.py` | `OptionsPanel`: preset selector (save / delete user presets), collapsible sections with every option and its tooltip (output format DXF / DWG, area *Select area… / Whole sheet*, OCR languages — installed ones only, a missing choice kept and marked *(not downloaded)* — and OCR accuracy, button *OCR languages and models…*), calibration status, OCR status line, "options changed" notice, conversion to / from `Options`. |
 | `layers_panel.py` | `LayersPanel`: layer table (keep checkbox, bordered colour swatch, name + linetype on two lines, entity count), filter, show / hide all, undo all, kept-layers counter, `select_layer()` (the layer of the selected entity); edits applied at save time. |
 | `report_panel.py` | `ReportPanel` (translated HTML report, save as `.txt` / `.html`, copy) and `ActivityPanel` (timestamped session log). |
@@ -382,7 +384,7 @@ ConvertCAD/
 | `dialogs.py` | `MarkdownDialog` (renders `resources/*.md`), `GuideDialog`, `TermsDialog` (first-launch gate), `AboutDialog` (component versions including RapidOCR, ONNX Runtime, the installed OCR models and LibreDWG, licence status), `ShortcutsDialog`, `CalibrateDialog` (real distance input with validation). |
 | `ocr_models_dialog.py` | `OcrModelsDialog` (*OCR languages and models…*): installed models (built in / downloaded / included) with *Remove*, drop-down list of the models to download with their size, *Download* with progress bar and *Cancel* (`DownloadWorker`, a `QThread`), *Install from file…* (offline computers), models folder, download page, help; `models_changed` signal; `stop_downloads()` at exit. |
 | `batch_dialog.py` | `BatchDialog`: input / output folders, sub-folders, *read the scale on each sheet*, per-file status and time, progress, cancel, open output folder. |
-| `widgets.py` | Reusable pieces: `PanelHeader` (title + small actions), `CollapsibleSection`, `Toast` (fading message), `small_button`, `label`, `hline`, `restyle`. |
+| `widgets.py` | Reusable pieces: `PanelHeader` (title + small actions), `CollapsibleSection`, `Toast` (fading message), `small_button`, `label`, `hline`, `restyle`, `ask_yes_no()` / `yes_no_box()` (Yes / No in the interface language). |
 | `theme.py` | Colour tokens for the dark and light themes, fixed markup palette, fonts, Qt palette and the complete style sheet; `apply_theme()`, `tok()`, `current()`. |
 | `icons.py` | The original icon set (SVG line art on a 24 px grid) tinted at run time with the theme colour; the application icon `APP_ICON_SVG`; checkbox tick for the style sheet. |
 
@@ -417,8 +419,10 @@ folder is bundled into the exe by `ConvertCAD.spec`.
 | `test_postprocess.py` | Layer edits at save time (remove, rename-merge, recolour), images, log. |
 | `test_cli_and_jobs.py` | Page ranges, CLI single / batch / errors, option mapping (including `--format`, `--area`, `--ocr-lang`, `--ocr-quality`), invalid OCR languages, presets keep the scale, background job runner (convert and cancel), `--scale auto`, `--list-ocr`, `--get-ocr-model`, options of version 1.0. |
 | `test_i18n.py` | Every `tr("…")` string and menu action is translated in every language (French, Spanish, German, Arabic), as are the OCR catalogue names; no stale translation; placeholders survive translation; guides and terms exist in every language; Arabic is right to left; engine progress messages are translated. |
+| `test_text_fonts.py` | PDF fonts → CAD fonts (Arial, Times New Roman, Courier New, Arial Narrow, Calibri, ISOCPEUR, bold / italic), unknown fonts → Arial, width factor of condensed text, each font's capital height in the DXF, centred title-block paragraphs, accents kept in the DWG. |
+| `test_units_and_report.py` | Imperial scales read (1/4" = 1'-0", 1" = 20'…), inch / foot factors, imperial DXF header; the report's options, unit names and message shapes translated in every language; the log stays English. |
 | `test_updates.py` | Version comparison, the check is off by default, one request with nothing about the user, the newest program release chosen (OCR models release, drafts and pre-releases skipped), failures reported. |
-| `test_ui_smoke.py` | The real window offscreen: open the sample, convert in the child process, edit layers, save through the real save code, switch theme twice; select an area, convert, overlay on / off, save as DWG (with the automatic re-conversion); OCR languages list and status, *OCR languages and models…* window; selecting an entity in the result (layer selected, hidden layer clears the selection). |
+| `test_ui_smoke.py` | The real window offscreen: open the sample, convert in the child process, edit layers, save through the real save code, switch theme twice; side panels collapse and reopen (bar, menu, Ctrl+0), Yes / No in French, *Convert a folder* next to *Open PDF*; select an area, convert, overlay on / off, save as DWG (with the automatic re-conversion); OCR languages list and status, *OCR languages and models…* window; selecting an entity in the result (layer selected, hidden layer clears the selection). |
 
 ### 4.7 `scripts/`
 
@@ -678,10 +682,19 @@ circle) are not treated as values. Consumed lines, fills and texts are marked so
   holes (white masks under texts); solid fills stay SOLID hatches.
 - Every geometric entity goes through `Transform` (flip Y, scale, offset) — the only place
   where page points become real units.
-- Text height = the measured cap height when known (SHX texts), else font size ×
-  `text_height_factor` (cap height ≈ 0.70 × font size).
-  Stacked lines of the same style are grouped by `group_text_lines()` into MTEXT
-  (attachment top-left).
+- Text (`fonts.py`): the PDF font name ("ABCDEF+Arial-BoldMT") and the span flags give a
+  `CadFont` — Windows TrueType file (arial.ttf, arialbd.ttf, times.ttf, cour.ttf,
+  calibri.ttf…), capital height ratio of that font (Arial 0.716, Times New Roman 0.662,
+  Courier New 0.571…) and a PyMuPDF base font with the same widths (helv, tiro, cour).
+  One DXF text style per font (`_style`). Text height = the measured cap height when known
+  (SHX texts), else font size × the font's ratio; fonts not recognised use Arial and the
+  option `text_height_factor` (0.70; a value changed by the user applies to every text).
+  Width factor = PDF length ÷ length of the text in the CAD font (`width_factor`, 1.0 when
+  within 4 %, not for OCR text): condensed text and replaced fonts keep their length.
+  Stacked lines of the same style are grouped by `group_text_paragraphs()` into MTEXT:
+  candidate paragraphs are found for left, centre and right alignment and the best kept
+  (more lines, then the tightest alignment); the MTEXT attachment is top-left, top-centre
+  or top-right accordingly, with `\W` for a condensed paragraph.
 - Linear dimensions: `msp.add_linear_dim(base, p1, p2, angle, text=PDF value,
   dimstyle="Standard", override={arrow/tick size, text height, colours…})` — the sizes
   come from `_dim_override()`, shared by every kind of dimension.
@@ -1185,8 +1198,13 @@ Nothing is sent over the network.
   tooltip remain (`MainWindow._fit_toolbar`).
 - The engine (`core`) stays language-neutral: its progress messages are translated in the
   interface by `tr_progress()` (pattern based), paper names by `tr_paper()`, and the HTML
-  report by passing `t=tr` to `ConversionReport.to_html()`. The `_log.txt` file is written in
-  English so logs can be compared and shared.
+  report by passing `t=tr` (options: `Options.describe(t)`) and `note=tr_note` (page notes,
+  block list: English shapes in `NOTE_TEMPLATES`, the {parts} copied) to
+  `ConversionReport.to_html()`. The `_log.txt` file is written in English so logs can be
+  compared and shared.
+- Qt's own texts (OK / Cancel, file dialogs) come from Qt's `qtbase_<lang>.qm`, installed
+  at start-up (`app._install_qt_translation`). Yes / No questions use
+  `widgets.ask_yes_no()` with translated buttons.
 - Long texts are Markdown files in `convertcad/resources` (`guide_<lang>`, `terms_<lang>`,
   `ocr_<lang>`); English is the fallback.
 - The language applies at the next start.
@@ -1589,6 +1607,7 @@ All third-party licences: [`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md).
 
 | Version | Date | Highlights |
 |---|---|---|
+| 1.2.1 | 2026-10-31 | Accents kept in DWG files; text in the PDF's font with its own size, length and alignment; imperial units and scales; collapsible side panels; AutoCAD-like model space with grid; report, Yes / No and Qt dialogs in the interface language; *Convert a folder* next to *Open PDF* |
 | 1.2.0 | 2026-10-30 | Radius, diameter, angle and arc length dimensions; texture hatches (dots, sand, concrete, gravel, earth, brick, insulation) rebuilt as standard patterns; repeated symbols at any angle; arcs traced on scanned drawings; selection in the result preview; interface in Spanish, German and Arabic (right to left); optional update check (off by default) |
 | 1.1.2 | 2026-10-30 | Select area: the page background is no longer written as a hatch of the area's size |
 | 1.1.1 | 2026-10-29 | Circle search of scanned pages about 30 times faster on large sheets (two radius bands, reduced copy for large circles, vectorised checks) |

@@ -85,6 +85,7 @@ def _convert_dxf(pdf_path: str, dxf_path: str, opt: Options,
     t0 = time.time()
     rep = ConversionReport(pdf_path=pdf_path, dxf_path=dxf_path,
                            options=opt.describe())
+    rep.source_options = opt          # lets the interface translate them
 
     def say(msg: str, frac: float) -> None:
         if should_cancel and should_cancel():
@@ -320,6 +321,7 @@ def _convert_to_dwg(pdf_path: str, dwg_path: str, opt: Options,
                            (lambda m, f: progress(m, f * 0.9)),
                            should_cancel)
         rep.options = opt.describe()
+        rep.source_options = opt
         rep.dxf_path = dwg_path
         if not rep.success:
             rep.outputs = [os.path.join(final_dir, os.path.basename(p))

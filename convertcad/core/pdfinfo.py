@@ -83,6 +83,43 @@ _SCALE_RE = re.compile(
 _RATIO_ALONE_RE = re.compile(r"^\s*" + _RATIO + r"\s*$", re.MULTILINE)
 
 
+# Imperial scales: architectural 1/4" = 1'-0" (1:48), 1 1/2" = 1'-0" (1:8),
+# engineering 1" = 20' (1:240). Inch and foot marks may be typographic.
+_IN = "[\"\u201d\u2033]"
+_FT = "['\u2019\u2032]"
+_IMPERIAL_RE = re.compile(
+    r"(?<![\d/.])(\d+(?:\s+\d+/\d+|/\d+|\.\d+)?)\s*" + _IN + r"\s*=\s*"
+    r"(\d+(?:\.\d+)?)\s*" + _FT + r"(?:\s*-?\s*0\s*" + _IN + r")?")
+
+
+def _inches(text: str) -> Optional[float]:
+    """'1/4' -> 0.25, '1 1/2' -> 1.5, '3' -> 3.0."""
+    try:
+        total = 0.0
+        for part in text.split():
+            if "/" in part:
+                a, b = part.split("/")
+                total += float(a) / float(b)
+            else:
+                total += float(part)
+        return total if total > 0 else None
+    except (ValueError, ZeroDivisionError):
+        return None
+
+
+def parse_imperial_scale(text: str) -> Optional[float]:
+    """1:N of an imperial scale ('1/4" = 1\'-0"' -> 48.0, '1" = 20\'' ->
+    240.0), or None."""
+    m = _IMPERIAL_RE.search(text or "")
+    if not m:
+        return None
+    paper = _inches(m.group(1))
+    if not paper:
+        return None
+    n = float(m.group(2)) * 12.0 / paper
+    return round(n, 6) if 1 <= n <= 100000 else None
+
+
 def _ratio(a: str, b: str) -> Optional[float]:
     try:
         x, y = float(a.replace(",", ".")), float(b.replace(",", "."))
@@ -113,7 +150,16 @@ def detect_scale(text: str) -> Optional[float]:
     ('1:200', '2.5:1000' as printed above a scale bar)."""
     text = text or ""
     found = set()
+    # imperial scales first; their fractions ("1/8" of 1/8" = 1'-0") are not
+    # metric ratios
+    imperial = [m.span() for m in _IMPERIAL_RE.finditer(text)]
+    for a, b in imperial:
+        n = parse_imperial_scale(text[a:b])
+        if n:
+            found.add(int(n) if n == int(n) else n)
     for m in _SCALE_RE.finditer(text):
+        if any(a <= m.start(1) < b for a, b in imperial):
+            continue
         n = _ratio(m.group(1), m.group(2))
         n = _round_scale(n) if n else None
         if n:

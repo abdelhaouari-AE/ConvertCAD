@@ -222,7 +222,10 @@ def _remap_handles(path: str) -> None:
 
     *Model_Space -> 0x1F; table heads (handles below 0x0A) unchanged;
     everything else shifted by HANDLE_SHIFT."""
-    with open(path, "r", encoding="utf-8", errors="replace") as fh:
+    # latin-1 keeps every byte as it is: the DXF written by ezdxf is in the
+    # drawing code page (cp1252 for DXF 2000), NOT UTF-8. Reading it as UTF-8
+    # turned "é" into "?" in the DWG.
+    with open(path, "r", encoding="latin-1") as fh:
         lines = fh.read().split("\n")
     n = len(lines) - (len(lines) % 2)
     # find the *Model_Space BLOCK_RECORD and the table heads
@@ -293,7 +296,7 @@ def _remap_handles(path: str) -> None:
     _fix_ltype_count(lines, n)
     lines = _complete_insert_scales(lines)
     lines = _drop_angular_arc_point(lines)
-    with open(path, "w", encoding="utf-8", newline="\n") as fh:
+    with open(path, "w", encoding="latin-1", newline="\n") as fh:
         fh.write("\n".join(lines))
 
 

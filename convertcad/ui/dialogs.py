@@ -169,6 +169,7 @@ class ShortcutsDialog(QDialog):
         ("Next / previous sheet", "Page Down / Page Up"),
         ("Toggle object snap", "F3"),
         ("Source PDF", "Ctrl+1"), ("DXF result", "Ctrl+2"),
+        ("Collapse both side panels", "Ctrl+0"),
         ("User guide", "F1"),
     ]
 

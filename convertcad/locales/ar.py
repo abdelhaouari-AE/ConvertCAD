@@ -293,8 +293,6 @@ STRINGS = {
         "يصبح نص PDF كيانات TEXT قابلة للتحرير.",
     "Left-aligned lines of the same size become one MTEXT paragraph (notes, title block).":
         "الأسطر المحاذاة إلى اليسار وبالحجم نفسه تصبح فقرة MTEXT واحدة (ملاحظات، إطار البيانات).",
-    "Cap height relative to the PDF font size. 0.70 suits most CAD fonts.":
-        "ارتفاع الأحرف الكبيرة نسبةً إلى حجم خط PDF. القيمة 0.70 تناسب معظم خطوط CAD.",
     "AutoCAD stores SHX text as hidden comments; they are placed on layer TEXT_SHX. Positions are approximate.":
         "يخزن AutoCAD نص SHX كتعليقات مخفية؛ وتوضع في الطبقة TEXT_SHX. المواضع تقريبية.",
     "Arrows, lines and value become a real DIMENSION entity: linear, radius, diameter, angle or arc length.":
@@ -979,4 +977,114 @@ STRINGS = {
         "فتح صفحة الإصدار",
     "Later":
         "لاحقاً",
+    "Arcs and circles":
+        "الأقواس والدوائر",
+    "AutoCAD SHX comments":
+        "تعليقات SHX من AutoCAD",
+    "Block detection":
+        "اكتشاف الكتل",
+    "Capital height relative to the PDF font size, for fonts ConvertCAD does not recognise. Arial, Times, Courier, Calibri… keep their own size. Changing it applies the ratio to every text.":
+        "ارتفاع الحروف الكبيرة نسبةً إلى حجم خط PDF، للخطوط التي لا يتعرف عليها ConvertCAD. تحتفظ Arial وTimes وCourier وCalibri… بحجمها الخاص. تغيير هذه القيمة يطبقها على جميع النصوص.",
+    "Collapse both side panels":
+        "طيّ اللوحتين الجانبيتين",
+    "Collapse the {name} panel":
+        "طيّ لوحة {name}",
+    "Open the {name} panel":
+        "فتح لوحة {name}",
+    "DWG (AutoCAD 2000 format)":
+        "DWG (تنسيق AutoCAD 2000)",
+    "Dimensions (arrows / ticks)":
+        "الأبعاد (أسهم / شرطات مائلة)",
+    "Engine version":
+        "إصدار المحرك",
+    "Feet (ft)":
+        "أقدام (ft)",
+    "Inches (in)":
+        "بوصات (in)",
+    "Hatch patterns as HATCH":
+        "أنماط التهشير كـ HATCH",
+    "Ignore white / background fills":
+        "تجاهل التعبئات البيضاء / الخلفية",
+    "Join polylines / splines":
+        "ربط الخطوط المتعددة / المنحنيات",
+    "Linetype recognition":
+        "التعرف على أنواع الخطوط",
+    "Native PDF layers":
+        "طبقات PDF الأصلية",
+    "No":
+        "لا",
+    "Yes":
+        "نعم",
+    "Output format":
+        "تنسيق الإخراج",
+    "Page {pno}: {msg}":
+        "الورقة {pno}: {msg}",
+    "Scale of the PDF sheet, e.g. 1:100, or 1/4\" = 1'-0\" in inches and feet. Ignored when the drawing is calibrated.":
+        "مقياس ورقة PDF، مثل 1:100، أو 1/4\" = 1'-0\" بالبوصات والأقدام. يُتجاهل عند معايرة الرسم.",
+    "Scanned pages: OCR":
+        "الصفحات الممسوحة: التعرف الضوئي",
+    "Scanned pages: tracing":
+        "الصفحات الممسوحة: التحويل إلى متجهات",
+    "Solid fills as HATCH":
+        "التعبئات المصمتة كـ HATCH",
+    "Text / MTEXT grouping":
+        "النصوص / تجميع MTEXT",
+    "calibrated ({value} {unit}/pt, about 1:{den})":
+        "معايَرة ({value} {unit}/pt، حوالي 1:{den})",
+    "read on each sheet (1:{den} when none is written)":
+        "تُقرأ على كل ورقة (1:{den} عند عدم كتابة أي مقياس)",
+    "on":
+        "مفعّل",
+    "off":
+        "معطّل",
+    "on (at least {n} copies)":
+        "مفعّل ({n} نسخ على الأقل)",
+    "on (at least {n} copies, also turned or mirrored)":
+        "مفعّل ({n} نسخ على الأقل، ومنها المدوّرة أو المعكوسة)",
+    "on ({dpi} dpi)":
+        "مفعّل ({dpi} نقطة/بوصة)",
+    "on ({languages}, {quality})":
+        "مفعّل ({languages}، {quality})",
+    "whole sheet":
+        "الورقة كاملة",
+    "selected area {w} x {h} pt at ({x}, {y})":
+        "المنطقة المحددة {w} x {h} pt عند ({x}، {y})",
+    "no drawing content.":
+        "لا يوجد محتوى رسم.",
+    "no single scale written on the sheet; 1:{den} used.":
+        "لا يوجد مقياس واحد مكتوب على الورقة؛ استُخدم 1:{den}.",
+    "scale 1:{den} read on the sheet.":
+        "قُرئ المقياس 1:{den} على الورقة.",
+    "scanned page traced at {dpi} dpi — {lines} line(s), {circles} circle(s), {arcs} arc(s), {source}; original scan kept on locked layer IMG_RASTER for checking.":
+        "صفحة ممسوحة حُوّلت إلى متجهات بدقة {dpi} نقطة/بوصة — {lines} خط، {circles} دائرة، {arcs} قوس، {source}؛ الصورة الأصلية محفوظة على الطبقة المقفلة IMG_RASTER للتحقق.",
+    "scanned page — image kept on locked layer IMG_RASTER (tracing disabled).":
+        "صفحة ممسوحة — الصورة محفوظة على الطبقة المقفلة IMG_RASTER (التحويل إلى متجهات معطّل).",
+    "selected area only — {kept} of {total} PDF elements kept.":
+        "المنطقة المحددة فقط — احتُفظ بـ {kept} من {total} عنصر PDF.",
+    "{name}: DWG written by GNU LibreDWG {version} (AutoCAD 2000 format{checked}).":
+        "{name}: ملف DWG كتبه GNU LibreDWG {version} (تنسيق AutoCAD 2000{checked}).",
+    "{name}: {n} entities x {k} insertions":
+        "{name}: {n} عنصر × {k} إدراج",
+    "{n} AutoCAD SHX text(s) recovered on layer TEXT_SHX.":
+        "استُعيد {n} نص SHX من AutoCAD على الطبقة TEXT_SHX.",
+    "{n} dashed line(s) rebuilt from {pieces} separate pieces (linetypes measured on the PDF).":
+        "أُعيد بناء {n} خط متقطع من {pieces} قطعة منفصلة (أنواع الخطوط مقيسة على PDF).",
+    "{n} hatch pattern(s) rebuilt from {lines} parallel lines.":
+        "أُعيد بناء {n} نمط تهشير من {lines} خط متوازٍ.",
+    "{n} letter outline(s) replaced by the real text written over them.":
+        "استُبدل {n} مخطط حروف بالنص الحقيقي المكتوب فوقه.",
+    "{n} pattern hatch(es) ({names}) rebuilt from {pieces} dashes and dots.":
+        "أُعيد بناء {n} تهشير بنمط ({names}) من {pieces} شرطة ونقطة.",
+    "{n} pattern hatch(es) ({names}) rebuilt from {pieces} dashes and dots; {rough}: scale and position estimated (random-looking pattern).":
+        "أُعيد بناء {n} تهشير بنمط ({names}) من {pieces} شرطة ونقطة؛ {rough}: المقياس والموضع تقديريان (نمط يبدو عشوائيًا).",
+    "{n} white (invisible) line(s) or text(s) left out.":
+        "استُبعد {n} خط أو نص أبيض (غير مرئي).",
+    "{n} OCR text(s) (PP-OCR: {model})":
+        "{n} نص بالتعرف الضوئي (PP-OCR: {model})",
+    "text layer already in the PDF used":
+        "استُخدمت طبقة النص الموجودة في PDF",
+    "OCR skipped":
+        "تم تخطي التعرف الضوئي",
+    "no OCR":
+        "بدون تعرف ضوئي",
 }

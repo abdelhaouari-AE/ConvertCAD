@@ -17,6 +17,11 @@ UNITS = {
     "mm": {"factor": 1.0, "insunits": 4, "label": "Millimetres (mm)"},
     "cm": {"factor": 0.1, "insunits": 5, "label": "Centimetres (cm)"},
     "m": {"factor": 0.001, "insunits": 6, "label": "Metres (m)"},
+    # imperial: 1 in = 25.4 mm, 1 ft = 304.8 mm
+    "in": {"factor": 1 / 25.4, "insunits": 1, "label": "Inches (in)",
+           "imperial": True},
+    "ft": {"factor": 1 / 304.8, "insunits": 2, "label": "Feet (ft)",
+           "imperial": True},
 }
 DEFAULT_UNITS = "mm"
 
@@ -24,6 +29,18 @@ DEFAULT_UNITS = "mm"
 # stays editable, so any custom scale such as 1:75 can be typed.
 PAPER_SCALES = [1, 2, 5, 10, 20, 25, 50, 75, 100, 125, 200, 250, 500,
                 1000, 2000, 2500, 5000]
+
+# Imperial scales as written on US drawings, with their 1:N value.
+# Architectural: 1/4" = 1'-0" means 1/4 inch on paper for 12 inches (1:48).
+# Engineering: 1" = 20' means 1 inch on paper for 240 inches (1:240).
+IMPERIAL_SCALES = [
+    ('1/16" = 1\'-0"', 192), ('3/32" = 1\'-0"', 128), ('1/8" = 1\'-0"', 96),
+    ('3/16" = 1\'-0"', 64), ('1/4" = 1\'-0"', 48), ('3/8" = 1\'-0"', 32),
+    ('1/2" = 1\'-0"', 24), ('3/4" = 1\'-0"', 16), ('1" = 1\'-0"', 12),
+    ('1 1/2" = 1\'-0"', 8), ('3" = 1\'-0"', 4), ('1" = 10\'', 120),
+    ('1" = 20\'', 240), ('1" = 30\'', 360), ('1" = 40\'', 480),
+    ('1" = 50\'', 600), ('1" = 60\'', 720), ('1" = 100\'', 1200),
+]
 
 # ---------------------------------------------------------------------------
 # DXF versions (label shown to the user -> ezdxf identifier)

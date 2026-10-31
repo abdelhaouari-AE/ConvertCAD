@@ -31,6 +31,7 @@ from .constants import (LAYER_BLOCKS, LAYER_DIM, LAYER_DIM_RAW, LAYER_HATCH,
                         LAYER_IMAGE, LAYER_LEADER, LAYER_SHX_TEXT, LAYER_TEXT,
                         LAYER_TRACE_TEXT, UNITS)
 from .extractor import PageData, RawText, Style
+from .fonts import CadFont, resolve as resolve_font, width_factor
 from .geometry import EArc, ECircle, EPolyline, ESpline, RebuiltPage
 from .patterns import parse_dash_pattern
 from .layers import LayerInfo, build_layer_table, layer_for_style, lineweight_enum
@@ -110,6 +111,20 @@ def nearest_aci(rgb) -> int:
 # ---------------------------------------------------------------------------
 # Writer
 # ---------------------------------------------------------------------------
+# Text height ratio of fonts that are not recognised (option "Text height
+# ratio"). Recognised fonts use their own capital height (fonts.py), unless
+# the user changed this ratio, which then applies to every text.
+DEFAULT_TEXT_RATIO = 0.7
+
+_ALIGN_ATTACHMENT = {"left": 1, "center": 2, "right": 3}   # MTEXT top row
+_ALIGN_SHIFT = {"left": 0.0, "center": 0.5, "right": 1.0}
+
+
+def _mtext_escape(text: str) -> str:
+    """Backslashes and braces are MTEXT format codes: written literally."""
+    return text.replace("\\", "\\\\").replace("{", "\\{").replace("}", "\\}")
+
+
 @dataclass
 class WriterSettings:
     dxf_version: str = "R2018"
@@ -117,7 +132,7 @@ class WriterSettings:
     layer_mode: str = "style"            # style | color | single
     use_pdf_layers: bool = True
     color_mode: str = "aci"              # aci | true
-    text_height_factor: float = 0.7      # cap height / font size
+    text_height_factor: float = DEFAULT_TEXT_RATIO   # cap height / font size
     effective_scale: float = 50.0        # 1:N, used for LTSCALE
     ignore_white_fills: bool = True
     ignore_background_fills: bool = True
@@ -163,7 +178,8 @@ class DxfWriter:
         hdr = self.doc.header
         if not self.r12:
             hdr["$INSUNITS"] = UNITS.get(self.s.units, UNITS["mm"])["insunits"]
-        hdr["$MEASUREMENT"] = 1                            # metric
+        imperial = UNITS.get(self.s.units, {}).get("imperial", False)
+        hdr["$MEASUREMENT"] = 0 if imperial else 1         # 0 imperial, 1 metric
         hdr["$LUNITS"] = 2                                 # decimal
         factor = UNITS.get(self.s.units, UNITS["mm"])["factor"]
         # 1 linetype-pattern unit ~ 10 mm on paper at the drawing scale
@@ -382,10 +398,41 @@ class DxfWriter:
             self._warn_once("spline", f"Some splines were skipped: {exc}")
 
     # ---- text ----------------------------------------------------------------
+    def _font(self, t: RawText) -> CadFont:
+        """CAD font of a text: the PDF font when recognised (fonts.py);
+        Arial for OCR and stroke (SHX) text."""
+        if t.source == "pdf":
+            return resolve_font(t.font, t.flags)
+        return resolve_font("", 0)
+
+    def _style(self, font: CadFont) -> str:
+        """DXF text style of this font (created on first use)."""
+        name = font.style
+        if name not in self.doc.styles:
+            try:
+                self.doc.styles.add(name, font=font.file)
+            except Exception:                              # pragma: no cover
+                return TEXT_STYLE
+        return name
+
+    def _ratio(self, font: CadFont) -> float:
+        """Capital height / font size for this font."""
+        user = self.s.text_height_factor
+        if font.cap and abs(user - DEFAULT_TEXT_RATIO) < 1e-9:
+            return font.cap
+        return user
+
     def _text_height(self, t: RawText, tr) -> float:
         if t.cap_height > 0:                    # measured letters (SHX)
             return max(tr.length(t.cap_height), 1e-6)
-        return max(tr.length(t.height) * self.s.text_height_factor, 1e-6)
+        return max(tr.length(t.height) * self._ratio(self._font(t)), 1e-6)
+
+    def _width_factor(self, t: RawText, height: float, tr) -> float:
+        """Width factor that keeps the PDF length of the text (1.0 for OCR
+        text, whose box is only approximate)."""
+        if t.source == "ocr" or t.width <= 0:
+            return 1.0
+        return width_factor(self._font(t), t.text, height, tr.length(t.width))
 
     def write_texts(self, texts: List[RawText], consumed: set,
                     dim_raw_ids: set, tr, group_mtext: bool = True) -> None:
@@ -402,14 +449,14 @@ class DxfWriter:
             by_layer.setdefault(layer, []).append(t)
         for layer, items in by_layer.items():
             if group_mtext and layer != LAYER_DIM_RAW and not self.r12:
-                groups = group_text_lines(items)
+                groups = group_text_paragraphs(items)
             else:
-                groups = [[t] for t in items]
-            for grp in groups:
+                groups = [([t], "left") for t in items]
+            for grp, align in groups:
                 if len(grp) == 1:
                     self._write_text(grp[0], layer, tr)
                 else:
-                    self._write_mtext(grp, layer, tr)
+                    self._write_mtext(grp, layer, tr, align)
 
     def write_shx_texts(self, texts: List[RawText], tr,
                         default_size: float) -> None:
@@ -422,8 +469,12 @@ class DxfWriter:
             self._write_text(t, layer, tr, stat="shx_texts")
 
     def _write_text(self, t: RawText, layer: str, tr, stat: str = "") -> None:
-        att = {"layer": layer, "height": self._text_height(t, tr),
-               "rotation": t.rotation, "style": TEXT_STYLE}
+        h = self._text_height(t, tr)
+        att = {"layer": layer, "height": h, "rotation": t.rotation,
+               "style": self._style(self._font(t))}
+        wf = self._width_factor(t, h, tr)
+        if wf != 1.0:
+            att["width"] = wf
         att.update(self._color_attribs(t.color, layer))
         ent = self.msp.add_text(t.text, dxfattribs=att)
         ent.set_placement(tr.pt(t.origin))
@@ -431,24 +482,35 @@ class DxfWriter:
         setattr(self.stats, stat, getattr(self.stats, stat) + 1)
         self._count(layer)
 
-    def _write_mtext(self, grp: List[RawText], layer: str, tr) -> None:
+    def _write_mtext(self, grp: List[RawText], layer: str, tr,
+                     align: str = "left") -> None:
         try:
             top = grp[0]
+            font = self._font(top)
             h = self._text_height(top, tr)
             a = math.radians(top.rotation)
+            d = (math.cos(a), -math.sin(a))                 # reading (page)
             up = (-math.sin(a), -math.cos(a))               # page coords
-            cap = top.height * self.s.text_height_factor
-            anchor = (top.origin[0] + up[0] * cap, top.origin[1] + up[1] * cap)
+            cap = top.cap_height or top.height * self._ratio(font)
+            k = _ALIGN_SHIFT.get(align, 0.0)
+            w = top.width or 0.55 * top.height * len(top.text)
+            anchor = (top.origin[0] + up[0] * cap + d[0] * w * k,
+                      top.origin[1] + up[1] * cap + d[1] * w * k)
             gaps = [math.dist(p.origin, q.origin) for p, q in zip(grp, grp[1:])]
             spacing = statistics.mean(gaps) if gaps else top.height * 1.2
             factor = spacing / max(cap * 5.0 / 3.0, 1e-9)
             att = {"layer": layer, "char_height": h,
-                   "rotation": top.rotation, "style": TEXT_STYLE,
+                   "rotation": top.rotation, "style": self._style(font),
                    "line_spacing_factor": max(0.25, min(4.0, factor))}
             att.update(self._color_attribs(top.color, layer))
-            mt = self.msp.add_mtext("\\P".join(t.text for t in grp),
-                                    dxfattribs=att)
-            mt.set_location(tr.pt(anchor), attachment_point=1)  # 1 = TOP LEFT
+            content = "\\P".join(_mtext_escape(t.text) for t in grp)
+            widths = [self._width_factor(t, h, tr) for t in grp]
+            wf = statistics.median(widths) if widths else 1.0
+            if abs(wf - 1.0) > 0.04:                      # condensed paragraph
+                content = f"{{\\W{wf:.3g};{content}}}"
+            mt = self.msp.add_mtext(content, dxfattribs=att)
+            mt.set_location(tr.pt(anchor),
+                            attachment_point=_ALIGN_ATTACHMENT.get(align, 1))
             stat = "ocr_texts" if top.source == "ocr" else "mtexts"
             setattr(self.stats, stat, getattr(self.stats, stat) + 1)
             self._count(layer)
@@ -960,44 +1022,76 @@ def _signed_offset(p1, p2, lp) -> float:
 # MTEXT grouping
 # ---------------------------------------------------------------------------
 def group_text_lines(texts: List[RawText]) -> List[List[RawText]]:
+    """Paragraph groups only (see group_text_paragraphs)."""
+    return [g for g, _ in group_text_paragraphs(texts)]
+
+
+def group_text_paragraphs(texts: List[RawText]
+                          ) -> List[Tuple[List[RawText], str]]:
     """
-    Group text spans into paragraphs (-> MTEXT). Lines join when they share
-    colour and size, start at the same x (left-aligned) and are stacked
-    0.6 to 2.2 line heights apart. Every input span appears in exactly one
-    group (single spans stay TEXT). Rotated text is grouped along its own
-    direction. O(n log n).
+    Group text spans into paragraphs (-> MTEXT), with their alignment.
+    Lines join when they share colour and size, are stacked 0.6 to 2.2 line
+    heights apart, and start at the same place ("left"), have the same
+    middle ("center", e.g. a title block) or end at the same place
+    ("right"). Left alignment is tried first, then centre, then right.
+    Every input span appears in exactly one group (single spans stay TEXT,
+    "left"). Rotated text is grouped along its own direction. O(n log n).
     """
     buckets: Dict[tuple, List[RawText]] = {}
     for t in texts:
         size_class = round(math.log(max(t.height, 0.1)) / math.log(1.12))
         buckets.setdefault((t.color, size_class, round(t.rotation)), []
                            ).append(t)
-    groups: List[List[RawText]] = []
+    out: List[Tuple[List[RawText], str]] = []
     for (_, _, rot), items in buckets.items():
         a = math.radians(rot)
         d = (math.cos(a), -math.sin(a))             # reading dir (page)
         n = (math.sin(a), math.cos(a))              # 'down' dir (page)
-        along = lambda t: t.origin[0] * d[0] + t.origin[1] * d[1]   # noqa
-        down = lambda t: t.origin[0] * n[0] + t.origin[1] * n[1]    # noqa
-        items.sort(key=along)
-        # columns of left-aligned spans
-        columns: List[List[RawText]] = []
-        for t in items:
-            if columns and along(t) - along(columns[-1][0]) \
-                    <= 0.6 * columns[-1][0].height:
-                columns[-1].append(t)
-            else:
-                columns.append([t])
-        for col in columns:
-            col.sort(key=down)
-            run = [col[0]]
-            for t in col[1:]:
-                gap = down(t) - down(run[-1])
-                h = run[-1].height
-                if 0.6 * h <= gap <= 2.2 * h:
-                    run.append(t)
+
+        def width(t):
+            return t.width or 0.55 * t.height * len(t.text)
+
+        def down(t, n=n):
+            return t.origin[0] * n[0] + t.origin[1] * n[1]
+
+        # candidate paragraphs for each alignment, then keep the best ones:
+        # more lines first, then the tightest alignment (centred lines of
+        # similar length also look left-aligned, but less exactly)
+        candidates = []
+        for rank, (align, k) in enumerate((("left", 0.0), ("center", 0.5),
+                                           ("right", 1.0))):
+            def key(t, k=k, d=d):
+                return t.origin[0] * d[0] + t.origin[1] * d[1] + k * width(t)
+            ordered = sorted(items, key=key)
+            columns: List[List[RawText]] = []
+            for t in ordered:
+                if columns and key(t) - key(columns[-1][-1]) \
+                        <= 0.6 * columns[-1][-1].height:
+                    columns[-1].append(t)
                 else:
-                    groups.append(run)
-                    run = [t]
-            groups.append(run)
-    return groups
+                    columns.append([t])
+            for col in columns:
+                col.sort(key=down)
+                run = [col[0]]
+                for t in col[1:] + [None]:
+                    if t is not None:
+                        gap = down(t) - down(run[-1])
+                        h = run[-1].height
+                        if 0.6 * h <= gap <= 2.2 * h:
+                            run.append(t)
+                            continue
+                    if len(run) >= 2:
+                        keys = [key(x) for x in run]
+                        spread = (max(keys) - min(keys)) / run[0].height
+                        candidates.append((-len(run), round(spread, 2), rank,
+                                           run, align))
+                    if t is not None:
+                        run = [t]
+        used = set()
+        for _, _, _, run, align in sorted(candidates, key=lambda c: c[:3]):
+            if any(id(t) in used for t in run):
+                continue
+            used.update(id(t) for t in run)
+            out.append((run, align))
+        out.extend(([t], "left") for t in items if id(t) not in used)
+    return out

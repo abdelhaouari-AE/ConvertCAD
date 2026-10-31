@@ -568,6 +568,53 @@ class DxfView(CadView):
     def background_token(self) -> str:
         return "model_space"
 
+    # ---- AutoCAD-like model space: dark blue-grey with a grid ---------------
+    # Same colour in both themes (AutoCAD's default model space, RGB 33 40 48).
+    # Grid lines every 1, 2 or 5 x 10^k drawing units, at least 14 px apart;
+    # a major line every 5 lines, like AutoCAD; the X and Y axes through the
+    # origin in red and green.
+    GRID_MINOR = QColor(43, 51, 61)
+    GRID_MAJOR = QColor(55, 65, 78)
+    AXIS_X = QColor(115, 52, 52)
+    AXIS_Y = QColor(52, 105, 60)
+
+    def drawBackground(self, painter: QPainter, rect: QRectF) -> None:
+        painter.fillRect(rect, theme.qcolor("model_space"))
+        if not self._has_content:
+            return
+        px = self.current_scale()                     # pixels per unit
+        if px <= 0:
+            return
+        step = 10 ** math.floor(math.log10(14.0 / px))
+        for k in (1, 2, 5, 10):
+            if step * k * px >= 14.0:
+                step *= k
+                break
+        x0 = math.floor(rect.left() / step)
+        x1 = math.ceil(rect.right() / step)
+        y0 = math.floor(rect.top() / step)
+        y1 = math.ceil(rect.bottom() / step)
+        if (x1 - x0) + (y1 - y0) > 1200:              # never too many lines
+            return
+        painter.save()
+        minor = QPen(self.GRID_MINOR, 0)
+        major = QPen(self.GRID_MAJOR, 0)
+        for i in range(x0, x1 + 1):
+            painter.setPen(major if i % 5 == 0 else minor)
+            x = i * step
+            painter.drawLine(QPointF(x, rect.top()), QPointF(x, rect.bottom()))
+        for j in range(y0, y1 + 1):
+            painter.setPen(major if j % 5 == 0 else minor)
+            y = j * step
+            painter.drawLine(QPointF(rect.left(), y), QPointF(rect.right(), y))
+        if rect.top() <= 0 <= rect.bottom():
+            painter.setPen(QPen(self.AXIS_X, 0))
+            painter.drawLine(QPointF(rect.left(), 0), QPointF(rect.right(), 0))
+        if rect.left() <= 0 <= rect.right():
+            painter.setPen(QPen(self.AXIS_Y, 0))
+            painter.drawLine(QPointF(0, rect.top()), QPointF(0, rect.bottom()))
+        painter.restore()
+
     # ---- loading ------------------------------------------------------------------
     def load(self, path: str) -> None:
         self.path = path
@@ -802,7 +849,7 @@ class DxfView(CadView):
             return
         painter.save()
         painter.resetTransform()
-        painter.setPen(QColor(theme.tok("text_muted")))
+        painter.setPen(QColor(160, 172, 186))          # on the dark model space
         painter.setFont(theme.ui_font(10.0, QFont.Weight.Normal))
         painter.drawText(self.viewport().rect().adjusted(40, 40, -40, -40),
                          Qt.AlignmentFlag.AlignCenter

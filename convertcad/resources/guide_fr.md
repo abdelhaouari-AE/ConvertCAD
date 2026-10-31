@@ -16,6 +16,7 @@ ConvertCAD transforme des dessins PDF 2D en **fichiers DXF ou DWG modifiables, c
 | Zoomer au curseur | Molette |
 | Déplacer la vue | Glisser avec le bouton du milieu, Espace + glisser, ou glisser avec l'outil Déplacer |
 | Ajuster la feuille | F |
+| Replier / ouvrir un panneau latéral | Cliquer sa barre au bord de la fenêtre ; Ctrl+0 replie les deux (comme le *Nettoyer l'écran* d'AutoCAD) |
 | Feuille suivante / précédente | Page suiv. / Page préc. |
 | Annuler un outil | Échap (clic droit annule le premier point) |
 
@@ -43,7 +44,7 @@ F3 active ou désactive l'accrochage.
 | Zones remplies | **HACHURE** pleine sur le calque HATCH |
 | Hachures dessinées en nombreuses lignes parallèles | Une **HACHURE** à motif (angle et espacement du PDF) |
 | Sable, béton, gravier, terre, brique, isolant ou points dessinés en nombreux tirets et points | Une **HACHURE** au motif standard (AR-SAND, AR-CONC, GRAVEL, EARTH, BRICK, INSUL, DOTS…) à l'échelle et à l'angle mesurés sur le PDF |
-| Texte | **TEXTE** ; les lignes empilées deviennent un paragraphe **MTEXT** |
+| Texte | **TEXT** dans la police du PDF (Arial, Times New Roman, Courier New, Calibri…, gras et italique), sa taille et sa longueur ; les lignes empilées deviennent un paragraphe **MTEXT**, aligné à gauche, centré ou à droite comme dans le PDF |
 | Texte SHX AutoCAD dessiné en traits | Vrai **TEXTE** sur le calque TEXT_SHX (les traits restent sur le calque masqué TEXT_SHX_STROKES) |
 | Flèche + ligne + flèche + valeur | Vraie **COTE** (calque DIM) — la valeur garde le texte du PDF |
 | Traits obliques + ligne + valeur | Vraie **COTE** à traits architecturaux |
@@ -58,11 +59,11 @@ Les textes de mesure non associés à une cote sont placés sur le calque **DIM_
 
 ## Les réglages
 
-**Échelle, unités et zone** — échelle du dessin (1:N) et unité du DXF (mm, cm, m) ; *Sélectionner une zone… / Feuille entière* (seule la zone est convertie, dans les coordonnées de la feuille ; la zone s'applique à chaque feuille convertie). *Lire l'échelle écrite sur chaque feuille* sert aux jeux de feuilles à échelles différentes (plan au 1:100, détails au 1:20) : chaque feuille utilise l'échelle de son cartouche, et l'échelle ci-dessus sert quand une feuille n'en indique aucune ou plusieurs ; le rapport indique l'échelle retenue pour chaque feuille. L'étalonnage remplace les deux ; le panneau affiche l'échelle équivalente (« environ 1:100,2 ») comme contrôle.
+**Échelle, unités et zone** — échelle du dessin (1:N, ou 1/4" = 1'-0" et 1" = 20' en pouces et pieds) et unité du DXF (mm, cm, m, pouces, pieds) ; *Sélectionner une zone… / Feuille entière* (seule la zone est convertie, dans les coordonnées de la feuille ; la zone s'applique à chaque feuille convertie). *Lire l'échelle écrite sur chaque feuille* sert aux jeux de feuilles à échelles différentes (plan au 1:100, détails au 1:20) : chaque feuille utilise l'échelle de son cartouche, et l'échelle ci-dessus sert quand une feuille n'en indique aucune ou plusieurs ; le rapport indique l'échelle retenue pour chaque feuille. L'étalonnage remplace les deux ; le panneau affiche l'échelle équivalente (« environ 1:100,2 ») comme contrôle.
 
 **Géométrie** — reconstruire arcs et cercles ; joindre les segments en polylignes ; joindre les courbes en splines uniques ; *précision des courbes* (Fine / Normale / Large) ; remplissages en hachures pleines ; *reconstruire les motifs de hachure* (lignes parallèles → HACHURE à motif ; sable, béton, gravier, terre, brique, isolant, points → le motif standard ; le sable et le béton ont un aspect aléatoire, leur échelle et leur position sont donc estimées, et le rapport le signale) ; *reconstruire les lignes pointillées* (tirets séparés → une ligne avec un type de ligne) ; ignorer masques blancs, traits blancs et fonds de page (ils masqueraient le dessin dans la CAO).
 
-**Texte** — exporter le texte ; regrouper les lignes empilées en paragraphes MTEXT ; *rapport de hauteur* (hauteur des majuscules ÷ taille de police, 0,70 convient à la plupart des polices) ; *récupérer les textes dessinés en traits ou en contours* : le texte SHX AutoCAD redevient du vrai texte (calque TEXT_SHX) grâce aux commentaires cachés qu'AutoCAD ajoute à ses PDF, et le texte TrueType dessiné en contours remplis est remplacé par son vrai texte.
+**Texte** — exporter le texte ; regrouper les lignes empilées en paragraphes MTEXT ; *rapport de hauteur* (hauteur des majuscules ÷ taille de police du PDF) pour les polices que ConvertCAD ne reconnaît pas — les polices reconnues gardent leur propre taille ; le modifier l'applique à tous les textes ; *récupérer les textes dessinés en traits ou en contours* : le texte SHX AutoCAD redevient du vrai texte (calque TEXT_SHX) grâce aux commentaires cachés qu'AutoCAD ajoute à ses PDF, et le texte TrueType dessiné en contours remplis est remplacé par son vrai texte.
 
 **Cotes et lignes de repère** — reconstruire les cotes à flèches (linéaires, rayon, diamètre, angle, longueur d'arc) et/ou à traits obliques ; reconstruire les lignes de repère.
 

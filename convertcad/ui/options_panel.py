@@ -21,8 +21,9 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox,
                                QPushButton, QScrollArea, QSpinBox, QToolButton,
                                QVBoxLayout, QWidget)
 
-from ..core.constants import (DXF_VERSIONS, OCR_QUALITIES, PAPER_SCALES,
-                              RASTER_DPI_CHOICES, UNITS)
+from ..core.constants import (DXF_VERSIONS, IMPERIAL_SCALES, OCR_QUALITIES,
+                              PAPER_SCALES, RASTER_DPI_CHOICES, UNITS)
+from ..core.pdfinfo import parse_imperial_scale
 from ..core.ocr_catalog import BY_ID, language_set
 from ..core.options import Options
 from ..core.units import effective_denominator
@@ -240,18 +241,22 @@ class OptionsPanel(QScrollArea):
     def _scale_section(self, sec: CollapsibleSection) -> None:
         self.scale = QComboBox()
         self.scale.setEditable(True)
-        for n in PAPER_SCALES:
-            self.scale.addItem(f"1:{n}", n)
+        self._scale_system = ""
+        self._fill_scales("mm")
+        # 1:100, 100, or an imperial scale such as 1/4" = 1'-0" or 1" = 20'
         self.scale.setValidator(QRegularExpressionValidator(
-            QRegularExpression(r"^\s*(1\s*[:/]\s*)?\d{1,6}([.,]\d+)?\s*$")))
-        self.scale.setToolTip(tr("Scale of the PDF sheet, e.g. 1:100. "
-                                 "Ignored when the drawing is calibrated."))
+            QRegularExpression("^[0-9 .,:/=\"'\\-\u2019\u201d\u2032\u2033]{0,24}$")))
+        self.scale.setToolTip(tr("Scale of the PDF sheet, e.g. 1:100, or "
+                                 "1/4\" = 1'-0\" in inches and feet. Ignored "
+                                 "when the drawing is calibrated."))
         self.scale.currentIndexChanged.connect(self._on_change)
         self.scale.lineEdit().editingFinished.connect(self._on_change)
         self.scale.setMinimumWidth(130)
         self._row(sec, tr("Drawing scale"), self.scale)
         self.units = self._combo([(tr(UNITS[u]["label"]), u) for u in UNITS],
                                  tr("Real-world unit of the DXF coordinates."))
+        self.units.currentIndexChanged.connect(
+            lambda _i: self._fill_scales(self.units.currentData() or "mm"))
         self._row(sec, tr("Units"), self.units)
         self.auto_scale = sec.add(self._check(
             tr("Read the scale written on each sheet"),
@@ -339,8 +344,11 @@ class OptionsPanel(QScrollArea):
         self.text_factor.setRange(0.4, 1.2)
         self.text_factor.setSingleStep(0.05)
         self.text_factor.setDecimals(2)
-        self.text_factor.setToolTip(tr("Cap height relative to the PDF font "
-                                       "size. 0.70 suits most CAD fonts."))
+        self.text_factor.setToolTip(tr(
+            "Capital height relative to the PDF font size, for fonts "
+            "ConvertCAD does not recognise. Arial, Times, Courier, Calibri… "
+            "keep their own size. Changing it applies the ratio to every "
+            "text."))
         self.text_factor.valueChanged.connect(self._on_change)
         self._row(sec, tr("Text height ratio"), self.text_factor)
         self.shx = sec.add(self._check(
@@ -477,8 +485,35 @@ class OptionsPanel(QScrollArea):
         sec.add(self.open_folder)
 
     # ---- Options <-> widgets -------------------------------------------------------------
+    def _fill_scales(self, unit: str) -> None:
+        """Metric units list 1:N scales; inches and feet list the usual
+        imperial scales (1/4" = 1'-0" = 1:48...). The value is kept."""
+        system = "imperial" if UNITS.get(unit, {}).get("imperial") else "metric"
+        if system == self._scale_system:
+            return
+        keep = self.scale_denominator() if self._scale_system else None
+        self._scale_system = system
+        self.scale.blockSignals(True)
+        self.scale.clear()
+        if system == "imperial":
+            for text, n in IMPERIAL_SCALES:
+                self.scale.addItem(text, n)
+        else:
+            for n in PAPER_SCALES:
+                self.scale.addItem(f"1:{n}", n)
+        self.scale.blockSignals(False)
+        if keep:
+            self.set_scale_denominator(keep)
+
     def scale_denominator(self) -> float:
-        txt = self.scale.currentText().strip().replace(",", ".")
+        txt = self.scale.currentText().strip()
+        i = self.scale.findText(txt)
+        if i >= 0 and self.scale.itemData(i):
+            return float(self.scale.itemData(i))
+        imperial = parse_imperial_scale(txt)
+        if imperial:
+            return imperial
+        txt = txt.replace(",", ".")
         m = re.match(r"^(?:1\s*[:/]\s*)?(\d+(?:\.\d+)?)$", txt)
         try:
             return max(float(m.group(1)), 1e-6) if m else 50.0
@@ -486,12 +521,13 @@ class OptionsPanel(QScrollArea):
             return 50.0
 
     def set_scale_denominator(self, den: float) -> None:
-        text = f"1:{den:g}"
-        i = self.scale.findText(text)
+        i = self.scale.findData(int(den) if den == int(den) else den)
+        if i < 0:
+            i = self.scale.findData(float(den))
         if i >= 0:
             self.scale.setCurrentIndex(i)
         else:
-            self.scale.setEditText(text)
+            self.scale.setEditText(f"1:{den:g}")
 
     def options(self) -> Options:
         return Options(

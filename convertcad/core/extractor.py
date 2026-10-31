@@ -88,6 +88,7 @@ class RawText:
     cap_height: float = 0.0          # measured letter height (pt), when known
                                      # exactly (SHX text): used as is instead
                                      # of height x text height ratio
+    flags: int = 0                   # PyMuPDF span flags (2 italic, 16 bold)
 
     def direction(self) -> Point:
         """Unit reading direction in PAGE coordinates (y down)."""
@@ -382,7 +383,8 @@ def extract_page(doc, page_index: int, read_shx_comments: bool = True,
                     rotation=round(rotation, 4),
                     color=_int_to_rgb(span.get("color", 0)),
                     font=span.get("font", "") or "",
-                    width=adv))
+                    width=adv,
+                    flags=int(span.get("flags", 0) or 0)))
 
     # ---- 2b. TrueType text drawn as outlines -------------------------------
     # CAD programs often export TrueType text as filled letter outlines and

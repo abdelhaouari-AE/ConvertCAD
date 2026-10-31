@@ -13,9 +13,15 @@ from typing import List, Optional
 from .. import APP_VERSION
 from .constants import (CURVE_PRECISION, DEFAULT_DXF_VERSION,
                         DEFAULT_LAYER_MODE, DEFAULT_PAGE_MODE, DEFAULT_UNITS,
-                        DWG_DXF_VERSION, OCR_QUALITIES, OUTPUT_FORMATS)
+                        DWG_DXF_VERSION, LAYER_MODES, OCR_QUALITIES,
+                        OUTPUT_FORMATS, UNITS)
 from .ocr_catalog import language_set
 from .units import effective_denominator
+
+
+def _english(text: str, **kwargs) -> str:
+    """No translation (conversion log): fill the {placeholders} only."""
+    return text.format(**kwargs) if kwargs else text
 
 
 @dataclass
@@ -112,65 +118,88 @@ class Options:
         return DWG_DXF_VERSION if self.output_format == "dwg" \
             else self.dxf_version
 
-    def scale_text(self) -> str:
+    def scale_text(self, t=None) -> str:
+        t = t or _english
         if self.calibrated_units_per_pt > 0:
             den = effective_denominator(self.calibrated_units_per_pt,
                                         self.units)
-            return (f"calibrated ({self.calibrated_units_per_pt:.6g} "
-                    f"{self.units}/pt, about 1:{den:.4g})")
+            return t("calibrated ({value} {unit}/pt, about 1:{den})",
+                     value=f"{self.calibrated_units_per_pt:.6g}",
+                     unit=self.units, den=f"{den:.4g}")
         if self.auto_scale:
-            return (f"read on each sheet (1:{self.scale_denominator:g} when "
-                    f"none is written)")
+            return t("read on each sheet (1:{den} when none is written)",
+                     den=f"{self.scale_denominator:g}")
         return f"1:{self.scale_denominator:g}"
 
-    def describe(self) -> dict:
-        """Options as written in the conversion log (English, stable keys)."""
-        on = lambda b: "on" if b else "off"                      # noqa: E731
-        area = "whole sheet"
+    def describe(self, t=None) -> dict:
+        """Options as shown in the report. Without `t` (a translation
+        function such as the interface's tr) the text is English, as written
+        in the conversion log."""
+        t = t or _english
+        on = lambda b: t("on") if b else t("off")                # noqa: E731
+        area = t("whole sheet")
         if self.clip_rect:
             x0, y0, x1, y1 = self.clip_rect
-            area = (f"selected area {x1 - x0:.0f} x {y1 - y0:.0f} pt at "
-                    f"({x0:.0f}, {y0:.0f})")
-        fmt = ("DWG (AutoCAD 2000 format)" if self.output_format == "dwg"
+            area = t("selected area {w} x {h} pt at ({x}, {y})",
+                     w=f"{x1 - x0:.0f}", h=f"{y1 - y0:.0f}",
+                     x=f"{x0:.0f}", y=f"{y0:.0f}")
+        fmt = (t("DWG (AutoCAD 2000 format)") if self.output_format == "dwg"
                else f"DXF {self.dxf_version}")
+        pages = {"single": t("One DXF, sheets side by side"),
+                 "split": t("One DXF per sheet")}.get(self.page_mode,
+                                                     self.page_mode)
+        precision = {"fine": t("Fine"), "normal": t("Normal"),
+                     "loose": t("Loose")}.get(self.curve_precision,
+                                              self.curve_precision)
+        unit = t(UNITS[self.units]["label"]) if self.units in UNITS \
+            else self.units
+        if self.block_detection:
+            blocks = (t("on (at least {n} copies, also turned or mirrored)",
+                        n=self.block_min_repeats) if self.block_rotations
+                      else t("on (at least {n} copies)",
+                             n=self.block_min_repeats))
+        else:
+            blocks = t("off")
+        quality = t(OCR_QUALITIES.get(self.ocr_quality, self.ocr_quality))
         return {
-            "Scale": self.scale_text(),
-            "Units": self.units,
-            "Area": area,
-            "Output format": fmt,
-            "Multi-page output": self.page_mode,
-            "Arcs & circles": on(self.fit_arcs),
-            "Join polylines / splines": f"{on(self.join_polylines)} / "
-                                        f"{on(self.join_splines)}",
-            "Curve precision": self.curve_precision,
-            "Solid fills as HATCH": on(self.hatches),
-            "Hatch patterns as HATCH": on(self.hatch_patterns),
-            "Dashed lines rebuilt": on(self.merge_dashes),
-            "Ignore white/background fills": f"{on(self.ignore_white_fills)} / "
-                                             f"{on(self.ignore_background_fills)}",
-            "Text / MTEXT grouping": f"{on(self.text_entities)} / "
-                                     f"{on(self.group_mtext)}",
-            "Text height factor": f"{self.text_height_factor:g}",
-            "AutoCAD SHX comments": on(self.shx_comments),
-            "Dimensions (arrows / ticks)": f"{on(self.dimensions)} / "
-                                           f"{on(self.tick_dimensions)}",
-            "Leaders": on(self.leaders),
-            "Native PDF layers": on(self.use_pdf_layers),
-            "Layer naming": self.layer_mode,
-            "Linetype recognition": on(self.recognize_linetypes),
-            "Colours": "AutoCAD Color Index" if self.color_mode == "aci"
-                       else "true colour",
-            "Block detection": (
-                f"on (min {self.block_min_repeats} repeats"
-                f"{', rotated/mirrored copies' if self.block_rotations else ''})"
-                if self.block_detection else "off"),
-            "Scanned pages: tracing": (f"on ({self.raster_dpi} dpi)"
-                                       if self.raster_mode else "off"),
-            "Scanned pages: OCR": (f"on ({language_set(self.ocr_lang).label}"
-                                   f", {self.ocr_quality} accuracy)"
-                                   if self.ocr else "off"),
-            "Raster images": on(self.include_images),
-            "Engine version": APP_VERSION,
+            t("Scale"): self.scale_text(t),
+            t("Units"): unit,
+            t("Area"): area,
+            t("Output format"): fmt,
+            t("Multi-page output"): pages,
+            t("Arcs and circles"): on(self.fit_arcs),
+            t("Join polylines / splines"): f"{on(self.join_polylines)} / "
+                                           f"{on(self.join_splines)}",
+            t("Curve precision"): precision,
+            t("Solid fills as HATCH"): on(self.hatches),
+            t("Hatch patterns as HATCH"): on(self.hatch_patterns),
+            t("Dashed lines rebuilt"): on(self.merge_dashes),
+            t("Ignore white / background fills"):
+                f"{on(self.ignore_white_fills)} / "
+                f"{on(self.ignore_background_fills)}",
+            t("Text / MTEXT grouping"): f"{on(self.text_entities)} / "
+                                        f"{on(self.group_mtext)}",
+            t("Text height ratio"): f"{self.text_height_factor:g}",
+            t("AutoCAD SHX comments"): on(self.shx_comments),
+            t("Dimensions (arrows / ticks)"): f"{on(self.dimensions)} / "
+                                              f"{on(self.tick_dimensions)}",
+            t("Leaders"): on(self.leaders),
+            t("Native PDF layers"): on(self.use_pdf_layers),
+            t("Layer naming"): t(LAYER_MODES.get(self.layer_mode,
+                                                 self.layer_mode)),
+            t("Linetype recognition"): on(self.recognize_linetypes),
+            t("Colours"): t("AutoCAD Color Index") if self.color_mode == "aci"
+                         else t("True colour (exact RGB)"),
+            t("Block detection"): blocks,
+            t("Scanned pages: tracing"): (t("on ({dpi} dpi)",
+                                            dpi=self.raster_dpi)
+                                          if self.raster_mode else t("off")),
+            t("Scanned pages: OCR"): (
+                t("on ({languages}, {quality})",
+                  languages=t(language_set(self.ocr_lang).label),
+                  quality=quality) if self.ocr else t("off")),
+            t("Raster images"): on(self.include_images),
+            t("Engine version"): APP_VERSION,
         }
 
 

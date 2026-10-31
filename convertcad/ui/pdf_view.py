@@ -41,7 +41,7 @@ _SEPARATORS = {"fr": ("\u202f", ","), "es": (".", ","), "de": (".", ",")}
 def format_length(value: float, unit: str) -> str:
     """'3,500.0 mm' (English, Arabic), '3 500,0 mm' (French), '3.500,0 mm'
     (Spanish, German); m with 3 decimals."""
-    decimals = {"mm": 1, "cm": 2, "m": 3}.get(unit, 2)
+    decimals = {"mm": 1, "cm": 2, "m": 3, "in": 2, "ft": 3}.get(unit, 2)
     s = f"{value:,.{decimals}f}"
     thousands, decimal = _SEPARATORS.get(language(), (",", "."))
     s = s.replace(",", "\x00").replace(".", decimal)

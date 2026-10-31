@@ -16,6 +16,7 @@ ConvertCAD turns 2D PDF drawings into **editable DXF or DWG files built with rea
 | Zoom at the cursor | Mouse wheel |
 | Pan | Middle-button drag, Space + drag, or left drag with the Pan tool |
 | Fit the sheet | F |
+| Collapse / open a side panel | Click its bar on the window edge; Ctrl+0 collapses both (like AutoCAD's *Clean screen*) |
 | Next / previous sheet | Page Down / Page Up |
 | Cancel a tool | Escape (right-click cancels the first point) |
 
@@ -43,7 +44,7 @@ F3 switches snapping on or off.
 | Filled areas | Solid **HATCH** on layer HATCH |
 | Hatching drawn as many parallel lines | One pattern **HATCH** (angle and spacing of the PDF) |
 | Sand, concrete, gravel, earth, brick, insulation or dots drawn as many dashes and dots | One **HATCH** with the standard pattern (AR-SAND, AR-CONC, GRAVEL, EARTH, BRICK, INSUL, DOTS…) at the scale and angle measured on the PDF |
-| Text | **TEXT**; stacked lines become one **MTEXT** paragraph |
+| Text | **TEXT** in the PDF's font (Arial, Times New Roman, Courier New, Calibri…, bold and italic), size and length; stacked lines become one **MTEXT** paragraph, left-aligned, centred or right-aligned like the PDF |
 | AutoCAD SHX text drawn as strokes | Real **TEXT** on layer TEXT_SHX (the strokes are kept on the hidden layer TEXT_SHX_STROKES) |
 | Arrow + line + arrow + value | Real **DIMENSION** (layer DIM) — the value keeps the PDF text |
 | Oblique ticks + line + value | Real **DIMENSION** with architectural ticks |
@@ -58,11 +59,11 @@ Measurement texts that matched no dimension are put on layer **DIM_RAW** (red) s
 
 ## Settings explained
 
-**Scale, units and area** — drawing scale (1:N) and DXF unit (mm, cm, m); *Select area… / Whole sheet* (only the area is converted, in the sheet's own coordinates; the area applies to every converted sheet). *Read the scale written on each sheet* is for sets whose sheets have different scales (plan at 1:100, details at 1:20): each sheet uses the scale of its title block, and the scale above is used when a sheet shows none or several; the report says which scale each sheet received. Calibration overrides both; the panel shows the equivalent scale ("about 1:100.2") as a sanity check.
+**Scale, units and area** — drawing scale (1:N, or 1/4" = 1'-0" and 1" = 20' in inches and feet) and DXF unit (mm, cm, m, inches, feet); *Select area… / Whole sheet* (only the area is converted, in the sheet's own coordinates; the area applies to every converted sheet). *Read the scale written on each sheet* is for sets whose sheets have different scales (plan at 1:100, details at 1:20): each sheet uses the scale of its title block, and the scale above is used when a sheet shows none or several; the report says which scale each sheet received. Calibration overrides both; the panel shows the equivalent scale ("about 1:100.2") as a sanity check.
 
 **Geometry** — rebuild arcs and circles; join segments into polylines; join curves into single splines; *curve precision* (Fine / Normal / Loose) sets how strictly a curve must match a circle; solid fills as hatches; *rebuild hatch patterns* (parallel lines → pattern HATCH; sand, concrete, gravel, earth, brick, insulation, dots → the standard pattern; sand and concrete look random, so their scale and position are estimated and the report says so); *rebuild dashed lines* (separate dashes → one line with a linetype); ignore white masks, white lines and page backgrounds (they would hide the drawing in CAD).
 
-**Text** — export text; group stacked lines into MTEXT paragraphs; *text height ratio* (cap height ÷ PDF font size, 0.70 suits most fonts); *recover text drawn as strokes or outlines*: AutoCAD SHX text comes back as real text (layer TEXT_SHX) from the hidden comments AutoCAD adds to its PDFs, and TrueType text drawn as filled outlines is replaced by its real text.
+**Text** — export text; group stacked lines into MTEXT paragraphs; *text height ratio* (capital height ÷ PDF font size) for fonts ConvertCAD does not recognise — recognised fonts keep their own size; changing it applies the ratio to every text; *recover text drawn as strokes or outlines*: AutoCAD SHX text comes back as real text (layer TEXT_SHX) from the hidden comments AutoCAD adds to its PDFs, and TrueType text drawn as filled outlines is replaced by its real text.
 
 **Dimensions and leaders** — rebuild dimensions with arrows (linear, radius, diameter, angle, arc length) and/or tick marks; rebuild leaders.
 

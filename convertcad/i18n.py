@@ -91,6 +91,71 @@ def tr_progress(msg: str) -> str:
     return tr(msg)
 
 
+# Messages of the conversion report (page notes, block list), as the engine
+# writes them in English. {name} parts are copied as they are. Longer
+# shapes first (a shape must match the whole message).
+NOTE_TEMPLATES = [
+    "{n} letter outline(s) replaced by the real text written over them.",
+    "{n} AutoCAD SHX text(s) recovered on layer TEXT_SHX.",
+    "selected area only — {kept} of {total} PDF elements kept.",
+    "{n} white (invisible) line(s) or text(s) left out.",
+    "scale 1:{den} read on the sheet.",
+    "no single scale written on the sheet; 1:{den} used.",
+    "no drawing content.",
+    "scanned page — image kept on locked layer IMG_RASTER (tracing "
+    "disabled).",
+    "scanned page traced at {dpi} dpi — {lines} line(s), {circles} "
+    "circle(s), {arcs} arc(s), {source}; original scan kept on locked layer "
+    "IMG_RASTER for checking.",
+    "{n} dashed line(s) rebuilt from {pieces} separate pieces (linetypes "
+    "measured on the PDF).",
+    "{n} hatch pattern(s) rebuilt from {lines} parallel lines.",
+    "{n} pattern hatch(es) ({names}) rebuilt from {pieces} dashes and dots; "
+    "{rough}: scale and position estimated (random-looking pattern).",
+    "{n} pattern hatch(es) ({names}) rebuilt from {pieces} dashes and dots.",
+    "{name}: DWG written by GNU LibreDWG {version} (AutoCAD 2000 "
+    "format{checked}).",
+    "{name}: {n} entities x {k} insertions",
+    # the {source} part of the scanned-page note
+    "{n} OCR text(s) (PP-OCR: {model})",
+    "text layer already in the PDF used",
+    "OCR skipped",
+    "no OCR",
+]
+_NOTE_RES = None
+
+
+def _note_patterns():
+    global _NOTE_RES
+    if _NOTE_RES is None:
+        _NOTE_RES = []
+        for tpl in NOTE_TEMPLATES:
+            rx = re.escape(tpl)
+            rx = re.sub(r"\\\{(\w+)\\\}", r"(?P<\1>.+?)", rx)
+            _NOTE_RES.append((re.compile("^" + rx + "$", re.S), tpl))
+    return _NOTE_RES
+
+
+def tr_note(msg: str) -> str:
+    """Translate a message of the conversion report ("Page 2: scale 1:100
+    read on the sheet."). Unknown messages are shown unchanged."""
+    if _LANG == "en" or not msg:
+        return msg
+    m = re.match(r"^Page (\d+): (.*)$", msg, re.S)
+    if m:
+        return tr("Page {pno}: {msg}", pno=m.group(1), msg=tr_note(m.group(2)))
+    for rx, tpl in _note_patterns():
+        m = rx.match(msg)
+        if m:
+            parts = m.groupdict()
+            if "source" in parts:                 # nested message
+                parts["source"] = tr_note(parts["source"])
+            if "model" in parts:                  # OCR language set name
+                parts["model"] = tr(parts["model"])
+            return tr(tpl, **parts)
+    return tr(msg)
+
+
 def tr_paper(text: str) -> str:
     """'A3 landscape' -> 'A3 paysage' (paper names come from the engine)."""
     if _LANG == "en" or not text:
@@ -262,9 +327,6 @@ _fr({
     "Left-aligned lines of the same size become one MTEXT paragraph (notes, title block).":
         "Les lignes alignées de même taille deviennent un paragraphe MTEXT "
         "(notes, cartouche).",
-    "Cap height relative to the PDF font size. 0.70 suits most CAD fonts.":
-        "Hauteur des majuscules par rapport à la taille de police. 0,70 "
-        "convient à la plupart des polices CAO.",
     "AutoCAD stores SHX text as hidden comments; they are placed on layer TEXT_SHX. Positions are approximate.":
         "AutoCAD stocke le texte SHX en commentaires cachés ; ils sont placés "
         "sur le calque TEXT_SHX. Positions approximatives.",
@@ -748,4 +810,118 @@ _fr({
         "de publication.",
     "Open the release page": "Ouvrir la page de publication",
     "Later": "Plus tard",
+})
+
+# 1.2.1: side panels, imperial units, report in the interface language
+_fr({
+    "Arcs and circles":
+        "Arcs et cercles",
+    "AutoCAD SHX comments":
+        "Commentaires SHX d'AutoCAD",
+    "Block detection":
+        "Détection des blocs",
+    "Capital height relative to the PDF font size, for fonts ConvertCAD does not recognise. Arial, Times, Courier, Calibri… keep their own size. Changing it applies the ratio to every text.":
+        "Hauteur des majuscules par rapport à la taille de police du PDF, pour les polices que ConvertCAD ne reconnaît pas. Arial, Times, Courier, Calibri… gardent leur propre taille. Modifier cette valeur l'applique à tous les textes.",
+    "Collapse both side panels":
+        "Replier les deux panneaux latéraux",
+    "Collapse the {name} panel":
+        "Replier le panneau {name}",
+    "Open the {name} panel":
+        "Ouvrir le panneau {name}",
+    "DWG (AutoCAD 2000 format)":
+        "DWG (format AutoCAD 2000)",
+    "Dimensions (arrows / ticks)":
+        "Cotes (flèches / traits obliques)",
+    "Engine version":
+        "Version du moteur",
+    "Feet (ft)":
+        "Pieds (ft)",
+    "Inches (in)":
+        "Pouces (in)",
+    "Hatch patterns as HATCH":
+        "Motifs de hachures en HATCH",
+    "Ignore white / background fills":
+        "Ignorer les remplissages blancs / de fond",
+    "Join polylines / splines":
+        "Joindre polylignes / splines",
+    "Linetype recognition":
+        "Reconnaissance des types de ligne",
+    "Native PDF layers":
+        "Calques natifs du PDF",
+    "No":
+        "Non",
+    "Yes":
+        "Oui",
+    "Output format":
+        "Format de sortie",
+    "Page {pno}: {msg}":
+        "Feuille {pno} : {msg}",
+    "Scale of the PDF sheet, e.g. 1:100, or 1/4\" = 1'-0\" in inches and feet. Ignored when the drawing is calibrated.":
+        "Échelle de la feuille PDF, p. ex. 1:100, ou 1/4\" = 1'-0\" en pouces et pieds. Ignorée lorsque le dessin est étalonné.",
+    "Scanned pages: OCR":
+        "Pages scannées : OCR",
+    "Scanned pages: tracing":
+        "Pages scannées : vectorisation",
+    "Solid fills as HATCH":
+        "Remplissages pleins en HATCH",
+    "Text / MTEXT grouping":
+        "Textes / regroupement MTEXT",
+    "calibrated ({value} {unit}/pt, about 1:{den})":
+        "étalonnée ({value} {unit}/pt, environ 1:{den})",
+    "read on each sheet (1:{den} when none is written)":
+        "lue sur chaque feuille (1:{den} si aucune n'est écrite)",
+    "on":
+        "oui",
+    "off":
+        "non",
+    "on (at least {n} copies)":
+        "oui (au moins {n} copies)",
+    "on (at least {n} copies, also turned or mirrored)":
+        "oui (au moins {n} copies, aussi tournées ou en miroir)",
+    "on ({dpi} dpi)":
+        "oui ({dpi} dpi)",
+    "on ({languages}, {quality})":
+        "oui ({languages}, {quality})",
+    "whole sheet":
+        "feuille entière",
+    "selected area {w} x {h} pt at ({x}, {y})":
+        "zone sélectionnée {w} x {h} pt en ({x}, {y})",
+    "no drawing content.":
+        "aucun contenu de dessin.",
+    "no single scale written on the sheet; 1:{den} used.":
+        "aucune échelle unique écrite sur la feuille ; 1:{den} utilisée.",
+    "scale 1:{den} read on the sheet.":
+        "échelle 1:{den} lue sur la feuille.",
+    "scanned page traced at {dpi} dpi — {lines} line(s), {circles} circle(s), {arcs} arc(s), {source}; original scan kept on locked layer IMG_RASTER for checking.":
+        "page scannée vectorisée à {dpi} dpi — {lines} ligne(s), {circles} cercle(s), {arcs} arc(s), {source} ; scan d'origine conservé sur le calque verrouillé IMG_RASTER pour contrôle.",
+    "scanned page — image kept on locked layer IMG_RASTER (tracing disabled).":
+        "page scannée — image conservée sur le calque verrouillé IMG_RASTER (vectorisation désactivée).",
+    "selected area only — {kept} of {total} PDF elements kept.":
+        "zone sélectionnée uniquement — {kept} éléments PDF conservés sur {total}.",
+    "{name}: DWG written by GNU LibreDWG {version} (AutoCAD 2000 format{checked}).":
+        "{name} : DWG écrit par GNU LibreDWG {version} (format AutoCAD 2000{checked}).",
+    "{name}: {n} entities x {k} insertions":
+        "{name} : {n} entités x {k} insertions",
+    "{n} AutoCAD SHX text(s) recovered on layer TEXT_SHX.":
+        "{n} texte(s) SHX d'AutoCAD récupéré(s) sur le calque TEXT_SHX.",
+    "{n} dashed line(s) rebuilt from {pieces} separate pieces (linetypes measured on the PDF).":
+        "{n} ligne(s) en tirets reconstruite(s) à partir de {pieces} morceaux séparés (types de ligne mesurés sur le PDF).",
+    "{n} hatch pattern(s) rebuilt from {lines} parallel lines.":
+        "{n} motif(s) de hachures reconstruit(s) à partir de {lines} lignes parallèles.",
+    "{n} letter outline(s) replaced by the real text written over them.":
+        "{n} contour(s) de lettres remplacé(s) par le vrai texte écrit dessus.",
+    "{n} pattern hatch(es) ({names}) rebuilt from {pieces} dashes and dots.":
+        "{n} hachure(s) à motif ({names}) reconstruite(s) à partir de {pieces} tirets et points.",
+    "{n} pattern hatch(es) ({names}) rebuilt from {pieces} dashes and dots; {rough}: scale and position estimated (random-looking pattern).":
+        "{n} hachure(s) à motif ({names}) reconstruite(s) à partir de {pieces} tirets et points ; {rough} : échelle et position estimées (motif d'aspect aléatoire).",
+    "{n} white (invisible) line(s) or text(s) left out.":
+        "{n} ligne(s) ou texte(s) blanc(s) (invisibles) écarté(s).",
+    "{n} OCR text(s) (PP-OCR: {model})":
+        "{n} texte(s) OCR (PP-OCR : {model})",
+    "text layer already in the PDF used":
+        "couche de texte déjà présente dans le PDF utilisée",
+    "OCR skipped":
+        "OCR ignorée",
+    "no OCR":
+        "pas d'OCR",
 })

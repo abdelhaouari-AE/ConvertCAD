@@ -151,8 +151,7 @@ def test_area_overlay_and_dwg(qapp, tmp_path, monkeypatch):
         target = tmp_path / "area.dwg"
         monkeypatch.setattr(mw.QFileDialog, "getSaveFileName",
                             staticmethod(lambda *a, **k: (str(target), "")))
-        monkeypatch.setattr(mw.QMessageBox, "question", staticmethod(
-            lambda *a, **k: mw.QMessageBox.StandardButton.Yes))
+        monkeypatch.setattr(mw, "ask_yes_no", lambda *a, **k: True)
         w.save_dxf()                      # -> converts again, then saves
         t0 = time.time()
         while (w._busy or w._save_thread is not None or w._pending_save) \
@@ -273,3 +272,48 @@ def test_select_an_entity_in_the_preview(qapp, sample_plan, tmp_path):
     view.select_at(QPointF(2, 2))
     assert picked[-1] is None and view.selected_index() == -1
     view.close()
+
+
+def test_side_panels_collapse_and_questions_are_translated(qapp):
+    """The side panels collapse to a bar (and Ctrl+0 collapses both); the
+    Yes / No buttons of questions are in the interface language."""
+    from convertcad import i18n
+    from convertcad.config import Settings
+    from convertcad.ui import main_window as mw
+    from convertcad.ui.side_panel import STRIP_WIDTH
+
+    s = Settings()
+    s.terms_accepted = True
+    w = mw.MainWindow(s)
+    w.resize(1400, 860)
+    w.show()
+    _pump(100)
+    try:
+        before = w.main_split.sizes()
+        w.left_side.strip.clicked.emit()
+        _pump(50)
+        assert w.left_side.collapsed and w.left_side.width() == STRIP_WIDTH
+        assert not w.a_show_pages.isChecked()
+        assert w.main_split.sizes()[1] > before[1]       # the view grew
+        w.a_show_pages.setChecked(True)
+        _pump(50)
+        assert not w.left_side.collapsed
+        w.a_clean.trigger()
+        assert w.left_side.collapsed and w.right_side.collapsed
+        w.a_clean.trigger()
+        assert not w.left_side.collapsed and not w.right_side.collapsed
+        # "Convert a folder" sits next to "Open PDF"
+        widgets = [w.toolbar.widgetForAction(a) for a in w.toolbar.actions()]
+        assert widgets.index(w.btn_batch) == widgets.index(w.btn_open) + 1
+    finally:
+        w.close()
+
+    from convertcad.ui.widgets import yes_no_box
+    i18n.set_language("fr")
+    try:
+        box, yes = yes_no_box(None, "ConvertCAD", "Quitter ?")
+        texts = sorted(b.text() for b in box.buttons())
+        assert yes.text() == "Oui" and box.defaultButton().text() == "Non"
+    finally:
+        i18n.set_language("en")
+    assert texts == ["Non", "Oui"]

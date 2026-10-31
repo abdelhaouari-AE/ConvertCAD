@@ -293,8 +293,6 @@ STRINGS = {
         "PDF-Text wird zu bearbeitbaren TEXT-Objekten.",
     "Left-aligned lines of the same size become one MTEXT paragraph (notes, title block).":
         "Linksbündige Zeilen gleicher Größe werden zu einem MTEXT-Absatz (Notizen, Schriftfeld).",
-    "Cap height relative to the PDF font size. 0.70 suits most CAD fonts.":
-        "Großbuchstabenhöhe im Verhältnis zur PDF-Schriftgröße. 0,70 passt zu den meisten CAD-Schriften.",
     "AutoCAD stores SHX text as hidden comments; they are placed on layer TEXT_SHX. Positions are approximate.":
         "AutoCAD speichert SHX-Text als versteckte Kommentare; sie werden auf den Layer TEXT_SHX gelegt. Die Positionen sind ungefähr.",
     "Arrows, lines and value become a real DIMENSION entity: linear, radius, diameter, angle or arc length.":
@@ -979,4 +977,114 @@ STRINGS = {
         "Veröffentlichungsseite öffnen",
     "Later":
         "Später",
+    "Arcs and circles":
+        "Bögen und Kreise",
+    "AutoCAD SHX comments":
+        "AutoCAD-SHX-Kommentare",
+    "Block detection":
+        "Blockerkennung",
+    "Capital height relative to the PDF font size, for fonts ConvertCAD does not recognise. Arial, Times, Courier, Calibri… keep their own size. Changing it applies the ratio to every text.":
+        "Großbuchstabenhöhe im Verhältnis zur Schriftgröße im PDF, für Schriften, die ConvertCAD nicht erkennt. Arial, Times, Courier, Calibri… behalten ihre eigene Größe. Wird der Wert geändert, gilt er für alle Texte.",
+    "Collapse both side panels":
+        "Beide Seitenleisten einklappen",
+    "Collapse the {name} panel":
+        "Leiste {name} einklappen",
+    "Open the {name} panel":
+        "Leiste {name} öffnen",
+    "DWG (AutoCAD 2000 format)":
+        "DWG (AutoCAD-2000-Format)",
+    "Dimensions (arrows / ticks)":
+        "Bemaßungen (Pfeile / Schrägstriche)",
+    "Engine version":
+        "Engine-Version",
+    "Feet (ft)":
+        "Fuß (ft)",
+    "Inches (in)":
+        "Zoll (in)",
+    "Hatch patterns as HATCH":
+        "Schraffurmuster als HATCH",
+    "Ignore white / background fills":
+        "Weiße / Hintergrundfüllungen ignorieren",
+    "Join polylines / splines":
+        "Polylinien / Splines verbinden",
+    "Linetype recognition":
+        "Linientyperkennung",
+    "Native PDF layers":
+        "Native PDF-Ebenen",
+    "No":
+        "Nein",
+    "Yes":
+        "Ja",
+    "Output format":
+        "Ausgabeformat",
+    "Page {pno}: {msg}":
+        "Blatt {pno}: {msg}",
+    "Scale of the PDF sheet, e.g. 1:100, or 1/4\" = 1'-0\" in inches and feet. Ignored when the drawing is calibrated.":
+        "Maßstab des PDF-Blatts, z. B. 1:100, oder 1/4\" = 1'-0\" in Zoll und Fuß. Wird ignoriert, wenn die Zeichnung kalibriert ist.",
+    "Scanned pages: OCR":
+        "Gescannte Seiten: OCR",
+    "Scanned pages: tracing":
+        "Gescannte Seiten: Vektorisierung",
+    "Solid fills as HATCH":
+        "Vollflächen als HATCH",
+    "Text / MTEXT grouping":
+        "Texte / MTEXT-Gruppierung",
+    "calibrated ({value} {unit}/pt, about 1:{den})":
+        "kalibriert ({value} {unit}/pt, etwa 1:{den})",
+    "read on each sheet (1:{den} when none is written)":
+        "auf jedem Blatt gelesen (1:{den}, wenn keiner angegeben ist)",
+    "on":
+        "ein",
+    "off":
+        "aus",
+    "on (at least {n} copies)":
+        "ein (mindestens {n} Kopien)",
+    "on (at least {n} copies, also turned or mirrored)":
+        "ein (mindestens {n} Kopien, auch gedreht oder gespiegelt)",
+    "on ({dpi} dpi)":
+        "ein ({dpi} dpi)",
+    "on ({languages}, {quality})":
+        "ein ({languages}, {quality})",
+    "whole sheet":
+        "ganzes Blatt",
+    "selected area {w} x {h} pt at ({x}, {y})":
+        "ausgewählter Bereich {w} x {h} pt bei ({x}, {y})",
+    "no drawing content.":
+        "kein Zeichnungsinhalt.",
+    "no single scale written on the sheet; 1:{den} used.":
+        "kein eindeutiger Maßstab auf dem Blatt; 1:{den} verwendet.",
+    "scale 1:{den} read on the sheet.":
+        "Maßstab 1:{den} auf dem Blatt gelesen.",
+    "scanned page traced at {dpi} dpi — {lines} line(s), {circles} circle(s), {arcs} arc(s), {source}; original scan kept on locked layer IMG_RASTER for checking.":
+        "gescannte Seite mit {dpi} dpi vektorisiert — {lines} Linie(n), {circles} Kreis(e), {arcs} Bogen/Bögen, {source}; Original-Scan zur Kontrolle auf dem gesperrten Layer IMG_RASTER behalten.",
+    "scanned page — image kept on locked layer IMG_RASTER (tracing disabled).":
+        "gescannte Seite — Bild auf dem gesperrten Layer IMG_RASTER behalten (Vektorisierung aus).",
+    "selected area only — {kept} of {total} PDF elements kept.":
+        "nur ausgewählter Bereich — {kept} von {total} PDF-Elementen behalten.",
+    "{name}: DWG written by GNU LibreDWG {version} (AutoCAD 2000 format{checked}).":
+        "{name}: DWG geschrieben von GNU LibreDWG {version} (AutoCAD-2000-Format{checked}).",
+    "{name}: {n} entities x {k} insertions":
+        "{name}: {n} Objekte x {k} Einfügungen",
+    "{n} AutoCAD SHX text(s) recovered on layer TEXT_SHX.":
+        "{n} AutoCAD-SHX-Text(e) auf Layer TEXT_SHX wiederhergestellt.",
+    "{n} dashed line(s) rebuilt from {pieces} separate pieces (linetypes measured on the PDF).":
+        "{n} gestrichelte Linie(n) aus {pieces} Einzelstücken wiederhergestellt (Linientypen am PDF gemessen).",
+    "{n} hatch pattern(s) rebuilt from {lines} parallel lines.":
+        "{n} Schraffurmuster aus {lines} parallelen Linien wiederhergestellt.",
+    "{n} letter outline(s) replaced by the real text written over them.":
+        "{n} Buchstabenkontur(en) durch den darüber geschriebenen echten Text ersetzt.",
+    "{n} pattern hatch(es) ({names}) rebuilt from {pieces} dashes and dots.":
+        "{n} Musterschraffur(en) ({names}) aus {pieces} Strichen und Punkten wiederhergestellt.",
+    "{n} pattern hatch(es) ({names}) rebuilt from {pieces} dashes and dots; {rough}: scale and position estimated (random-looking pattern).":
+        "{n} Musterschraffur(en) ({names}) aus {pieces} Strichen und Punkten wiederhergestellt; {rough}: Maßstab und Lage geschätzt (zufällig wirkendes Muster).",
+    "{n} white (invisible) line(s) or text(s) left out.":
+        "{n} weiße (unsichtbare) Linie(n) oder Text(e) weggelassen.",
+    "{n} OCR text(s) (PP-OCR: {model})":
+        "{n} OCR-Text(e) (PP-OCR: {model})",
+    "text layer already in the PDF used":
+        "bereits im PDF vorhandene Textebene verwendet",
+    "OCR skipped":
+        "OCR übersprungen",
+    "no OCR":
+        "keine OCR",
 }
