@@ -18,8 +18,8 @@
 <style>
 /* ConvertCAD website — one static page, no framework.
    Concept: engineering graph paper ("papier millimétré"): 8 px minor squares,
-   a major line every 5 squares. In the hero, a blue light travels ALONG the
-   major grid lines (the page's one animation). Dark theme = CAD model space.
+   a major line every 5 squares. The grid lights up in blue around the mouse
+   pointer and follows it. Dark theme = CAD model space.
    Type: Saira Semi Condensed (headings, drafting feel) + Public Sans (text). */
 :root {
   --paper:   #f6f9fc;   /* page */
@@ -31,7 +31,7 @@
   --major:   rgba(29, 95, 209, .12);
   --accent:  #1d5fd1;   /* plotter blue: buttons, links */
   --on-accent: #ffffff;
-  --glow:    #2ab3ec;   /* light travelling along the grid */
+  --glow:    #1a73e8;   /* grid lit around the mouse pointer */
   --shade:   rgba(15, 34, 56, .22);
   --f-head: "Saira Semi Condensed", "Arial Narrow", system-ui, sans-serif;
   --f-text: "Public Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -90,27 +90,26 @@ p { margin: 0 }
 
 /* ---------- hero ---------- */
 .hero { padding-block: 56px 0 }
-/* the travelling light: a soft band of colour, visible only through the major
-   grid lines. Grid and light are fixed to the window, so they stay aligned. */
+/* the grid lights up around the mouse pointer: a round blue glow, visible only
+   through the grid lines (major lines fully, minor lines half). Grid and glow are
+   fixed to the window, so they stay aligned. --mx / --my are set by the script. */
 body::after {
   content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
-  background: linear-gradient(115deg, transparent 40%, var(--glow) 50%, transparent 60%);
-  background-size: 260% 100%; background-position: 120% 0;
-  -webkit-mask-image: linear-gradient(#000 1px, transparent 1px), linear-gradient(90deg, #000 1px, transparent 1px);
-          mask-image: linear-gradient(#000 1px, transparent 1px), linear-gradient(90deg, #000 1px, transparent 1px);
-  -webkit-mask-size: 40px 40px; mask-size: 40px 40px;
+  background: radial-gradient(230px circle at var(--mx, -400px) var(--my, -400px),
+              var(--glow) 0%, var(--glow) 22%, transparent 78%);
+  -webkit-mask-image:
+    linear-gradient(#000 1px, transparent 1px), linear-gradient(90deg, #000 1px, transparent 1px),
+    linear-gradient(rgba(0,0,0,.5) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,.5) 1px, transparent 1px);
+          mask-image:
+    linear-gradient(#000 1px, transparent 1px), linear-gradient(90deg, #000 1px, transparent 1px),
+    linear-gradient(rgba(0,0,0,.5) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,.5) 1px, transparent 1px);
+  -webkit-mask-size: 40px 40px, 40px 40px, 8px 8px, 8px 8px;
+          mask-size: 40px 40px, 40px 40px, 8px 8px, 8px 8px;
   -webkit-mask-position: -1px -1px; mask-position: -1px -1px;
-  opacity: .8;
+  opacity: 0; transition: opacity .4s ease;
 }
-@media (prefers-reduced-motion: no-preference) {
-  body::after { animation: sweep 10s cubic-bezier(.45, .05, .35, 1) .4s infinite }
-}
-@media (prefers-reduced-motion: reduce) { body::after { display: none } }
-@keyframes sweep {
-  0%   { background-position: 120% 0 }
-  65%  { background-position: -20% 0 }
-  100% { background-position: -20% 0 }
-}
+body.pointer-in::after { opacity: .9 }
+@media (prefers-reduced-motion: reduce) { body::after { transition: none } }
 .hero .wrap { position: relative }
 .hero-text { max-width: 760px }
 .lede { font-size: 1.2rem; color: var(--muted); margin-top: 20px; max-width: 40em }
@@ -381,6 +380,24 @@ footer a:hover { color: var(--ink) }
 </footer>
 
 <script>
+/* 0. Grid lit around the mouse pointer (mouse and pen only, not touch screens). */
+(function () {
+  var root = document.documentElement, body = document.body, x = 0, y = 0, queued = false;
+  function paint() {
+    root.style.setProperty('--mx', x + 'px');
+    root.style.setProperty('--my', y + 'px');
+    queued = false;
+  }
+  window.addEventListener('pointermove', function (e) {
+    if (e.pointerType === 'touch') return;
+    x = e.clientX; y = e.clientY;
+    body.classList.add('pointer-in');
+    if (!queued) { queued = true; requestAnimationFrame(paint); }   // at most once per frame
+  }, { passive: true });
+  document.addEventListener('pointerleave', function () { body.classList.remove('pointer-in'); });
+  window.addEventListener('blur', function () { body.classList.remove('pointer-in'); });
+})();
+
 /* 1. Screenshot tabs (Source PDF / DXF result / Report). */
 (function () {
   var tabs = document.querySelectorAll('.window-bar [role="tab"]');
