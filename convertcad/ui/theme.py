@@ -5,8 +5,9 @@ Design intent
 -------------
 * The drawing is the hero: the chrome is quiet graphite (dark) or cool
   drafting-film grey (light); colour is reserved for actions and markup.
-* Brand teal (shared with the author's other tools) marks the ONE primary
-  action of the moment.
+* Plotter blue #1D5FD1 (the colour of the icon and of the website) marks
+  the ONE primary action of the moment. "link" is the same blue made
+  lighter on the dark theme, for blue TEXT on a dark background.
 * Markup drawn ON the sheet (snap glyphs, measurements, calibration) uses
   its own fixed palette, readable on white paper and on dark canvas alike.
 
@@ -23,20 +24,22 @@ TOKENS = {
         "input": "#1A1F25", "canvas": "#15191E", "sheet_shadow": "#0C0F12",
         "border": "#343C46", "border_strong": "#4A5460",
         "text": "#E4E8EC", "text_muted": "#9BA5B1", "text_faint": "#6E7884",
-        "accent": "#2BB3C0", "accent_hover": "#45C5D1",
-        "accent_press": "#1F9AA6", "on_accent": "#04262A",
+        "accent": "#1D5FD1", "accent_hover": "#2F72E6",
+        "accent_press": "#174FB0", "on_accent": "#FFFFFF",
+        "link": "#4C9BFF",
         "ok": "#59C08A", "warn": "#E3A33E", "err": "#EE6A5A",
-        "model_space": "#212830", "selection": "#2BB3C0",
+        "model_space": "#212830", "selection": "#4C9BFF",
     },
     "light": {
         "bg": "#E9EDF0", "panel": "#F7F8F9", "panel_alt": "#E3E8EC",
         "input": "#FFFFFF", "canvas": "#C9D0D6", "sheet_shadow": "#9AA4AD",
         "border": "#CBD2D8", "border_strong": "#A9B3BC",
         "text": "#1B232B", "text_muted": "#55606C", "text_faint": "#89939E",
-        "accent": "#0E7490", "accent_hover": "#0B6178",
-        "accent_press": "#094F62", "on_accent": "#FFFFFF",
+        "accent": "#1D5FD1", "accent_hover": "#174FB0",
+        "accent_press": "#123F8C", "on_accent": "#FFFFFF",
+        "link": "#1D5FD1",
         "ok": "#1D8A57", "warn": "#B26A00", "err": "#C23A2B",
-        "model_space": "#212830", "selection": "#2BB3C0",
+        "model_space": "#212830", "selection": "#4C9BFF",
     },
 }
 
@@ -107,7 +110,7 @@ def apply_theme(app: QApplication, name: str) -> None:
     pal.setColor(role.ToolTipBase, QColor(t["panel_alt"]))
     pal.setColor(role.ToolTipText, QColor(t["text"]))
     pal.setColor(role.PlaceholderText, QColor(t["text_faint"]))
-    pal.setColor(role.Link, QColor(t["accent"]))
+    pal.setColor(role.Link, QColor(t["link"]))
     pal.setColor(QPalette.ColorGroup.Disabled, role.Text, QColor(t["text_faint"]))
     pal.setColor(QPalette.ColorGroup.Disabled, role.ButtonText,
                  QColor(t["text_faint"]))
@@ -136,6 +139,13 @@ QToolTip {{
 QMenuBar {{ background: {t['bg']}; padding: 2px 4px; }}
 QMenuBar::item {{ padding: 4px 9px; border-radius: 3px; background: transparent; }}
 QMenuBar::item:selected {{ background: {t['panel_alt']}; }}
+QToolButton#MenuCornerButton {{
+    padding: 2px 8px; border: 1px solid {t['border']}; border-radius: 3px;
+    color: {t['text']}; background: transparent; font-size: 8.5pt;
+}}
+QToolButton#MenuCornerButton:hover {{
+    border-color: {t['accent']}; background: {t['panel_alt']};
+}}
 QMenu {{
     background: {t['panel']}; border: 1px solid {t['border_strong']};
     padding: 4px;
@@ -194,7 +204,7 @@ QPushButton[kind="danger"], QToolButton[kind="danger"] {{
     background: transparent; color: {t['err']}; border: 1px solid {t['err']};
 }}
 QPushButton[kind="link"] {{
-    background: transparent; border: 0; color: {t['accent']}; padding: 2px 0;
+    background: transparent; border: 0; color: {t['link']}; padding: 2px 0;
     text-align: left;
 }}
 QPushButton[kind="link"]:hover {{ text-decoration: underline; }}
@@ -319,7 +329,7 @@ QToolButton#SnapToggle {{
     color: {t['text_faint']}; font-size: 7.5pt; font-weight: 600;
 }}
 QToolButton#SnapToggle:checked {{
-    color: {t['text']}; border-color: {MARKUP['snap']}; background: transparent;
+    color: {t['on_accent']}; border-color: {t['accent']}; background: {t['accent']};
 }}
 
 /* ---- empty state ---------------------------------------------------- */
@@ -330,7 +340,7 @@ QFrame#DropCard {{
 }}
 QFrame#DropCard[drag="true"] {{ border: 2px dashed {t['accent']}; }}
 QLabel#StepNumber {{
-    color: {t['accent']}; font-weight: 700; font-size: 10pt;
+    color: {t['link']}; font-weight: 700; font-size: 10pt;
     border: 1px solid {t['accent']}; border-radius: 10px;
     min-width: 18px; max-width: 18px; min-height: 18px; max-height: 18px;
     qproperty-alignment: AlignCenter;

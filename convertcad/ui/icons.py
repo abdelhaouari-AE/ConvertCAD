@@ -55,6 +55,8 @@ PATHS = {
     "stop": '<rect x="6" y="6" width="12" height="12" rx="1.5"/>',
     "drop": '<rect x="5" y="3" width="14" height="18" rx="1"/><path d="M5 16h14M12.5 16v5M8 7h8M8 10h5"/><path d="M12 9v0"/>',
     "close": '<path d="M6 6l12 12M18 6 6 18"/>',
+    "feedback": '<path d="M4.5 5h15A1.5 1.5 0 0 1 21 6.5v9a1.5 1.5 0 0 1-1.5 1.5H10l-4.5 3.5V17h-1A1.5 1.5 0 0 1 3 15.5v-9A1.5 1.5 0 0 1 4.5 5z"/><path d="M12 8.2v3.6M12 14.2v.1"/>',
+    "update": '<path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4.5v4h-4"/><path d="M12 8.5v6M9.5 12l2.5 2.5 2.5-2.5"/>',
     "info": '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.6v.1"/>',
     "select": '<rect x="3.5" y="4" width="6" height="6" rx="1"/><path d="M5 7l1.2 1.2L8.3 6"/><rect x="3.5" y="14" width="6" height="6" rx="1"/><path d="M13 7h7.5M13 17h7.5"/>',
     "area": '<path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4" /><path d="M10 4h4M10 20h4M4 10v4M20 10v4" stroke-dasharray="1.2 2.2"/><path d="M9 9h6v6H9z" fill="{c}" fill-opacity="0.25"/>',
@@ -94,20 +96,30 @@ def clear_cache() -> None:
 # ---------------------------------------------------------------------------
 # Application icon (also used to generate assets/icon.ico)
 # ---------------------------------------------------------------------------
-APP_ICON_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect x="2" y="2" width="60" height="60" rx="13" fill="#0E7490"/>
-  <rect x="2" y="2" width="60" height="60" rx="13" fill="none" stroke="#0B5F76" stroke-width="2"/>
-  <g fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M14 47 L14 26 A13 13 0 0 1 40 26 L40 47"/>
-    <path d="M14 47 L50 47"/>
-    <circle cx="27" cy="26" r="4.5"/>
+APP_ICON_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="207 212 840 840">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#005CF2"/>
+      <stop offset="1" stop-color="#004FE2"/>
+    </linearGradient>
+    <clipPath id="sq"><rect x="217" y="222" width="820" height="820" rx="150"/></clipPath>
+  </defs>
+  <rect x="217" y="222" width="820" height="820" rx="150" fill="url(#bg)"/>
+  <g clip-path="url(#sq)" fill="none" stroke="#4BB0FF" stroke-width="3.5" stroke-linecap="round">
+    <!-- construction grid -->
+    <path d="M292 310V945 M375 255V1010 M628 232V1030 M878 255V1010"/>
+    <path d="M280 320H985 M230 443H1025 M217 625H1037 M230 812H1025 M280 935H990"/>
+    <!-- 45 degree construction lines in the corners -->
+    <path d="M878 412L985 305 M878 830L985 940 M272 960L390 842"/>
+    <!-- hatched cells -->
+    <path d="M292 345L317 320 M292 375L347 320 M292 405L375 322 M292 435L375 352
+             M292 465L375 382 M292 495L375 412 M310 505L375 440"/>
+    <path d="M800 935L878 857 M830 935L878 887 M860 935L878 917"/>
   </g>
-  <g fill="none" stroke="#9FE7EE" stroke-width="2.2" stroke-linecap="round">
-    <path d="M14 55 L50 55"/>
-    <path d="M11.5 57.5 L16.5 52.5 M47.5 57.5 L52.5 52.5"/>
-    <path d="M50 16 L50 41"/>
-    <path d="M47.5 43.5 L52.5 38.5 M47.5 18.5 L52.5 13.5"/>
-  </g>
+  <!-- the C: ring 144 thick, flat top terminal, 40 degree cut at the bottom -->
+  <path fill="#FFFFFF"
+        d="M876 436 A312 312 0 1 0 867 826 L757 733 A168 168 0 1 1 755 515 L876 515 Z"/>
+  <path d="M757 733L867 826" stroke="#4BB0FF" stroke-width="3.5"/>
 </svg>"""
 
 

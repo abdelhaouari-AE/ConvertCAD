@@ -2,6 +2,26 @@
 
 All notable changes to ConvertCAD. Versions follow *major.minor.patch*.
 
+## [1.2.2] — 2026-11-02
+
+### Fixed
+- **Ticking or unticking a sheet** in the Sheets panel showed "An unexpected error
+  occurred (TypeError: toggled() only accepts 0 argument(s))".
+
+### Added
+- **Feedback** button (right end of the menu bar, also in Help): opens a short form in
+  the web browser to report a problem or suggest an improvement — no account needed.
+  ConvertCAD sends nothing itself; the version, system and language are only filled in
+  the form.
+- **Updates** button next to it (same as Help > Check for updates).
+
+### Changed
+- New application icon.
+- Interface colour: plotter blue (#1D5FD1), the colour of the icon and the website,
+  instead of teal. Active object-snap buttons are blue.
+- The side-panel bars ("Sheets", "Settings · Layers · Report") are written in the same
+  colour as the panel titles.
+
 ## [1.2.1] — 2026-10-31
 
 ### Fixed

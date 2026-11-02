@@ -43,7 +43,9 @@ class _SheetRow(QWidget):
         self.check = QCheckBox(f"{tr('Sheet')} {info.number}")
         self.check.setChecked(info.kind != "empty")
         self.check.setToolTip(tr("Include this sheet in the conversion"))
-        self.check.toggled.connect(self.toggled.emit)
+        # QCheckBox.toggled carries the new state (bool) but our signal
+        # takes no argument: drop it, the panel reads the box itself
+        self.check.toggled.connect(lambda _on: self.toggled.emit())
         top.addWidget(self.check)
         top.addStretch(1)
         kind = {"vector": tr("Vector"), "scanned": tr("Scan"),

@@ -173,7 +173,7 @@ class BatchDialog(QDialog):
         for i in range(len(self.files)):
             self._set_status(i, tr("Waiting"), theme.tok("text_muted"))
             self.table.item(i, 2).setText("")
-        self._set_status(0, tr("Converting"), theme.tok("accent"))
+        self._set_status(0, tr("Converting"), theme.tok("link"))
         self.progress.setValue(0)
         self.progress.show()
         self.options.auto_scale = self.auto_scale.isChecked()
@@ -204,7 +204,7 @@ class BatchDialog(QDialog):
                 self.table.item(i, 2).setText(f"{rep.duration_s:.1f} s")
                 if i + 1 < len(self.files):
                     self._set_status(i + 1, tr("Converting"),
-                                     theme.tok("accent"))
+                                     theme.tok("link"))
             elif kind in ("done", "cancelled", "error"):
                 self._finish(kind, msg)
 

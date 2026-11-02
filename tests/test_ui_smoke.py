@@ -69,6 +69,17 @@ def test_open_convert_edit_save(qapp, tmp_path, monkeypatch):
         w.open_sample()
         _pump(200)
         assert w.pages_panel.page_count() == 2
+        # ticking a sheet box on and off must not raise (1.2.1 bug:
+        # "toggled() only accepts 0 argument(s), 1 given")
+        box = w.pages_panel._rows[1].check
+        box.setChecked(False)
+        box.setChecked(True)
+        _pump(50)
+        # Feedback and Updates buttons sit at the right end of the menu bar
+        corner = w.menuBar().cornerWidget()
+        assert corner is not None
+        assert [b.defaultAction() for b in w.corner_buttons] == \
+            [w.a_feedback, w.a_updates]
 
         w.convert_or_cancel()
         t0 = time.time()

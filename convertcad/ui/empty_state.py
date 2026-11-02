@@ -37,7 +37,7 @@ class EmptyState(QWidget):
         cl.setContentsMargins(36, 32, 36, 30)
         cl.setSpacing(10)
         pic = QLabel()
-        pic.setPixmap(icon("drop", theme.tok("accent")).pixmap(56, 56))
+        pic.setPixmap(icon("drop", theme.tok("link")).pixmap(56, 56))
         cl.addWidget(pic, 0, Qt.AlignmentFlag.AlignHCenter)
         title = label(tr("Drop a PDF drawing here"), "title")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)

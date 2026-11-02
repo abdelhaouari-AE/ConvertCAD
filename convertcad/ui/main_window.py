@@ -224,8 +224,16 @@ class MainWindow(QMainWindow):
                          lambda: TermsDialog(self, gate=False).exec())
         self.a_about = A("About ConvertCAD", lambda: AboutDialog(self).exec())
         self.a_updates = A("Check for updates…", self.check_updates,
+                           icon_name="update",
                            tip="Ask GitHub whether a newer ConvertCAD exists "
                                "(nothing is sent, nothing is installed)")
+        self.a_updates.setIconText(tr("Updates"))        # short button label
+        self.a_feedback = A("Report a problem or suggest an improvement…",
+                            self.open_feedback, icon_name="feedback",
+                            tip="Opens a short form in your web browser (no "
+                                "account needed). Do not attach confidential "
+                                "drawings.")
+        self.a_feedback.setIconText(tr("Feedback"))
         self.a_updates_auto = A("Check for updates at startup",
                                 self._toggle_update_check, checkable=True)
         self.a_updates_auto.setChecked(bool(self.settings.check_updates))
@@ -297,9 +305,32 @@ class MainWindow(QMainWindow):
         h.addAction(self.a_updates)
         h.addAction(self.a_updates_auto)
         h.addSeparator()
+        h.addAction(self.a_feedback)
+        h.addSeparator()
         h.addAction(self.a_terms)
         h.addAction(self.a_settings_dir)
         h.addAction(self.a_about)
+        # Feedback and Updates buttons on the right end of the menu bar,
+        # on the same line as File, View, Tools, Help
+        # parent given here: PySide does not let the menu bar own a corner
+        # widget, which Python would otherwise delete at the end of this method
+        corner = QWidget(mb)
+        corner.setObjectName("MenuCorner")
+        self.menu_corner = corner
+        cl = QHBoxLayout(corner)
+        cl.setContentsMargins(0, 0, 6, 0)
+        cl.setSpacing(4)
+        self.corner_buttons = []
+        for a in (self.a_feedback, self.a_updates):
+            b = QToolButton()
+            b.setObjectName("MenuCornerButton")
+            b.setDefaultAction(a)
+            b.setIconSize(icon_size(15))
+            b.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+            b.setToolTip(a.toolTip())
+            cl.addWidget(b)
+            self.corner_buttons.append(b)
+        mb.setCornerWidget(corner, Qt.Corner.TopRightCorner)
 
     def _tool_button(self, action: QAction, text_beside=True) -> QToolButton:
         b = QToolButton()
@@ -356,7 +387,7 @@ class MainWindow(QMainWindow):
         help_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         hm = QMenu(help_btn)
         for a in (self.a_guide, self.a_keys, self.a_ocr, self.a_updates,
-                  self.a_terms, self.a_about):
+                  self.a_feedback, self.a_terms, self.a_about):
             hm.addAction(a)
         help_btn.setMenu(hm)
         help_btn.setProperty("iconName", "help")
@@ -1292,6 +1323,20 @@ class MainWindow(QMainWindow):
             self.settings.save()
             QMessageBox.information(self, APP_NAME, tr(
                 "Language changed. Restart ConvertCAD to apply it."))
+
+    # ---- feedback -----------------------------------------------------------
+    def open_feedback(self) -> None:
+        """Open the problem / improvement form in the web browser. ConvertCAD
+        itself sends nothing: the version, system and language are only
+        written in the form address (hidden fields of the form)."""
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+
+        from ..core.feedback import form_url
+        from ..i18n import language
+        url = form_url(language())
+        self.activity.log(tr("Feedback form opened in the web browser."))
+        QDesktopServices.openUrl(QUrl(url))
 
     # ---- updates (opt-in) ---------------------------------------------------
     def _toggle_update_check(self, on: bool) -> None:

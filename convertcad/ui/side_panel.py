@@ -82,7 +82,8 @@ class _Strip(QWidget):
             path.moveTo(cx + a / 2, cy - a)
             path.lineTo(cx - a / 2, cy)
             path.lineTo(cx + a / 2, cy + a)
-        color = theme.qcolor("text" if self._hover else "text_muted")
+        # same white (dark theme) as the panel titles, e.g. "Activity"
+        color = theme.qcolor("link" if self._hover else "text")
         p.setPen(QPen(color, 1.6, Qt.PenStyle.SolidLine,
                       Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
         p.drawPath(path)

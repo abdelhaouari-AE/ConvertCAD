@@ -925,3 +925,16 @@ _fr({
     "no OCR":
         "pas d'OCR",
 })
+
+_fr({
+    'Updates':
+        'Mises à jour',
+    'Feedback':
+        'Signaler',
+    'Report a problem or suggest an improvement…':
+        'Signaler un problème ou proposer une amélioration…',
+    'Opens a short form in your web browser (no account needed). Do not attach confidential drawings.':
+        "Ouvre un court formulaire dans votre navigateur (aucun compte nécessaire). N'y joignez pas de plans confidentiels.",
+    'Feedback form opened in the web browser.':
+        "Formulaire d'avis ouvert dans le navigateur.",
+})

@@ -1087,4 +1087,14 @@ STRINGS = {
         "OCR übersprungen",
     "no OCR":
         "keine OCR",
+    'Updates':
+        'Updates',
+    'Feedback':
+        'Feedback',
+    'Report a problem or suggest an improvement…':
+        'Problem melden oder Verbesserung vorschlagen…',
+    'Opens a short form in your web browser (no account needed). Do not attach confidential drawings.':
+        'Öffnet ein kurzes Formular im Webbrowser (kein Konto nötig). Hängen Sie keine vertraulichen Zeichnungen an.',
+    'Feedback form opened in the web browser.':
+        'Feedback-Formular im Webbrowser geöffnet.',
 }

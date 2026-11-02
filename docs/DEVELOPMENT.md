@@ -1,10 +1,10 @@
 # ConvertCAD — Development guide
 
-Complete technical description of **ConvertCAD 1.2.1**: the programming language and
+Complete technical description of **ConvertCAD 1.2.2**: the programming language and
 tools, the architecture and data flow, the content of every file, the algorithms, the
 options, the tests, the build and release process, and how to extend the application.
 
-*Author: abdelhaouari · Last update: 31 October 2026 · Applies to version 1.2.1*
+*Author: abdelhaouari · Last update: 2 November 2026 · Applies to version 1.2.2*
 
 How to build the downloads (portable, installer, AppImage, .deb) and sign them:
 [PACKAGING.md](PACKAGING.md).
@@ -309,7 +309,7 @@ ConvertCAD/
 | `requirements.txt` | Runtime dependencies with minimum versions and a comment on each. |
 | `requirements-dev.txt` | Runtime + development tools (pytest, PyInstaller, Ruff). |
 | `README.md` | GitHub home page: features, screenshots, install, use, build, licence, French summary. |
-| `CHANGELOG.md` | Version history (1.0.0 first public release, 1.1.0 OCR models, 1.2.0 curved dimensions, textures, five languages, 1.2.1 text fonts, imperial units). |
+| `CHANGELOG.md` | Version history (1.0.0 first public release, 1.1.0 OCR models, 1.2.0 curved dimensions, textures, five languages, 1.2.1 text fonts, imperial units, 1.2.2 feedback form, plotter-blue theme). |
 | `LICENSE` | GNU Affero General Public License v3.0 (full text). |
 | `THIRD_PARTY_NOTICES.md` | Licences of every library used or bundled. |
 | `.gitignore` | Files Git must ignore: caches, `.venv/`, `build/`, `dist/`, test outputs (`*.dxf`, `*.dwg`, `*_log.txt`), the Linux LibreDWG build and the OCR models of an offline build (`vendor/ocr_models`). |
@@ -964,7 +964,7 @@ geometry are saved in the settings. Panels can be hidden from *View → Panels*.
 ### 6.2 Workflow and state
 
 `MainWindow._update_state()` enables actions and chooses the **one primary action**
-(highlighted in teal) according to the state:
+(highlighted in blue) according to the state:
 
 | State | Primary action | Notes |
 |---|---|---|
@@ -1222,7 +1222,7 @@ tests then check it automatically. For a right-to-left language add its code to
 ## 12. Theme and icons
 
 - `theme.TOKENS` holds every interface colour for the `dark` and `light` themes (background,
-  panels, borders, text levels, accent teal, ok / warn / error, inputs…). `MARKUP` holds the
+  panels, borders, text levels, accent plotter blue #1D5FD1, ok / warn / error, inputs…). `MARKUP` holds the
   colours drawn on the sheet (snap glyphs, measurements, calibration), readable on white
   paper and on the dark canvas.
 - `theme.style_sheet(tokens)` generates the complete Qt style sheet from the tokens;
@@ -1607,6 +1607,7 @@ All third-party licences: [`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md).
 
 | Version | Date | Highlights |
 |---|---|---|
+| 1.2.2 | 2026-11-02 | Sheet tick-box error fixed; Feedback (Tally form, `core/feedback.py`, `FORM_URL`) and Updates buttons in the menu bar corner; new icon; plotter-blue accent, blue snap buttons |
 | 1.2.1 | 2026-10-31 | Accents kept in DWG files; text in the PDF's font with its own size, length and alignment; imperial units and scales; collapsible side panels; AutoCAD-like model space with grid; report, Yes / No and Qt dialogs in the interface language; *Convert a folder* next to *Open PDF* |
 | 1.2.0 | 2026-10-30 | Radius, diameter, angle and arc length dimensions; texture hatches (dots, sand, concrete, gravel, earth, brick, insulation) rebuilt as standard patterns; repeated symbols at any angle; arcs traced on scanned drawings; selection in the result preview; interface in Spanish, German and Arabic (right to left); optional update check (off by default) |
 | 1.1.2 | 2026-10-30 | Select area: the page background is no longer written as a hatch of the area's size |

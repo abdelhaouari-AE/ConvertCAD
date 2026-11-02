@@ -1087,4 +1087,14 @@ STRINGS = {
         "تم تخطي التعرف الضوئي",
     "no OCR":
         "بدون تعرف ضوئي",
+    'Updates':
+        'التحديثات',
+    'Feedback':
+        'ملاحظات',
+    'Report a problem or suggest an improvement…':
+        'الإبلاغ عن مشكلة أو اقتراح تحسين…',
+    'Opens a short form in your web browser (no account needed). Do not attach confidential drawings.':
+        'يفتح نموذجًا قصيرًا في متصفح الويب (دون الحاجة إلى حساب). لا ترفق رسومات سرية.',
+    'Feedback form opened in the web browser.':
+        'تم فتح نموذج الملاحظات في متصفح الويب.',
 }
