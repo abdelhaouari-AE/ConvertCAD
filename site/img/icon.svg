@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="207 212 840 840">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#005CF2"/>
+      <stop offset="1" stop-color="#004FE2"/>
+    </linearGradient>
+    <clipPath id="sq"><rect x="217" y="222" width="820" height="820" rx="150"/></clipPath>
+  </defs>
+  <rect x="217" y="222" width="820" height="820" rx="150" fill="url(#bg)"/>
+  <g clip-path="url(#sq)" fill="none" stroke="#4BB0FF" stroke-width="3.5" stroke-linecap="round">
+    <!-- construction grid -->
+    <path d="M292 310V945 M375 255V1010 M628 232V1030 M878 255V1010"/>
+    <path d="M280 320H985 M230 443H1025 M217 625H1037 M230 812H1025 M280 935H990"/>
+    <!-- 45 degree construction lines in the corners -->
+    <path d="M878 412L985 305 M878 830L985 940 M272 960L390 842"/>
+    <!-- hatched cells -->
+    <path d="M292 345L317 320 M292 375L347 320 M292 405L375 322 M292 435L375 352
+             M292 465L375 382 M292 495L375 412 M310 505L375 440"/>
+    <path d="M800 935L878 857 M830 935L878 887 M860 935L878 917"/>
+  </g>
+  <!-- the C: ring 144 thick, flat top terminal, 40 degree cut at the bottom -->
+  <path fill="#FFFFFF"
+        d="M876 436 A312 312 0 1 0 867 826 L757 733 A168 168 0 1 1 755 515 L876 515 Z"/>
+  <path d="M757 733L867 826" stroke="#4BB0FF" stroke-width="3.5"/>
+</svg>
