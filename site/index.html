@@ -221,6 +221,11 @@ section { padding-block: 96px 0 }
 .files .btn { padding: 10px 18px; font-size: .95rem }
 .note { margin-top: 14px; font-size: .9rem; color: var(--muted) }
 .note code, .file { font-family: var(--f-file); font-size: .86em }
+/* code signing policy (required by SignPath Foundation) */
+.policy { margin-top: 24px; padding: 22px 28px; border-radius: 12px; background: var(--sheet);
+  border: 1px solid var(--line); color: var(--muted); font-size: .95rem }
+.policy h3 { color: var(--ink); font-size: 1.1rem; margin-bottom: 8px }
+.policy p + p { margin-top: 6px }
 
 /* ---------- footer ---------- */
 footer { margin-top: 110px; border-top: 1px solid var(--line); background: var(--paper); padding-block: 32px 40px; color: var(--muted); font-size: .93rem }
@@ -402,6 +407,13 @@ footer a:hover { color: var(--ink) }
         </div>
       </div>
 
+      <div class="policy" id="code-signing">
+        <h3>Code signing policy</h3>
+        <p>Free code signing provided by <a href="https://about.signpath.io">SignPath.io</a>, certificate by <a href="https://signpath.org">SignPath Foundation</a>. Only the Windows programs built from this project's public source code by its GitHub Actions workflow are signed, and each signing request is approved by hand.</p>
+        <p>Committers and reviewers: <a href="https://github.com/abdelhaouari-AE">abdelhaouari</a>. Approvers: <a href="https://github.com/abdelhaouari-AE">abdelhaouari</a>.</p>
+        <p>Privacy: ConvertCAD sends no data on its own. It goes online only when you download an OCR language, check for updates or open the feedback form. <a href="https://github.com/abdelhaouari-AE/ConvertCAD/blob/main/PRIVACY.md">Privacy policy</a> · <a href="https://github.com/abdelhaouari-AE/ConvertCAD/blob/main/CODE_SIGNING.md">Full code signing policy</a></p>
+      </div>
+
     </div>
   </section>
 </main>
@@ -413,6 +425,8 @@ footer a:hover { color: var(--ink) }
       <a href="https://github.com/abdelhaouari-AE/ConvertCAD">GitHub</a>
       <a href="https://github.com/abdelhaouari-AE/ConvertCAD/blob/main/LICENSE">Licence</a>
       <a href="https://github.com/abdelhaouari-AE/ConvertCAD/blob/main/convertcad/resources/terms_en.md">Terms of use</a>
+      <a href="https://github.com/abdelhaouari-AE/ConvertCAD/blob/main/PRIVACY.md">Privacy</a>
+      <a href="#code-signing">Code signing policy</a>
       <a href="https://github.com/abdelhaouari-AE/ConvertCAD/blob/main/THIRD_PARTY_NOTICES.md">Third-party licences</a>
     </nav>
   </div>

@@ -113,35 +113,37 @@ file is checked against its SHA-256 before it is kept.
 - **Maintenance:** `python scripts/get_ocr_models.py --list` (catalogue),
   `--check DIR --load` (checksums + test run of every pack).
 
-## Code signing (Windows, optional)
+## Code signing (Windows)
 
-Unsigned programs work, but Windows SmartScreen shows "Windows protected your PC /
-unknown publisher" the first time, until the download builds a reputation.
-To sign, get an Authenticode code-signing certificate, then before building:
+The official downloads are signed by **SignPath Foundation** (free for open-source
+projects): see [CODE_SIGNING.md](../CODE_SIGNING.md) for the policy and
+[PRIVACY.md](../PRIVACY.md) for the privacy policy (shown by the installer, required by
+SignPath).
 
-```bat
-set CONVERTCAD_SIGN_PFX=C:\keys\convertcad.pfx
-set CONVERTCAD_SIGN_PASSWORD=********
-:: or, for a certificate in the Windows store / on a USB token:
-set CONVERTCAD_SIGN_THUMBPRINT=0123456789ABCDEF0123456789ABCDEF01234567
-```
+How it works in `.github/workflows/build.yml` (job `windows`):
 
-`build_exe.bat` then signs `ConvertCAD.exe`, `ConvertCAD-cli.exe` and the LibreDWG
-programs, and `build_installer.bat` signs the setup program
-(`scripts\sign_windows.bat`, needs `signtool.exe` from the Windows SDK). In GitHub Actions,
-add the secrets `SIGN_PFX_BASE64` (the .pfx, base64-encoded) and `SIGN_PFX_PASSWORD`.
+1. PyInstaller builds `dist/ConvertCAD/`; the smoke test runs.
+2. `ConvertCAD.exe` and `ConvertCAD-cli.exe` are uploaded as an artifact and sent to
+   SignPath (artifact configuration `app`, file `.signpath/artifact-configurations/app.xml`).
+   The job **waits for the approval on signpath.io** (up to 1 hour), downloads the signed
+   files and checks their signature.
+3. The portable zip and the installer are made from the signed programs.
+4. The installer is signed the same way (configuration `installer`), second approval.
 
-Where to get a certificate:
-- **SignPath Foundation** — free signing for open-source projects that meet its terms
-  (public repository, OSI licence, builds from GitHub Actions); <https://signpath.org/>.
-- A commercial certificate authority (Certum — which has a lower-cost open-source
-  certificate —, Sectigo, DigiCert...). Since 2023 the private key must stay on a hardware
-  token or a cloud signing service.
-- Microsoft **Azure Artifact Signing** (formerly Trusted Signing, about 10 USD/month):
-  at the time of writing only for individuals in the USA / Canada and organisations in the
-  USA / Canada / EU / UK.
+Third-party programs (LibreDWG `dxf2dwg.exe` / `dwg2dxf.exe`) are not signed: SignPath
+Foundation signs only binaries built from this project's own source.
 
-Check the current conditions with each provider.
+One-time setup, after SignPath Foundation accepted the project:
+
+- in SignPath: project slug `ConvertCAD`, signing policy `release-signing` (manual
+  approval), GitHub as trusted build system, artifact configurations `app` and
+  `installer` pasted from `.signpath/artifact-configurations/`, a CI user with an API token;
+- in GitHub (Settings > Secrets and variables > Actions): secret `SIGNPATH_API_TOKEN`,
+  variable `SIGNPATH_ORGANIZATION_ID`.
+
+Without them the build simply produces unsigned programs. Signing on your own computer
+with a certificate of your own is still possible with `scripts\sign_windows.bat`
+(`CONVERTCAD_SIGN_PFX` / `CONVERTCAD_SIGN_THUMBPRINT`).
 
 ## Release checklist
 

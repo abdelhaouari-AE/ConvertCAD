@@ -45,6 +45,8 @@ DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
 LicenseFile=..\LICENSE
+; privacy policy shown before installing (required by SignPath Foundation)
+InfoBeforeFile=privacy.txt
 OutputDir={#OutputDir}
 OutputBaseFilename={#AppName}-{#AppVersion}-win64-setup
 SetupIconFile=..\assets\icon.ico
@@ -54,6 +56,8 @@ VersionInfoVersion={#AppVersion}
 VersionInfoCompany={#AppPublisher}
 VersionInfoDescription={#AppName} setup
 VersionInfoProductName={#AppName}
+VersionInfoProductVersion={#AppVersion}
+VersionInfoProductTextVersion={#AppVersion}
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern

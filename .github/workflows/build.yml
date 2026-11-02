@@ -12,9 +12,13 @@
 #  - automatically when a version tag is pushed:  git tag v1.2.0 && git push --tags
 #    (the release of that tag is created the same way)
 #
-# Optional code signing (Windows): add the repository secrets
-#   SIGN_PFX_BASE64    the .pfx certificate, base64-encoded
-#   SIGN_PFX_PASSWORD  its password
+# Code signing (Windows) by SignPath Foundation, see CODE_SIGNING.md.
+# Active once these are set in the repository (Settings > Secrets and variables
+# > Actions):
+#   secret   SIGNPATH_API_TOKEN        API token of the SignPath CI user
+#   variable SIGNPATH_ORGANIZATION_ID  SignPath organization ID
+# Each signing request waits for a manual approval on signpath.io (two per
+# release: the programs, then the installer built from them).
 # Without them the programs are built unsigned.
 name: build
 
@@ -34,10 +38,10 @@ permissions:
 jobs:
   windows:
     runs-on: windows-latest
+    timeout-minutes: 180                  # includes waiting for the signing approvals
     env:
       QT_QPA_PLATFORM: offscreen
-      SIGN_PFX_BASE64: ${{ secrets.SIGN_PFX_BASE64 }}
-      SIGN_PFX_PASSWORD: ${{ secrets.SIGN_PFX_PASSWORD }}
+      SIGNPATH_ON: ${{ secrets.SIGNPATH_API_TOKEN != '' && vars.SIGNPATH_ORGANIZATION_ID != '' }}
     steps:
       - uses: actions/checkout@v5
 
@@ -74,25 +78,48 @@ jobs:
             Write-Error "the OCR did not run in the built program"; exit 1 }
           Remove-Item dist/check -Recurse
 
-      - name: Code signing (only when the secrets are set)
-        if: env.SIGN_PFX_BASE64 != ''
+      # ---- signing 1/2: ConvertCAD.exe and ConvertCAD-cli.exe (SignPath) ----
+      - name: Upload the programs to sign
+        id: unsigned_app
+        if: env.SIGNPATH_ON == 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: unsigned-programs
+          path: |
+            dist/ConvertCAD/ConvertCAD.exe
+            dist/ConvertCAD/ConvertCAD-cli.exe
+          retention-days: 1
+
+      - name: Sign the programs (approve the request on signpath.io)
+        if: env.SIGNPATH_ON == 'true'
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ConvertCAD
+          signing-policy-slug: release-signing
+          artifact-configuration-slug: app
+          github-artifact-id: ${{ steps.unsigned_app.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 3600
+          output-artifact-directory: dist/signed-programs
+
+      - name: Put the signed programs back
+        if: env.SIGNPATH_ON == 'true'
         shell: pwsh
         run: |
-          $pfx = Join-Path $env:RUNNER_TEMP "convertcad.pfx"
-          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:SIGN_PFX_BASE64))
-          "CONVERTCAD_SIGN_PFX=$pfx" | Out-File -FilePath $env:GITHUB_ENV -Append
-          "CONVERTCAD_SIGN_PASSWORD=$env:SIGN_PFX_PASSWORD" | Out-File -FilePath $env:GITHUB_ENV -Append
-
-      - name: Sign the programs
-        if: env.SIGN_PFX_BASE64 != ''
-        shell: cmd
-        run: call scripts\sign_windows.bat dist\ConvertCAD\ConvertCAD.exe dist\ConvertCAD\ConvertCAD-cli.exe dist\ConvertCAD\_internal\libredwg\dxf2dwg.exe dist\ConvertCAD\_internal\libredwg\dwg2dxf.exe
+          Copy-Item dist/signed-programs/ConvertCAD.exe, dist/signed-programs/ConvertCAD-cli.exe dist/ConvertCAD/ -Force
+          # stop here if the signature is missing or invalid
+          foreach ($f in "dist/ConvertCAD/ConvertCAD.exe", "dist/ConvertCAD/ConvertCAD-cli.exe") {
+            $sig = Get-AuthenticodeSignature $f
+            if ($sig.Status -ne "Valid") { Write-Error "$f is not signed: $($sig.Status)"; exit 1 }
+          }
 
       - name: Portable zip
         shell: pwsh
         run: |
           $v = python -c "import convertcad; print(convertcad.APP_VERSION)"
-          Copy-Item README.md, LICENSE, THIRD_PARTY_NOTICES.md, CHANGELOG.md dist/ConvertCAD/
+          Copy-Item README.md, LICENSE, THIRD_PARTY_NOTICES.md, CHANGELOG.md, PRIVACY.md, CODE_SIGNING.md dist/ConvertCAD/
           Compress-Archive -Path dist/ConvertCAD -DestinationPath "dist/ConvertCAD-$v-win64-portable.zip"
 
       - name: Installer (Inno Setup)
@@ -101,6 +128,39 @@ jobs:
           choco install innosetup -y --no-progress
           set CONVERTCAD_NOPAUSE=1
           call scripts\build_installer.bat
+
+      # ---- signing 2/2: the installer (built from the signed programs) ----
+      - name: Upload the installer to sign
+        id: unsigned_setup
+        if: env.SIGNPATH_ON == 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: unsigned-installer
+          path: dist/ConvertCAD-*-win64-setup.exe
+          retention-days: 1
+
+      - name: Sign the installer (approve the request on signpath.io)
+        if: env.SIGNPATH_ON == 'true'
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ConvertCAD
+          signing-policy-slug: release-signing
+          artifact-configuration-slug: installer
+          github-artifact-id: ${{ steps.unsigned_setup.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 3600
+          output-artifact-directory: dist/signed-installer
+
+      - name: Put the signed installer back
+        if: env.SIGNPATH_ON == 'true'
+        shell: pwsh
+        run: |
+          Copy-Item dist/signed-installer/*.exe dist/ -Force
+          $f = Get-ChildItem dist/ConvertCAD-*-win64-setup.exe
+          $sig = Get-AuthenticodeSignature $f.FullName
+          if ($sig.Status -ne "Valid") { Write-Error "installer not signed: $($sig.Status)"; exit 1 }
 
       - uses: actions/upload-artifact@v6
         with:

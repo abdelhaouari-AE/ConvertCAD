@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SignPath artifact configuration "app": the two ConvertCAD programs,
+     uploaded by .github/workflows/build.yml (job windows, step "Sign the
+     programs"). Paste it in SignPath: project ConvertCAD > Artifact
+     configurations > slug "app". -->
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <zip-file>
+    <pe-file path="ConvertCAD.exe" product-name="ConvertCAD">
+      <authenticode-sign/>
+    </pe-file>
+    <pe-file path="ConvertCAD-cli.exe" product-name="ConvertCAD">
+      <authenticode-sign/>
+    </pe-file>
+  </zip-file>
+</artifact-configuration>

@@ -257,6 +257,24 @@ vérifiez l'échelle sur une cote connue, contrôlez le calque `DIM` et passez e
 calque `DIM_RAW`. Guide complet : *Aide → Guide d'utilisation* ou
 [`guide_fr.md`](convertcad/resources/guide_fr.md).
 
+## Code signing policy
+
+Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by
+[SignPath Foundation](https://signpath.org). Only the Windows programs built by the public
+GitHub Actions workflow from this repository are signed (`ConvertCAD.exe`,
+`ConvertCAD-cli.exe` and the installer); every signing request is approved by hand.
+
+- Committers and reviewers: [abdelhaouari](https://github.com/abdelhaouari-AE)
+- Approvers: [abdelhaouari](https://github.com/abdelhaouari-AE)
+
+Details: [CODE_SIGNING.md](CODE_SIGNING.md).
+
+## Privacy
+
+ConvertCAD sends no data on its own: no account, no analytics, no tracking. It goes online
+only when you download an OCR language, check for updates (off at startup by default) or
+open the feedback form. Full text: [PRIVACY.md](PRIVACY.md).
+
 ## Licence
 
 Copyright © 2026 **abdelhaouari**.
