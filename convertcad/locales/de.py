@@ -1097,4 +1097,6 @@ STRINGS = {
         'Öffnet ein kurzes Formular im Webbrowser (kein Konto nötig). Hängen Sie keine vertraulichen Zeichnungen an.',
     'Feedback form opened in the web browser.':
         'Feedback-Formular im Webbrowser geöffnet.',
+    'Interface language':
+        'Sprache der Oberfläche',
 }

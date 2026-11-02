@@ -21,7 +21,7 @@ from urllib.parse import urlencode
 from .. import APP_VERSION
 from .updates import REPOSITORY
 
-FORM_URL = ""                           # e.g. "https://tally.so/r/abc123"
+FORM_URL = "https://tally.so/r/RWx889"
 FALLBACK_URL = f"https://github.com/{REPOSITORY}/issues/new"
 
 

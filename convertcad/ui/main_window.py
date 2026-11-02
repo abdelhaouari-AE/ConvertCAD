@@ -32,7 +32,7 @@ from typing import List, Optional
 from PySide6.QtCore import QByteArray, QPointF, QRectF, Qt, QThread, QTimer, \
     Signal
 from PySide6.QtGui import QAction, QActionGroup, QKeySequence
-from PySide6.QtWidgets import (QApplication, QComboBox, QFileDialog,
+from PySide6.QtWidgets import (QApplication, QComboBox, QFileDialog, QFrame,
                                QHBoxLayout, QMainWindow, QMenu, QMessageBox,
                                QPushButton, QSizePolicy, QSlider, QSplitter,
                                QStackedWidget,
@@ -381,18 +381,22 @@ class MainWindow(QMainWindow):
             tb.addWidget(b)
         tb.addSeparator()
         tb.addWidget(self._tool_button(self.a_theme, text_beside=False))
-        help_btn = QToolButton()
-        help_btn.setIcon(icon("help"))
-        help_btn.setIconSize(icon_size(18))
-        help_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-        hm = QMenu(help_btn)
-        for a in (self.a_guide, self.a_keys, self.a_ocr, self.a_updates,
-                  self.a_feedback, self.a_terms, self.a_about):
-            hm.addAction(a)
-        help_btn.setMenu(hm)
-        help_btn.setProperty("iconName", "help")
-        self.help_btn = help_btn
-        tb.addWidget(help_btn)
+        # interface language: the button shows the code of the chosen
+        # language (EN, FR, ES, DE, AR) and opens the list of languages
+        self.lang_btn = QToolButton()
+        self.lang_btn.setObjectName("LanguageButton")
+        self.lang_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.lang_btn.setToolTip(tr("Interface language"))
+        lang_menu = QMenu(self.lang_btn)
+        self._lang_actions = {}
+        for code, name in LANGUAGES.items():
+            a = lang_menu.addAction(f"{code.upper()}   {name}",
+                                    lambda c=code: self.set_language(c))
+            a.setCheckable(True)
+            self._lang_actions[code] = a
+        self.lang_btn.setMenu(lang_menu)
+        self._show_language(self.settings.language)
+        tb.addWidget(self.lang_btn)
         self.toolbar = tb
 
     def _build_body(self) -> None:
@@ -422,8 +426,8 @@ class MainWindow(QMainWindow):
         wl = QVBoxLayout(work)
         wl.setContentsMargins(0, 0, 0, 0)
         wl.setSpacing(0)
-        bar = QWidget()
-        bar.setObjectName("Panel")
+        bar = QFrame()                   # Source PDF / DXF result / overlay
+        bar.setObjectName("ViewBar")     # grey line under it, like the panels
         bl = QHBoxLayout(bar)
         bl.setContentsMargins(8, 0, 8, 0)
         self.view_tabs = QTabBar()
@@ -1297,10 +1301,9 @@ class MainWindow(QMainWindow):
         for a in self.findChildren(QAction):
             if a.data() and isinstance(a.data(), str) and a.data() != "stop":
                 a.setIcon(icon(a.data()))
-        self.help_btn.setIcon(icon("help"))
         for w in self.findChildren(QToolButton):
             name = w.property("iconName")
-            if name and w is not self.help_btn:
+            if name:
                 w.setIcon(icon(name, theme.tok("text_muted")))
         for w in self.findChildren(QPushButton):        # e.g. report buttons
             name = w.property("iconName")
@@ -1317,10 +1320,18 @@ class MainWindow(QMainWindow):
         self.report_panel.refresh()
         self._update_state()
 
+    def _show_language(self, lang: str) -> None:
+        """Language button text (EN, FR…) and tick in its menu."""
+        lang = lang if lang in LANGUAGES else "en"
+        self.lang_btn.setText(lang.upper())
+        for code, a in self._lang_actions.items():
+            a.setChecked(code == lang)
+
     def set_language(self, lang: str) -> None:
         if lang != self.settings.language:
             self.settings.language = lang
             self.settings.save()
+            self._show_language(lang)
             QMessageBox.information(self, APP_NAME, tr(
                 "Language changed. Restart ConvertCAD to apply it."))
 

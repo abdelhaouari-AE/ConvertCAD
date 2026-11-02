@@ -80,6 +80,9 @@ def test_open_convert_edit_save(qapp, tmp_path, monkeypatch):
         assert corner is not None
         assert [b.defaultAction() for b in w.corner_buttons] == \
             [w.a_feedback, w.a_updates]
+        # the language button shows the language code, no "?" button left
+        assert w.lang_btn.text() == "EN"
+        assert not hasattr(w, "help_btn")
 
         w.convert_or_cancel()
         t0 = time.time()

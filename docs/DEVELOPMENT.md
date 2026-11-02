@@ -1607,7 +1607,7 @@ All third-party licences: [`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md).
 
 | Version | Date | Highlights |
 |---|---|---|
-| 1.2.2 | 2026-11-02 | Sheet tick-box error fixed; Feedback (Tally form, `core/feedback.py`, `FORM_URL`) and Updates buttons in the menu bar corner; new icon; plotter-blue accent, blue snap buttons |
+| 1.2.2 | 2026-11-02 | Sheet tick-box error fixed; Feedback (Tally form, `core/feedback.py`, `FORM_URL`) and Updates buttons in the menu bar corner; language button (EN, FR…) replacing the "?" button; new icon; plotter-blue accent, blue snap buttons |
 | 1.2.1 | 2026-10-31 | Accents kept in DWG files; text in the PDF's font with its own size, length and alignment; imperial units and scales; collapsible side panels; AutoCAD-like model space with grid; report, Yes / No and Qt dialogs in the interface language; *Convert a folder* next to *Open PDF* |
 | 1.2.0 | 2026-10-30 | Radius, diameter, angle and arc length dimensions; texture hatches (dots, sand, concrete, gravel, earth, brick, insulation) rebuilt as standard patterns; repeated symbols at any angle; arcs traced on scanned drawings; selection in the result preview; interface in Spanish, German and Arabic (right to left); optional update check (off by default) |
 | 1.1.2 | 2026-10-30 | Select area: the page background is no longer written as a hatch of the area's size |

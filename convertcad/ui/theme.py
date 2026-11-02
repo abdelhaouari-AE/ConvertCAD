@@ -251,6 +251,14 @@ QFrame#Panel, QWidget#Panel {{ background: {t['panel']}; }}
 QFrame#PanelHeader {{
     background: {t['panel']}; border-bottom: 1px solid {t['border']};
 }}
+QFrame#ViewBar {{
+    background: {t['panel']}; border-bottom: 1px solid {t['border']};
+}}
+QToolButton#LanguageButton {{
+    padding: 2px 7px; border: 1px solid {t['border_strong']}; border-radius: 3px;
+    font-weight: 600; font-size: 8.5pt; min-width: 22px;
+}}
+QToolButton#LanguageButton::menu-indicator {{ image: none; width: 0; }}
 QLabel#PanelTitle {{ font-weight: 600; font-size: 9.5pt; }}
 QLabel[role="muted"] {{ color: {t['text_muted']}; }}
 QLabel[role="faint"] {{ color: {t['text_faint']}; }}

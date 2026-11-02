@@ -937,4 +937,6 @@ _fr({
         "Ouvre un court formulaire dans votre navigateur (aucun compte nécessaire). N'y joignez pas de plans confidentiels.",
     'Feedback form opened in the web browser.':
         "Formulaire d'avis ouvert dans le navigateur.",
+    'Interface language':
+        "Langue de l'interface",
 })

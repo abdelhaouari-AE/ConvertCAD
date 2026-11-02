@@ -1097,4 +1097,6 @@ STRINGS = {
         'Abre un breve formulario en su navegador (sin necesidad de cuenta). No adjunte planos confidenciales.',
     'Feedback form opened in the web browser.':
         'Formulario de comentarios abierto en el navegador.',
+    'Interface language':
+        'Idioma de la interfaz',
 }

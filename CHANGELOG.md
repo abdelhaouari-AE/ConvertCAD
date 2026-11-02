@@ -14,6 +14,8 @@ All notable changes to ConvertCAD. Versions follow *major.minor.patch*.
   ConvertCAD sends nothing itself; the version, system and language are only filled in
   the form.
 - **Updates** button next to it (same as Help > Check for updates).
+- **Language button** (EN, FR, ES, DE, AR) at the right end of the toolbar, in place of
+  the "?" button (the Help menu keeps the guide and the other help items).
 
 ### Changed
 - New application icon.
@@ -21,6 +23,7 @@ All notable changes to ConvertCAD. Versions follow *major.minor.patch*.
   instead of teal. Active object-snap buttons are blue.
 - The side-panel bars ("Sheets", "Settings · Layers · Report") are written in the same
   colour as the panel titles.
+- The Source PDF / DXF result bar has a grey line under it, like the other bars.
 
 ## [1.2.1] — 2026-10-31
 
