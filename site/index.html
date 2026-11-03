@@ -111,7 +111,7 @@ code { font-family: var(--f-mono); font-size: .86em }
 body.pointer-in .grid-zone::after { opacity: .3 }
 @media (prefers-reduced-motion: reduce) { .grid-zone::after { transition: none } }
 .hero-grid { --fade: linear-gradient(to bottom, #000 0, #000 calc(100% - 110px), transparent 100%); padding-bottom: 110px }
-.download-grid { --fade: linear-gradient(to bottom, transparent 0, #000 200px) }
+.download-grid { --fade: linear-gradient(to bottom, transparent 0, #000 160px) }
 
 /* ---------- top bar ---------- */
 .top {
@@ -178,18 +178,15 @@ body.pointer-in .grid-zone::after { opacity: .3 }
 }
 .compare .tag-pdf { left: 14px; background: #ffffff; color: #16212b; border: 1px solid #d5dde3 }
 .compare .tag-dxf { right: 14px; background: #1a1f25; color: #e4e8ec; border: 1px solid #343c46 }
-/* the "scroll bar" under the picture: drag it to the sides */
-.slider-row { display: flex; align-items: center; gap: 14px; margin-top: 14px; font: 500 .78rem var(--f-mono); color: var(--muted) }
-.slider-row input { flex: 1; accent-color: var(--accent); cursor: ew-resize }
 
 /* ---------- sections ---------- */
 section { padding-block: 104px 0 }
 /* solid band behind the features; fades into the page after the last cards */
 #features {
-  margin-top: 96px; padding-block: 96px 200px;
-  background: linear-gradient(to bottom, var(--paper) 0, var(--band) 72px, var(--band) calc(100% - 200px), var(--paper) 100%);
+  margin-top: 40px; padding-block: 72px 140px;
+  background: linear-gradient(to bottom, var(--paper) 0, var(--band) 72px, var(--band) calc(100% - 140px), var(--paper) 100%);
 }
-#download { padding-top: 40px; padding-bottom: 112px }
+#download { padding-top: 0; padding-bottom: 112px }
 .section-head { max-width: 640px }
 .section-head p { color: var(--muted); margin-top: 14px; font-size: 1.08rem }
 .section-head h2 { margin-top: 10px }
@@ -308,9 +305,6 @@ footer a:hover { color: var(--ink) }
           <span class="tag tag-dxf">DXF</span>
           <div class="divider"><span class="knob" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7l-5 5 5 5M15 7l5 5-5 5"/></svg></span></div>
         </div>
-        <label class="slider-row"><span>PDF</span>
-          <input type="range" id="compare-range" min="0" max="100" value="50" aria-label="Show more of the PDF or of the DXF">
-          <span>DXF</span></label>
       </div>
     </div>
   </div>
@@ -336,7 +330,7 @@ footer a:hover { color: var(--ink) }
           <div class="text">
             <span class="label">Scanned drawings</span>
             <h3>Scans become drawings</h3>
-            <p>Lines, circles and arcs of a scan are traced into vectors, and its text is read in more than 50 languages, Arabic included.</p>
+            <p>Lines, circles and arcs of a scan are traced into vectors. Its text is read by the built-in PaddleOCR model, about 50 languages (English, French and other Latin-script languages, Chinese, Japanese). More OCR models, such as Arabic, Cyrillic or Greek, can be downloaded from the app when needed.</p>
           </div>
           <figure class="zoom"><img src="img/f-scan.webp" srcset="img/f-scan-700.webp 700w, img/f-scan.webp 1006w" sizes="(max-width: 860px) 100vw, 640px" width="1006" height="613" loading="lazy" alt="A scanned plan on the left, and on the right the same part traced into CAD lines with its text read by OCR"></figure>
         </div>
@@ -345,7 +339,7 @@ footer a:hover { color: var(--ink) }
           <div class="text">
             <span class="label">Scale and review</span>
             <h3>Measure before you trust</h3>
-            <p>The scale is read from the title block or set on two points. Measure with object snaps, lay the PDF over the result and read the report.</p>
+            <p>The scale is read from the title block or set on two points. Measure distances with object snaps, lay the PDF over the resulting DXF to compare them, and read the conversion report for more details.</p>
           </div>
           <figure class="zoom"><img src="img/f-measure.webp" srcset="img/f-measure-700.webp 700w, img/f-measure.webp 1400w" sizes="(max-width: 860px) 100vw, 640px" width="1400" height="989" loading="lazy" alt="A 12 m distance measured on the PDF, with an intersection snap marker"></figure>
         </div>
@@ -354,7 +348,7 @@ footer a:hover { color: var(--ink) }
           <div class="text">
             <span class="label">Output</span>
             <h3>DXF or DWG, your way</h3>
-            <p>DXF from R12 to 2018 or DWG. One file for all sheets or one per sheet, or only the area you select.</p>
+            <p>Convert the whole PDF, one sheet of it or only the area you select. Save as DXF (R12 to 2018) or DWG, in one file for all sheets or one per sheet.</p>
           </div>
           <figure class="zoom tall"><img src="img/f-output.webp" width="696" height="1050" loading="lazy" alt="Output settings: file format, DXF version and multi-page output"></figure>
         </div>
@@ -409,7 +403,7 @@ footer a:hover { color: var(--ink) }
           </div>
           <ul class="files">
             <li>
-              <div class="what"><b>Installer</b><span>Adds ConvertCAD to the Start menu. No administrator rights needed.</span></div>
+              <div class="what"><b>Installer</b><span>An .exe that installs ConvertCAD in your programs, with a Start menu entry. No administrator rights needed.</span></div>
               <span class="size" data-size="win-setup"></span>
               <a class="btn btn-main" data-file="win-setup" href="https://github.com/abdelhaouari-AE/ConvertCAD/releases">Download</a>
             </li>
@@ -504,17 +498,16 @@ document.getElementById('theme-btn').addEventListener('click', function () {
   try { localStorage.setItem('convertcad-theme', root.dataset.theme); } catch (e) {}
 });
 
-/* 2. PDF / DXF comparison. Drag on the picture or move the bar under it.
+/* 2. PDF / DXF comparison. Drag on the picture (or use the arrow keys).
       When the picture first comes into view, the divider sweeps once from
       side to side (not with "reduce motion", and never after the visitor
       has touched it). */
 (function () {
-  var box = document.getElementById('compare'), range = document.getElementById('compare-range');
+  var box = document.getElementById('compare');
   var touched = false, anim = null;
   function set(p) {
     p = Math.max(0, Math.min(100, p));
     box.style.setProperty('--pos', p + '%');
-    range.value = p;
   }
   function stop() { touched = true; if (anim) cancelAnimationFrame(anim); anim = null; }
   function fromEvent(e) {
@@ -526,7 +519,14 @@ document.getElementById('theme-btn').addEventListener('click', function () {
   box.addEventListener('pointermove', function (e) { if (dragging) fromEvent(e); });
   box.addEventListener('pointerup', function () { dragging = false; });
   box.addEventListener('pointercancel', function () { dragging = false; });
-  range.addEventListener('input', function () { stop(); set(+range.value); });
+  // keyboard: arrow keys move the divider
+  box.tabIndex = 0;
+  box.addEventListener('keydown', function (e) {
+    var step = e.key === 'ArrowLeft' ? -5 : e.key === 'ArrowRight' ? 5 : 0;
+    if (!step) return;
+    e.preventDefault(); stop();
+    set(parseFloat(box.style.getPropertyValue('--pos') || '50') + step);
+  });
 
   if (matchMedia('(prefers-reduced-motion: reduce)').matches || !('IntersectionObserver' in window)) return;
   // 50 % -> 82 % -> 18 % -> 50 %, eased, 3.2 s
