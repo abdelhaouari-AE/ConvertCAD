@@ -1,10 +1,10 @@
 # ConvertCAD — Development guide
 
-Complete technical description of **ConvertCAD 1.2.2**: the programming language and
+Complete technical description of **ConvertCAD 1.2.3**: the programming language and
 tools, the architecture and data flow, the content of every file, the algorithms, the
 options, the tests, the build and release process, and how to extend the application.
 
-*Author: abdelhaouari · Last update: 2 November 2026 · Applies to version 1.2.2*
+*Author: abdelhaouari · Last update: 3 November 2026 · Applies to version 1.2.3*
 
 How to build the downloads (portable, installer, AppImage, .deb) and sign them:
 [PACKAGING.md](PACKAGING.md).
@@ -1607,6 +1607,7 @@ All third-party licences: [`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md).
 
 | Version | Date | Highlights |
 |---|---|---|
+| 1.2.3 | 2026-11-03 | Interface polish: language button, tab lines, regular-weight slim panel titles, paper size instead of the Vector tag, centred welcome step numbers |
 | 1.2.2 | 2026-11-02 | Sheet tick-box error fixed; Feedback (Tally form, `core/feedback.py`, `FORM_URL`) and Updates buttons in the menu bar corner; language button (EN, FR…) replacing the "?" button; new icon; plotter-blue accent, blue snap buttons |
 | 1.2.1 | 2026-10-31 | Accents kept in DWG files; text in the PDF's font with its own size, length and alignment; imperial units and scales; collapsible side panels; AutoCAD-like model space with grid; report, Yes / No and Qt dialogs in the interface language; *Convert a folder* next to *Open PDF* |
 | 1.2.0 | 2026-10-30 | Radius, diameter, angle and arc length dimensions; texture hatches (dots, sand, concrete, gravel, earth, brick, insulation) rebuilt as standard patterns; repeated symbols at any angle; arcs traced on scanned drawings; selection in the result preview; interface in Spanish, German and Arabic (right to left); optional update check (off by default) |

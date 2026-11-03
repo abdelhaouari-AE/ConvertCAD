@@ -2,7 +2,7 @@
 
 All notable changes to ConvertCAD. Versions follow *major.minor.patch*.
 
-## [Unreleased]
+## [1.2.3] — 2026-11-03
 
 ### Changed
 - Interface polish: the language button has the size of the theme button and no frame;

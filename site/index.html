@@ -37,6 +37,7 @@ try { var t = localStorage.getItem('convertcad-theme'); if (t) document.document
   --on-accent: #ffffff;
   --glow:    #1d5fd1;   /* grid lit around the mouse pointer */
   --shade:   rgba(22, 33, 43, .16);
+  --band:    #e9eef2;   /* solid band behind the features */
   --f-head: "Archivo", "Arial Narrow", system-ui, sans-serif;
   --f-text: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --f-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
@@ -48,6 +49,7 @@ try { var t = localStorage.getItem('convertcad-theme'); if (t) document.document
     --paper: #0f1519; --sheet: #151d23; --ink: #e3eaee; --muted: #93a4b1; --line: #26333c;
     --minor: rgba(160, 190, 210, .05); --major: rgba(160, 190, 210, .10);
     --accent: #4c9bff; --on-accent: #061218; --glow: #4c9bff; --shade: rgba(0, 0, 0, .5);
+    --band: #161f26;
     color-scheme: dark;
   }
 }
@@ -55,6 +57,7 @@ try { var t = localStorage.getItem('convertcad-theme'); if (t) document.document
   --paper: #0f1519; --sheet: #151d23; --ink: #e3eaee; --muted: #93a4b1; --line: #26333c;
   --minor: rgba(160, 190, 210, .05); --major: rgba(160, 190, 210, .10);
   --accent: #4c9bff; --on-accent: #061218; --glow: #4c9bff; --shade: rgba(0, 0, 0, .5);
+  --band: #161f26;
   color-scheme: dark;
 }
 
@@ -64,14 +67,6 @@ html { scroll-behavior: smooth; scroll-padding-top: 76px }
 body {
   margin: 0; color: var(--ink); background-color: var(--paper);
   font: 16.5px/1.6 var(--f-text);
-  background-image:
-    linear-gradient(var(--major) 1px, transparent 1px),
-    linear-gradient(90deg, var(--major) 1px, transparent 1px),
-    linear-gradient(var(--minor) 1px, transparent 1px),
-    linear-gradient(90deg, var(--minor) 1px, transparent 1px);
-  background-size: 50px 50px, 50px 50px, 10px 10px, 10px 10px;
-  background-position: -1px -1px;
-  background-attachment: fixed;
 }
 img { max-width: 100%; height: auto; display: block }
 a { color: var(--accent); text-underline-offset: 3px }
@@ -90,23 +85,33 @@ code { font-family: var(--f-mono); font-size: .86em }
   padding-right: max(20px, env(safe-area-inset-right, 0px));
 }
 
-/* the grid lights up around the mouse pointer, through the grid lines only */
-body::after {
-  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
-  background: radial-gradient(230px circle at var(--mx, -400px) var(--my, -400px), var(--glow) 0%, transparent 70%);
-  -webkit-mask-image:
-    linear-gradient(#000 1px, transparent 1px), linear-gradient(90deg, #000 1px, transparent 1px),
-    linear-gradient(rgba(0,0,0,.5) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,.5) 1px, transparent 1px);
-          mask-image:
-    linear-gradient(#000 1px, transparent 1px), linear-gradient(90deg, #000 1px, transparent 1px),
-    linear-gradient(rgba(0,0,0,.5) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,.5) 1px, transparent 1px);
-  -webkit-mask-size: 50px 50px, 50px 50px, 10px 10px, 10px 10px;
-          mask-size: 50px 50px, 50px 50px, 10px 10px, 10px 10px;
-  -webkit-mask-position: -1px -1px; mask-position: -1px -1px;
+/* Grid zones: the grey CAD grid is drawn only in the top of the page (it
+   fades out under the version line) and from the Download section to the
+   footer (it fades in). --fade is the mask that makes it appear / disappear.
+   ::after is the same grid in blue, shown only around the mouse pointer
+   (--gx / --gy: pointer position inside the zone, set by the script). */
+.grid-zone { position: relative; isolation: isolate }
+.grid-zone::before, .grid-zone::after {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background-image:
+    linear-gradient(var(--gc) 1px, transparent 1px), linear-gradient(90deg, var(--gc) 1px, transparent 1px),
+    linear-gradient(var(--gm) 1px, transparent 1px), linear-gradient(90deg, var(--gm) 1px, transparent 1px);
+  background-size: 50px 50px, 50px 50px, 10px 10px, 10px 10px;
+  background-position: -1px -1px;
+  -webkit-mask-image: var(--fade); mask-image: var(--fade);
+}
+.grid-zone::before { --gc: var(--major); --gm: var(--minor) }
+.grid-zone::after {
+  --gc: var(--glow); --gm: color-mix(in srgb, var(--glow) 50%, transparent);
+  -webkit-mask-image: radial-gradient(230px circle at var(--gx, -400px) var(--gy, -400px), #000, transparent 70%), var(--fade);
+          mask-image: radial-gradient(230px circle at var(--gx, -400px) var(--gy, -400px), #000, transparent 70%), var(--fade);
+  -webkit-mask-composite: source-in; mask-composite: intersect;
   opacity: 0; transition: opacity .4s ease;
 }
-body.pointer-in::after { opacity: .3 }
-@media (prefers-reduced-motion: reduce) { body::after { transition: none } }
+body.pointer-in .grid-zone::after { opacity: .3 }
+@media (prefers-reduced-motion: reduce) { .grid-zone::after { transition: none } }
+.hero-grid { --fade: linear-gradient(to bottom, #000 0, #000 calc(100% - 110px), transparent 100%); padding-bottom: 110px }
+.download-grid { --fade: linear-gradient(to bottom, transparent 0, #000 200px) }
 
 /* ---------- top bar ---------- */
 .top {
@@ -130,7 +135,8 @@ body.pointer-in::after { opacity: .3 }
 .theme-btn svg { width: 20px; height: 20px }
 
 /* ---------- hero ---------- */
-.hero { padding-block: 64px 0; text-align: center }
+.hero { text-align: center }
+.hero-grid { padding-top: 64px }
 .hero h1 { margin-top: 16px }
 .hero h1 em { font-style: normal; color: var(--accent) }
 .lede { font-size: 1.15rem; color: var(--muted); margin: 18px auto 0; max-width: 36em }
@@ -148,7 +154,7 @@ body.pointer-in::after { opacity: .3 }
 .facts { margin-top: 16px; font: .84rem var(--f-mono); color: var(--muted) }
 
 /* PDF / DXF comparison: the DXF is drawn over the PDF and clipped at --pos */
-.compare-wrap { margin-top: 48px }
+.compare-wrap { margin-top: -40px }   /* starts where the grid fades out */
 .compare {
   position: relative; aspect-ratio: 1600 / 1119; border-radius: 8px; overflow: hidden;
   border: 1px solid var(--line); background: #212830; box-shadow: 0 24px 60px -34px var(--shade);
@@ -178,6 +184,12 @@ body.pointer-in::after { opacity: .3 }
 
 /* ---------- sections ---------- */
 section { padding-block: 104px 0 }
+/* solid band behind the features; fades into the page after the last cards */
+#features {
+  margin-top: 96px; padding-block: 96px 200px;
+  background: linear-gradient(to bottom, var(--paper) 0, var(--band) 72px, var(--band) calc(100% - 200px), var(--paper) 100%);
+}
+#download { padding-top: 40px; padding-bottom: 112px }
 .section-head { max-width: 640px }
 .section-head p { color: var(--muted); margin-top: 14px; font-size: 1.08rem }
 .section-head h2 { margin-top: 10px }
@@ -185,7 +197,11 @@ section { padding-block: 104px 0 }
 /* features: a card next to a zoomed screenshot, alternately left / right */
 .feature-list { display: grid; gap: 56px; margin-top: 52px }
 .feature { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 40px; align-items: center }
-.feature:nth-child(even) .card { order: 2 }
+.feature:nth-child(even) .text { order: 2 }
+.text { padding: 8px 4px }
+.text h3 { margin-top: 6px }
+.text p { color: var(--muted); margin-top: 10px }
+.text code { background: var(--sheet); border: 1px solid var(--line); border-radius: 4px; padding: 2px 6px; white-space: nowrap }
 .card {
   padding: 30px 32px; background: var(--sheet); border: 1px solid var(--line); border-radius: 10px;
 }
@@ -219,8 +235,8 @@ section { padding-block: 104px 0 }
 .note { margin-top: 14px; font-size: .9rem; color: var(--muted) }
 
 /* ---------- footer: code signing policy (required by SignPath Foundation), links ---------- */
-footer { margin-top: 112px; border-top: 1px solid var(--line); background: var(--paper); padding-block: 32px 40px; color: var(--muted); font-size: .9rem }
-.policy { padding-bottom: 24px; margin-bottom: 24px; border-bottom: 1px solid var(--line); max-width: 860px }
+footer { border-top: 1px solid var(--line); background: var(--paper); padding-block: 32px 40px; color: var(--muted); font-size: .9rem }
+.policy { padding-bottom: 24px; margin-bottom: 24px; border-bottom: 1px solid var(--line) }
 .policy .label { display: block; margin-bottom: 8px }
 .policy p + p { margin-top: 4px }
 .foot { display: flex; gap: 16px 40px; flex-wrap: wrap; justify-content: space-between }
@@ -230,7 +246,7 @@ footer a:hover { color: var(--ink) }
 
 @media (max-width: 860px) {
   .feature, .platforms, .duo { grid-template-columns: 1fr }
-  .feature:nth-child(even) .card { order: 0 }
+  .feature:nth-child(even) .text { order: 0 }
   .feature { gap: 18px }
   section { padding-block: 80px 0 }
 }
@@ -268,6 +284,7 @@ footer a:hover { color: var(--ink) }
 
 <main id="top">
   <div class="hero">
+    <div class="grid-zone hero-grid">
     <div class="wrap">
       <span class="label">Free · Windows &amp; Linux · 100 % offline</span>
       <h1>PDF drawings back into <em>real CAD</em>.</h1>
@@ -279,6 +296,9 @@ footer a:hover { color: var(--ink) }
         </a>
       </div>
       <p class="facts" id="hero-facts">Free and open source · Windows 10/11 and Linux</p>
+    </div>
+    </div>
+    <div class="wrap">
 
       <div class="compare-wrap">
         <div class="compare" id="compare" aria-label="The same plan: the source PDF on the left, the DXF made by ConvertCAD on the right">
@@ -304,7 +324,7 @@ footer a:hover { color: var(--ink) }
 
       <div class="feature-list">
         <div class="feature">
-          <div class="card">
+          <div class="text">
             <span class="label">CAD entities</span>
             <h3>Real CAD, not exploded lines</h3>
             <p>True dimensions, blocks for repeated symbols, hatches, dashed linetypes and editable text, sorted into layers created from the colours and line weights of the PDF.</p>
@@ -313,7 +333,7 @@ footer a:hover { color: var(--ink) }
         </div>
 
         <div class="feature">
-          <div class="card">
+          <div class="text">
             <span class="label">Scanned drawings</span>
             <h3>Scans become drawings</h3>
             <p>Lines, circles and arcs of a scan are traced into vectors, and its text is read in more than 50 languages, Arabic included.</p>
@@ -322,7 +342,7 @@ footer a:hover { color: var(--ink) }
         </div>
 
         <div class="feature">
-          <div class="card">
+          <div class="text">
             <span class="label">Scale and review</span>
             <h3>Measure before you trust</h3>
             <p>The scale is read from the title block or set on two points. Measure with object snaps, lay the PDF over the result and read the report.</p>
@@ -331,7 +351,7 @@ footer a:hover { color: var(--ink) }
         </div>
 
         <div class="feature">
-          <div class="card">
+          <div class="text">
             <span class="label">Output</span>
             <h3>DXF or DWG, your way</h3>
             <p>DXF from R12 to 2018 or DWG. One file for all sheets or one per sheet, or only the area you select.</p>
@@ -340,7 +360,7 @@ footer a:hover { color: var(--ink) }
         </div>
 
         <div class="feature">
-          <div class="card">
+          <div class="text">
             <span class="label">Interface</span>
             <h3>Your language, your theme</h3>
             <p>English, French, Spanish, German or Arabic, in a dark or a light theme. Switch from the toolbar.</p>
@@ -349,7 +369,7 @@ footer a:hover { color: var(--ink) }
         </div>
 
         <div class="feature">
-          <div class="card">
+          <div class="text">
             <span class="label">Automation</span>
             <h3>A whole folder at once</h3>
             <p>Convert every PDF of a folder from the window, or script it from the command line: <code>ConvertCAD-cli plan.pdf -o plan.dwg</code></p>
@@ -373,7 +393,7 @@ footer a:hover { color: var(--ink) }
     </div>
   </section>
 
-  <section id="download">
+  <section id="download" class="grid-zone download-grid">
     <div class="wrap">
       <div class="section-head">
         <span class="label">Download</span>
@@ -454,12 +474,17 @@ footer a:hover { color: var(--ink) }
 <script>
 /* 0. Grid lit around the mouse pointer (mouse and pen only, not touch screens). */
 (function () {
-  var root = document.documentElement, body = document.body, x = 0, y = 0, queued = false;
+  var body = document.body, x = -1000, y = -1000, queued = false;
+  var zones = document.querySelectorAll('.grid-zone');
   function paint() {
-    root.style.setProperty('--mx', x + 'px');
-    root.style.setProperty('--my', y + 'px');
+    zones.forEach(function (z) {
+      var r = z.getBoundingClientRect();
+      z.style.setProperty('--gx', (x - r.left) + 'px');
+      z.style.setProperty('--gy', (y - r.top) + 'px');
+    });
     queued = false;
   }
+  window.addEventListener('scroll', function () { if (!queued) { queued = true; requestAnimationFrame(paint); } }, { passive: true });
   window.addEventListener('pointermove', function (e) {
     if (e.pointerType === 'touch') return;
     x = e.clientX; y = e.clientY;
