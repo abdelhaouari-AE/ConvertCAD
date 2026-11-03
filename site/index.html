@@ -62,7 +62,7 @@ try { var t = localStorage.getItem('convertcad-theme'); if (t) document.document
 }
 
 * { box-sizing: border-box }
-html { scroll-behavior: smooth; scroll-padding-top: 76px }
+html { scroll-behavior: smooth; scroll-padding-top: calc(var(--bar-h, 59px) + 3px) }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto } }
 body {
   margin: 0; color: var(--ink); background-color: var(--paper);
@@ -188,6 +188,7 @@ section { padding-block: 104px 0 }
 }
 #download { padding-top: 0; padding-bottom: 112px }
 .section-head { max-width: 640px }
+.section-head .label { display: block }      /* links land exactly on it */
 .section-head p { color: var(--muted); margin-top: 14px; font-size: 1.08rem }
 .section-head h2 { margin-top: 10px }
 
@@ -250,6 +251,7 @@ footer a:hover { color: var(--ink) }
 @media (max-width: 560px) {
   body { font-size: 16px }
   .top { position: static }
+  html { scroll-padding-top: 3px }      /* the bar scrolls away on phones */
   .top .wrap { gap: 10px 14px }
   .theme-btn { order: 2; margin-left: auto }
   .top nav { order: 3; width: 100%; margin-left: 0; gap: 4px 14px; font-size: .9rem }
@@ -267,8 +269,8 @@ footer a:hover { color: var(--ink) }
   <div class="wrap">
     <a class="brand" href="#top"><img src="img/icon.svg" alt="" width="28" height="28">ConvertCAD</a>
     <nav aria-label="Main">
-      <a href="#features">Features</a>
-      <a href="#download">Download</a>
+      <a href="#features-head">Features</a>
+      <a href="#download-head">Download</a>
       <a href="https://github.com/abdelhaouari-AE/ConvertCAD/blob/main/convertcad/resources/guide_en.md">User guide</a>
       <a href="https://github.com/abdelhaouari-AE/ConvertCAD">Source code</a>
     </nav>
@@ -287,7 +289,7 @@ footer a:hover { color: var(--ink) }
       <h1>PDF drawings back into <em>real CAD</em>.</h1>
       <p class="lede">ConvertCAD rebuilds the lines, dimensions, hatches, blocks, layers and text of a 2D PDF plan as editable DXF and DWG, on your own computer.</p>
       <div class="actions">
-        <a class="btn btn-main" href="#download">
+        <a class="btn btn-main" href="#download-head">
           <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v10m0 0-4-4m4 4 4-4M4 16h12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           Start converting
         </a>
@@ -311,7 +313,7 @@ footer a:hover { color: var(--ink) }
 
   <section id="features">
     <div class="wrap">
-      <div class="section-head">
+      <div class="section-head" id="features-head">
         <span class="label">Features</span>
         <h2>The intent of the drawing, not just its strokes.</h2>
       </div>
@@ -348,7 +350,7 @@ footer a:hover { color: var(--ink) }
           <div class="text">
             <span class="label">Output</span>
             <h3>DXF or DWG, your way</h3>
-            <p>Convert the whole PDF, one sheet of it or only the area you select. Save as DXF (R12 to 2018) or DWG, in one file for all sheets or one per sheet.</p>
+            <p>Convert the whole PDF, one sheet of it or only the area you select. Save as DXF or DWG, in one file for all sheets or one per sheet.</p>
           </div>
           <figure class="zoom tall"><img src="img/f-output.webp" width="696" height="1050" loading="lazy" alt="Output settings: file format, DXF version and multi-page output"></figure>
         </div>
@@ -389,7 +391,7 @@ footer a:hover { color: var(--ink) }
 
   <section id="download" class="grid-zone download-grid">
     <div class="wrap">
-      <div class="section-head">
+      <div class="section-head" id="download-head">
         <span class="label">Download</span>
         <h2>Everything included. Nothing else to install.</h2>
         <p class="release-line" id="release-line">The DWG converter and the text recognition come with the program.</p>
@@ -403,7 +405,7 @@ footer a:hover { color: var(--ink) }
           </div>
           <ul class="files">
             <li>
-              <div class="what"><b>Installer</b><span>An .exe that installs ConvertCAD in your programs, with a Start menu entry. No administrator rights needed.</span></div>
+              <div class="what"><b>Installer</b><span>An .exe that installs ConvertCAD in your programs.</span></div>
               <span class="size" data-size="win-setup"></span>
               <a class="btn btn-main" data-file="win-setup" href="https://github.com/abdelhaouari-AE/ConvertCAD/releases">Download</a>
             </li>
@@ -487,6 +489,15 @@ footer a:hover { color: var(--ink) }
   }, { passive: true });
   document.addEventListener('pointerleave', function () { body.classList.remove('pointer-in'); });
   window.addEventListener('blur', function () { body.classList.remove('pointer-in'); });
+})();
+
+/* 0b. Height of the top bar, so a link lands its section title 3 px under it. */
+(function () {
+  var bar = document.querySelector('.top');
+  function measure() { document.documentElement.style.setProperty('--bar-h', bar.offsetHeight + 'px'); }
+  measure();
+  window.addEventListener('resize', measure);
+  if (document.fonts) document.fonts.ready.then(measure);
 })();
 
 /* 1. Light / dark button: switches to the theme not shown now. */
