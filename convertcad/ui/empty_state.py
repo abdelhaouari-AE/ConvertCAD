@@ -8,7 +8,7 @@ a recent drawing — with the four steps of the workflow, in order.
 import os
 from typing import List
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QPointF, QRectF, Qt, Signal
 from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QPushButton,
                                QVBoxLayout, QWidget)
 
@@ -17,6 +17,33 @@ from . import theme
 from .icons import icon, icon_size
 from .widgets import label, restyle
 
+
+
+class StepBadge(QWidget):
+    """Step number in a circle. Drawn by hand: a QLabel centres the text box,
+    not the digit itself, so the number looked low in the circle."""
+    SIZE = 20
+
+    def __init__(self, n: int, parent=None):
+        super().__init__(parent)
+        self.n = n
+        self.setFixedSize(self.SIZE, self.SIZE)
+
+    def paintEvent(self, event) -> None:             # noqa: N802 (Qt name)
+        from PySide6.QtGui import QFont, QFontMetricsF, QPainter, QPen
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        p.setPen(QPen(theme.qcolor("accent"), 1.2))
+        r = QRectF(self.rect()).adjusted(0.8, 0.8, -0.8, -0.8)
+        p.drawEllipse(r)
+        f = theme.ui_font(9.0, QFont.Weight.DemiBold)
+        p.setFont(f)
+        p.setPen(theme.qcolor("link"))
+        # centre the digit's real outline (its tight bounding box)
+        box = QFontMetricsF(f).tightBoundingRect(str(self.n))
+        x = r.center().x() - box.width() / 2 - box.left()
+        y = r.center().y() - box.height() / 2 - box.top()
+        p.drawText(QPointF(x, y), str(self.n))
 
 class EmptyState(QWidget):
     open_requested = Signal()
@@ -68,9 +95,7 @@ class EmptyState(QWidget):
                                   tr("Convert"), tr("Review and save")), 1):
             s = QHBoxLayout()
             s.setSpacing(6)
-            num = QLabel(str(n))
-            num.setObjectName("StepNumber")
-            s.addWidget(num)
+            s.addWidget(StepBadge(n), 0, Qt.AlignmentFlag.AlignVCenter)
             s.addWidget(label(text, "muted"))
             steps.addLayout(s)
         wrap = QHBoxLayout()

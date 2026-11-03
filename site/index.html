@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>ConvertCAD — PDF to DXF and DWG, offline</title>
 <meta name="description" content="Free, open-source converter that turns 2D PDF drawings into editable DXF and DWG files with real dimensions, layers, blocks, hatches and text. Runs on your computer, for Windows and Linux.">
-<meta property="og:title" content="ConvertCAD — PDF to DXF and DWG, offline">
+<meta property="og:title" content="ConvertCAD — PDF drawings back into real CAD">
 <meta property="og:description" content="Turn PDF drawings into editable CAD files with real dimensions, layers, blocks and hatches. Free, open source, runs on your computer.">
 <meta property="og:image" content="https://abdelhaouari-ae.github.io/ConvertCAD/img/social.png">
 <meta property="og:type" content="website">
@@ -13,243 +13,238 @@
 <link rel="icon" type="image/svg+xml" href="img/icon.svg">
 <link rel="icon" type="image/png" href="img/icon-64.png">
 <link rel="apple-touch-icon" href="img/icon-180.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Semi+Condensed:wght@500;600;700&family=Public+Sans:wght@400;500;600&display=swap">
 <script>
 /* theme chosen with the top-bar button, remembered in this browser only */
 try { var t = localStorage.getItem('convertcad-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
 </script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@112,600;112,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
 /* ConvertCAD website — one static page, no framework.
-   Concept: engineering graph paper ("papier millimétré"): 8 px minor squares,
-   a major line every 5 squares. The grid lights up in blue around the mouse
-   pointer and follows it. Dark theme = CAD model space.
-   Type: Saira Semi Condensed (headings, drafting feel) + Public Sans (text). */
+   Light theme: whitish drafting sheet with a grey AutoCAD-like grid (minor
+   lines every 10 px, a major line every 5). Dark theme: CAD model space.
+   Type: Archivo (headings), IBM Plex Sans (text), IBM Plex Mono (labels). */
 :root {
-  --paper:   #f6f9fc;   /* page */
-  --sheet:   #ffffff;   /* panels */
-  --ink:     #0f2238;   /* text, deep blue ink */
-  --muted:   #4e6178;
-  --line:    #d6e0eb;   /* panel borders */
-  --minor:   rgba(29, 95, 209, .06);
-  --major:   rgba(29, 95, 209, .12);
+  --paper:   #f5f7f8;   /* page */
+  --sheet:   #ffffff;   /* cards */
+  --ink:     #16212b;   /* text */
+  --muted:   #5b6b78;
+  --line:    #d5dde3;   /* borders */
+  --minor:   rgba(22, 33, 43, .045);   /* grid */
+  --major:   rgba(22, 33, 43, .09);
   --accent:  #1d5fd1;   /* plotter blue: buttons, links */
   --on-accent: #ffffff;
-  --glow:    #1a73e8;   /* grid lit around the mouse pointer */
-  --shade:   rgba(15, 34, 56, .22);
-  --f-head: "Saira Semi Condensed", "Arial Narrow", system-ui, sans-serif;
-  --f-text: "Public Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --f-file: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace;
+  --glow:    #1d5fd1;   /* grid lit around the mouse pointer */
+  --shade:   rgba(22, 33, 43, .16);
+  --f-head: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --f-text: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
   color-scheme: light;
 }
-/* dark theme: follows the system, unless the visitor chose with the button
-   (html data-theme="light" / "dark", remembered in the browser) */
+/* dark theme: follows the system, unless the visitor chose with the button */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --paper: #0a1626; --sheet: #0f1f33; --ink: #e4edf7; --muted: #9db0c6; --line: #22374f;
-    --minor: rgba(80, 160, 255, .06); --major: rgba(80, 160, 255, .12);
-    --accent: #4c9bff; --on-accent: #06121f; --glow: #3fd0f5; --shade: rgba(0, 0, 0, .5);
+    --paper: #0f1519; --sheet: #151d23; --ink: #e3eaee; --muted: #93a4b1; --line: #26333c;
+    --minor: rgba(160, 190, 210, .05); --major: rgba(160, 190, 210, .10);
+    --accent: #4c9bff; --on-accent: #061218; --glow: #4c9bff; --shade: rgba(0, 0, 0, .5);
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --paper: #0a1626; --sheet: #0f1f33; --ink: #e4edf7; --muted: #9db0c6; --line: #22374f;
-  --minor: rgba(80, 160, 255, .06); --major: rgba(80, 160, 255, .12);
-  --accent: #4c9bff; --on-accent: #06121f; --glow: #3fd0f5; --shade: rgba(0, 0, 0, .5);
+  --paper: #0f1519; --sheet: #151d23; --ink: #e3eaee; --muted: #93a4b1; --line: #26333c;
+  --minor: rgba(160, 190, 210, .05); --major: rgba(160, 190, 210, .10);
+  --accent: #4c9bff; --on-accent: #061218; --glow: #4c9bff; --shade: rgba(0, 0, 0, .5);
   color-scheme: dark;
 }
 
 * { box-sizing: border-box }
-html { scroll-behavior: smooth }
+html { scroll-behavior: smooth; scroll-padding-top: 76px }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto } }
 body {
   margin: 0; color: var(--ink); background-color: var(--paper);
-  font: 17px/1.6 var(--f-text);
-  /* graph paper, fixed to the window */
+  font: 16.5px/1.6 var(--f-text);
   background-image:
     linear-gradient(var(--major) 1px, transparent 1px),
     linear-gradient(90deg, var(--major) 1px, transparent 1px),
     linear-gradient(var(--minor) 1px, transparent 1px),
     linear-gradient(90deg, var(--minor) 1px, transparent 1px);
-  background-size: 40px 40px, 40px 40px, 8px 8px, 8px 8px;
+  background-size: 50px 50px, 50px 50px, 10px 10px, 10px 10px;
   background-position: -1px -1px;
   background-attachment: fixed;
 }
 img { max-width: 100%; height: auto; display: block }
 a { color: var(--accent); text-underline-offset: 3px }
-:focus-visible { outline: 3px solid var(--glow); outline-offset: 3px; border-radius: 4px }
-h1, h2, h3 { font-family: var(--f-head); line-height: 1.12; margin: 0; text-wrap: balance; letter-spacing: -.005em }
-h1 { font-size: clamp(2.3rem, 5.2vw, 4rem); font-weight: 700 }
-h2 { font-size: clamp(1.7rem, 3.2vw, 2.4rem); font-weight: 700 }
-h3 { font-size: 1.28rem; font-weight: 600 }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px }
+h1, h2, h3 { font-family: var(--f-head); font-stretch: 112%; line-height: 1.1; margin: 0; text-wrap: balance }
+h1 { font-size: clamp(2.3rem, 5.4vw, 4rem); font-weight: 800 }
+h2 { font-size: clamp(1.6rem, 3vw, 2.2rem); font-weight: 800 }
+h3 { font-size: 1.3rem; font-weight: 600 }
 p { margin: 0 }
+code { font-family: var(--f-mono); font-size: .86em }
+.label { font: 500 .74rem/1.4 var(--f-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted) }
 
 .wrap {
-  max-width: 1160px; margin: 0 auto;
+  max-width: 1120px; margin: 0 auto;
   padding-left: max(20px, env(safe-area-inset-left, 0px));
   padding-right: max(20px, env(safe-area-inset-right, 0px));
 }
 
-/* ---------- top bar (stays at the top while scrolling) ---------- */
-.top {
-  position: sticky; top: 0; z-index: 10; padding-block: 12px;
-  background: color-mix(in srgb, var(--sheet) 88%, transparent);
-  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
-  border-bottom: 1px solid var(--line);
-}
-.top .wrap { display: flex; align-items: center; gap: 28px; flex-wrap: wrap }
-.theme-btn {
-  display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px;
-  border: 1px solid var(--line); border-radius: 8px; background: transparent;
-  color: var(--ink); cursor: pointer; padding: 0; flex: none;
-}
-.theme-btn:hover { border-color: var(--accent) }
-.theme-btn svg { width: 19px; height: 19px }
-.theme-btn .moon { display: none }
-:root[data-theme="dark"] .theme-btn .sun { display: none }
-:root[data-theme="dark"] .theme-btn .moon { display: block }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .theme-btn .sun { display: none }
-  :root:not([data-theme="light"]) .theme-btn .moon { display: block }
-}
-html { scroll-padding-top: 80px }      /* anchors are not hidden under the bar */
-.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink);
-  font: 700 1.3rem var(--f-head) }
-.brand img { width: 30px; height: 30px }
-.top nav { display: flex; gap: 26px; margin-left: auto; flex-wrap: wrap; font-weight: 500; align-items: center }
-.top nav a { color: var(--muted); text-decoration: none }
-.top nav a:hover { color: var(--ink) }
-
-/* ---------- hero ---------- */
-.hero { padding-block: 56px 0 }
-/* the grid lights up around the mouse pointer: a round blue glow, visible only
-   through the grid lines (major lines fully, minor lines half). Grid and glow are
-   fixed to the window, so they stay aligned. --mx / --my are set by the script. */
+/* the grid lights up around the mouse pointer, through the grid lines only */
 body::after {
   content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
-  background: radial-gradient(230px circle at var(--mx, -400px) var(--my, -400px),
-              var(--glow) 0%, transparent 70%);
+  background: radial-gradient(230px circle at var(--mx, -400px) var(--my, -400px), var(--glow) 0%, transparent 70%);
   -webkit-mask-image:
     linear-gradient(#000 1px, transparent 1px), linear-gradient(90deg, #000 1px, transparent 1px),
     linear-gradient(rgba(0,0,0,.5) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,.5) 1px, transparent 1px);
           mask-image:
     linear-gradient(#000 1px, transparent 1px), linear-gradient(90deg, #000 1px, transparent 1px),
     linear-gradient(rgba(0,0,0,.5) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,.5) 1px, transparent 1px);
-  -webkit-mask-size: 40px 40px, 40px 40px, 8px 8px, 8px 8px;
-          mask-size: 40px 40px, 40px 40px, 8px 8px, 8px 8px;
+  -webkit-mask-size: 50px 50px, 50px 50px, 10px 10px, 10px 10px;
+          mask-size: 50px 50px, 50px 50px, 10px 10px, 10px 10px;
   -webkit-mask-position: -1px -1px; mask-position: -1px -1px;
   opacity: 0; transition: opacity .4s ease;
 }
-body.pointer-in::after { opacity: .35 }   /* subtle: never competes with the text */
+body.pointer-in::after { opacity: .3 }
 @media (prefers-reduced-motion: reduce) { body::after { transition: none } }
-.hero .wrap { position: relative }
-.hero-text { max-width: 760px }
-.lede { font-size: 1.2rem; color: var(--muted); margin-top: 20px; max-width: 40em }
-.actions { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin-top: 32px }
+
+/* ---------- top bar ---------- */
+.top {
+  position: sticky; top: 0; z-index: 10; padding-block: 12px;
+  background: color-mix(in srgb, var(--paper) 90%, transparent);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+}
+.top .wrap { display: flex; align-items: center; gap: 28px; flex-wrap: wrap }
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink);
+  font: 800 1.2rem var(--f-head); font-stretch: 112% }
+.brand img { width: 28px; height: 28px }
+.top nav { display: flex; gap: 24px; margin-left: auto; flex-wrap: wrap; font-weight: 500; align-items: center }
+.top nav a { color: var(--muted); text-decoration: none }
+.top nav a:hover { color: var(--ink) }
+.theme-btn {
+  display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px;
+  border: 0; border-radius: 6px; background: transparent; color: var(--ink); cursor: pointer; padding: 0; flex: none;
+}
+.theme-btn:hover { background: var(--line) }
+.theme-btn svg { width: 20px; height: 20px }
+
+/* ---------- hero ---------- */
+.hero { padding-block: 64px 0; text-align: center }
+.hero h1 { margin-top: 16px }
+.hero h1 em { font-style: normal; color: var(--accent) }
+.lede { font-size: 1.15rem; color: var(--muted); margin: 18px auto 0; max-width: 36em }
+.actions { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; margin-top: 30px }
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 10px;
-  padding: 14px 24px; border-radius: 8px; font: 600 1rem var(--f-text);
-  text-decoration: none; border: 1px solid transparent; white-space: nowrap;
+  padding: 14px 24px; border-radius: 6px; font: 600 1rem var(--f-text);
+  text-decoration: none; border: 1px solid transparent; white-space: nowrap; cursor: pointer;
 }
 .btn-main { background: var(--accent); color: var(--on-accent) }   /* flat, no shadow */
 .btn-main:hover { filter: brightness(1.08) }
 .btn-plain { color: var(--ink); border-color: var(--line); background: var(--sheet) }
 .btn-plain:hover { border-color: var(--accent) }
 .btn svg { width: 18px; height: 18px; flex: none }
-.facts { margin-top: 18px; color: var(--muted); font-size: .95rem }
+.facts { margin-top: 16px; font: .84rem var(--f-mono); color: var(--muted) }
 
-/* app window with the real screenshots */
-.window {
-  margin-top: 48px; border-radius: 12px 12px 0 0; overflow: hidden;
-  background: #1b2228; border: 1px solid #2a343d; border-bottom: 0;
-  box-shadow: 0 30px 70px -30px var(--shade);
+/* PDF / DXF comparison: the DXF is drawn over the PDF and clipped at --pos */
+.compare-wrap { margin-top: 48px }
+.compare {
+  position: relative; aspect-ratio: 1600 / 1119; border-radius: 8px; overflow: hidden;
+  border: 1px solid var(--line); background: #212830; box-shadow: 0 24px 60px -34px var(--shade);
+  touch-action: pan-y; user-select: none; cursor: ew-resize; --pos: 50%;
 }
-.window-bar { display: flex; align-items: center; gap: 4px; padding: 8px 10px 0; background: #151b20; flex-wrap: wrap;
-  border-bottom: 1px solid #2a343d; margin-bottom: 14px }   /* space above the screenshot */
-.window-bar button {
-  font: 500 .9rem var(--f-text); color: #9fb0bf; background: transparent; border: 0;
-  padding: 8px 14px 10px; border-bottom: 2px solid transparent; cursor: pointer;
+.compare img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none }
+.compare .dxf { clip-path: inset(0 0 0 var(--pos)) }
+.compare .divider {
+  position: absolute; top: 0; bottom: 0; left: var(--pos); width: 2px; margin-left: -1px;
+  background: var(--accent); pointer-events: none;
 }
-.window-bar button[aria-selected="true"] { color: #fff; border-bottom-color: #4c9bff }
-.window-bar button:hover { color: #fff }
-.window-bar .hint { margin-left: auto; color: #6f8291; font-size: .82rem; padding: 0 6px 6px }
-.shot { position: relative; aspect-ratio: 1600 / 960; background: #1b2228 }
-.shot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top left }
-.shot img[hidden] { display: none }
+.compare .knob {
+  position: absolute; top: 50%; left: 50%; width: 40px; height: 40px; margin: -20px 0 0 -20px;
+  border-radius: 50%; background: var(--accent); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+}
+.compare .knob svg { width: 22px; height: 22px }
+.compare .tag {
+  position: absolute; top: 14px; padding: 4px 10px; border-radius: 4px;
+  font: 500 .74rem var(--f-mono); letter-spacing: .1em; pointer-events: none;
+}
+.compare .tag-pdf { left: 14px; background: #ffffff; color: #16212b; border: 1px solid #d5dde3 }
+.compare .tag-dxf { right: 14px; background: #1a1f25; color: #e4e8ec; border: 1px solid #343c46 }
+/* the "scroll bar" under the picture: drag it to the sides */
+.slider-row { display: flex; align-items: center; gap: 14px; margin-top: 14px; font: 500 .78rem var(--f-mono); color: var(--muted) }
+.slider-row input { flex: 1; accent-color: var(--accent); cursor: ew-resize }
 
 /* ---------- sections ---------- */
-section { padding-block: 96px 0 }
-.section-head { max-width: 680px }
+section { padding-block: 104px 0 }
+.section-head { max-width: 640px }
 .section-head p { color: var(--muted); margin-top: 14px; font-size: 1.08rem }
+.section-head h2 { margin-top: 10px }
 
-/* features: two columns of cards, like the privacy card below them */
-.features { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; margin-top: 48px }
-.feature {
-  display: flex; gap: 20px; align-items: flex-start; padding: 26px 30px;
-  background: var(--sheet); border: 1px solid var(--line); border-radius: 12px;
+/* features: a card next to a zoomed screenshot, alternately left / right */
+.feature-list { display: grid; gap: 56px; margin-top: 52px }
+.feature { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 40px; align-items: center }
+.feature:nth-child(even) .card { order: 2 }
+.card {
+  padding: 30px 32px; background: var(--sheet); border: 1px solid var(--line); border-radius: 10px;
 }
-.feature svg { flex: none; width: 48px; height: 48px; color: var(--accent) }
-.feature div { min-width: 0 }
-.feature p { color: var(--muted); margin-top: 6px }
-.feature.private svg { color: var(--glow) }
-
-/* privacy band: the promise in one line, inside the features section */
-.promise {
-  margin-top: 24px; padding: 26px 30px; border-radius: 12px; background: var(--sheet);
-  border: 1px solid var(--line); display: flex; gap: 22px; align-items: center; flex-wrap: wrap;
+.card svg { width: 40px; height: 40px; color: var(--accent); margin-bottom: 14px }
+.card h3 { margin-top: 6px }
+.card p { color: var(--muted); margin-top: 10px }
+.card code { background: var(--paper); border: 1px solid var(--line); border-radius: 4px; padding: 2px 6px; white-space: nowrap }
+.zoom {
+  margin: 0; border-radius: 10px; overflow: hidden; border: 1px solid var(--line);
+  background: #212830; box-shadow: 0 24px 60px -36px var(--shade);
 }
-.promise svg { width: 40px; height: 40px; color: var(--glow); flex: none }
-.promise div { flex: 1 1 320px; min-width: 0 }
-.promise strong { font: 600 1.25rem var(--f-head); display: block }
-.promise span { color: var(--muted) }
+.zoom.tall { display: flex; justify-content: center; background: #232930 }
+.zoom.tall img { max-height: 440px; width: auto }
+.duo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; margin-top: 56px }
 
 /* ---------- download ---------- */
 .release-line { margin-top: 12px; color: var(--muted) }
 .platforms { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; margin-top: 40px }
-.platform { background: var(--sheet); border: 1px solid var(--line); border-radius: 12px; padding: 26px 28px 22px }
+.platform { background: var(--sheet); border: 1px solid var(--line); border-radius: 10px; padding: 26px 28px 22px }
 .platform.yours { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) }
 .platform-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap }
 .platform-head small { color: var(--muted); font-size: .9rem }
-.yours-tag { color: var(--accent); font-weight: 600; font-size: .9rem }
+.yours-tag { color: var(--accent); font: 500 .74rem var(--f-mono); letter-spacing: .1em; text-transform: uppercase }
 .files { list-style: none; margin: 18px 0 0; padding: 0 }
 .files li { display: flex; align-items: center; gap: 16px; padding: 14px 0; border-top: 1px solid var(--line) }
 .files .what { flex: 1; min-width: 0 }
 .files .what b { font-weight: 600; display: block }
 .files .what span { color: var(--muted); font-size: .93rem }
-.files .size { color: var(--muted); font-size: .9rem; font-variant-numeric: tabular-nums; white-space: nowrap }
+.files .size { color: var(--muted); font: .84rem var(--f-mono); white-space: nowrap }
 .files .btn { padding: 10px 18px; font-size: .95rem }
 .note { margin-top: 14px; font-size: .9rem; color: var(--muted) }
-.note code, .file { font-family: var(--f-file); font-size: .86em }
-/* code signing policy (required by SignPath Foundation) */
-.policy { margin-top: 24px; padding: 22px 28px; border-radius: 12px; background: var(--sheet);
-  border: 1px solid var(--line); color: var(--muted); font-size: .95rem }
-.policy h3 { color: var(--ink); font-size: 1.1rem; margin-bottom: 8px }
-.policy p + p { margin-top: 6px }
 
-/* ---------- footer ---------- */
-footer { margin-top: 110px; border-top: 1px solid var(--line); background: var(--paper); padding-block: 32px 40px; color: var(--muted); font-size: .93rem }
-footer .wrap { display: flex; gap: 24px 40px; flex-wrap: wrap; justify-content: space-between }
+/* ---------- footer: code signing policy (required by SignPath Foundation), links ---------- */
+footer { margin-top: 112px; border-top: 1px solid var(--line); background: var(--paper); padding-block: 32px 40px; color: var(--muted); font-size: .9rem }
+.policy { padding-bottom: 24px; margin-bottom: 24px; border-bottom: 1px solid var(--line); max-width: 860px }
+.policy .label { display: block; margin-bottom: 8px }
+.policy p + p { margin-top: 4px }
+.foot { display: flex; gap: 16px 40px; flex-wrap: wrap; justify-content: space-between }
 footer nav { display: flex; gap: 22px; flex-wrap: wrap }
 footer a { color: var(--muted) }
 footer a:hover { color: var(--ink) }
 
 @media (max-width: 860px) {
-  .features, .platforms { grid-template-columns: 1fr }
-  .top nav { gap: 18px }
-  section { padding-block: 72px 0 }
+  .feature, .platforms, .duo { grid-template-columns: 1fr }
+  .feature:nth-child(even) .card { order: 0 }
+  .feature { gap: 18px }
+  section { padding-block: 80px 0 }
 }
 @media (max-width: 560px) {
   body { font-size: 16px }
-  /* phone: brand and theme button on the first line, links below;
-     the bar scrolls away so it does not take a quarter of the screen */
   .top { position: static }
   .top .wrap { gap: 10px 14px }
   .theme-btn { order: 2; margin-left: auto }
   .top nav { order: 3; width: 100%; margin-left: 0; gap: 4px 14px; font-size: .9rem }
-  .window-bar .hint { display: none }
+  .hero { padding-top: 44px }
+  .card { padding: 24px }
   .files li { flex-wrap: wrap }
-  .feature svg { width: 40px; height: 40px }
+  .compare .tag { top: 8px; font-size: .66rem }
+  .compare .knob { width: 32px; height: 32px; margin: -16px 0 0 -16px }
 }
 </style>
 </head>
@@ -257,7 +252,7 @@ footer a:hover { color: var(--ink) }
 
 <header class="top">
   <div class="wrap">
-    <a class="brand" href="#top"><img src="img/icon.svg" alt="" width="30" height="30">ConvertCAD</a>
+    <a class="brand" href="#top"><img src="img/icon.svg" alt="" width="28" height="28">ConvertCAD</a>
     <nav aria-label="Main">
       <a href="#features">Features</a>
       <a href="#download">Download</a>
@@ -265,8 +260,8 @@ footer a:hover { color: var(--ink) }
       <a href="https://github.com/abdelhaouari-AE/ConvertCAD">Source code</a>
     </nav>
     <button class="theme-btn" id="theme-btn" type="button" aria-label="Switch between light and dark theme" title="Light / dark theme">
-      <svg class="sun" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></svg>
-      <svg class="moon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>
+      <!-- circle, half dark and half light (the same symbol as in the program) -->
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor"/></svg>
     </button>
   </div>
 </header>
@@ -274,31 +269,28 @@ footer a:hover { color: var(--ink) }
 <main id="top">
   <div class="hero">
     <div class="wrap">
-      <div class="hero-text">
-        <h1>Turn PDF drawings back into editable CAD files.</h1>
-        <p class="lede">ConvertCAD rebuilds the lines, arcs, dimensions, hatches, blocks and text of a 2D PDF plan as real DXF and DWG entities, on your own computer.</p>
-        <div class="actions">
-          <a class="btn btn-main" id="hero-download" href="#download">
-            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v10m0 0-4-4m4 4 4-4M4 16h12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <span id="hero-download-text">Download ConvertCAD</span>
-          </a>
-          <a class="btn btn-plain" href="#download">Windows and Linux versions</a>
-        </div>
-        <p class="facts" id="hero-facts">Free and open source. Windows 10/11 and Linux.</p>
+      <span class="label">Free · Windows &amp; Linux · 100 % offline</span>
+      <h1>PDF drawings back into <em>real CAD</em>.</h1>
+      <p class="lede">ConvertCAD rebuilds the lines, dimensions, hatches, blocks, layers and text of a 2D PDF plan as editable DXF and DWG, on your own computer.</p>
+      <div class="actions">
+        <a class="btn btn-main" href="#download">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v10m0 0-4-4m4 4 4-4M4 16h12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Start converting
+        </a>
       </div>
+      <p class="facts" id="hero-facts">Free and open source · Windows 10/11 and Linux</p>
 
-      <div class="window" role="region" aria-label="ConvertCAD screenshots">
-        <div class="window-bar" role="tablist" aria-label="Screenshots">
-          <button role="tab" id="tab-dxf" aria-selected="true" aria-controls="shot-dxf">DXF result</button>
-          <button role="tab" id="tab-pdf" aria-selected="false" aria-controls="shot-pdf">Source PDF</button>
-          <button role="tab" id="tab-report" aria-selected="false" aria-controls="shot-report">Report</button>
-          <span class="hint">Real screenshots of ConvertCAD 1.2.2</span>
+      <div class="compare-wrap">
+        <div class="compare" id="compare" aria-label="The same plan: the source PDF on the left, the DXF made by ConvertCAD on the right">
+          <img src="img/hero-pdf.webp" srcset="img/hero-pdf-800.webp 800w, img/hero-pdf.webp 1600w" sizes="(max-width: 1120px) 100vw, 1080px" width="1600" height="1119" alt="Source PDF: formwork plan with grid lines, dimensions and a title block">
+          <img class="dxf" src="img/hero-dxf.webp" srcset="img/hero-dxf-800.webp 800w, img/hero-dxf.webp 1600w" sizes="(max-width: 1120px) 100vw, 1080px" width="1600" height="1119" alt="The same plan converted to DXF, shown on a CAD model space background">
+          <span class="tag tag-pdf">PDF</span>
+          <span class="tag tag-dxf">DXF</span>
+          <div class="divider"><span class="knob" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7l-5 5 5 5M15 7l5 5-5 5"/></svg></span></div>
         </div>
-        <div class="shot">
-          <img id="shot-dxf" role="tabpanel" aria-labelledby="tab-dxf" src="img/dxf-result.webp" srcset="img/dxf-result-800.webp 800w, img/dxf-result.webp 1600w" sizes="(max-width: 1160px) 100vw, 1120px" width="1600" height="960" alt="ConvertCAD showing the converted DXF of a floor plan, with its 17 layers listed on the right">
-          <img id="shot-pdf" role="tabpanel" aria-labelledby="tab-pdf" src="img/source-pdf.webp" srcset="img/source-pdf-800.webp 800w, img/source-pdf.webp 1600w" sizes="(max-width: 1160px) 100vw, 1120px" width="1600" height="960" alt="The source PDF in ConvertCAD, with a 12 m distance measured between two grid lines and an intersection snap" hidden loading="lazy">
-          <img id="shot-report" role="tabpanel" aria-labelledby="tab-report" src="img/report.webp" srcset="img/report-800.webp 800w, img/report.webp 1600w" sizes="(max-width: 1160px) 100vw, 1120px" width="1600" height="960" alt="The conversion report listing what was rebuilt on each sheet" hidden loading="lazy">
-        </div>
+        <label class="slider-row"><span>PDF</span>
+          <input type="range" id="compare-range" min="0" max="100" value="50" aria-label="Show more of the PDF or of the DXF">
+          <span>DXF</span></label>
       </div>
     </div>
   </div>
@@ -306,48 +298,76 @@ footer a:hover { color: var(--ink) }
   <section id="features">
     <div class="wrap">
       <div class="section-head">
-        <h2>What ConvertCAD does</h2>
-        <p>It rebuilds the intent of the drawing, not just its strokes, and it never sends your drawings anywhere.</p>
+        <span class="label">Features</span>
+        <h2>The intent of the drawing, not just its strokes.</h2>
       </div>
 
-      <div class="features">
+      <div class="feature-list">
         <div class="feature">
-          <svg viewBox="0 0 48 48" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 14v20M40 14v20M8 24h32"/><path d="M8 24l6-3v6zM40 24l-6-3v6z" fill="currentColor" stroke="none"/><path d="M17 18h14" stroke-width="1.5"/></svg>
-          <div><h3>Real CAD entities</h3>
-          <p>Linear, radius, diameter, angle and arc length dimensions. Blocks for repeated symbols at any angle. Hatches, including sand, concrete and brick. Dashed linetypes and editable text.</p></div>
+          <div class="card">
+            <span class="label">CAD entities</span>
+            <h3>Real CAD, not exploded lines</h3>
+            <p>True dimensions, blocks for repeated symbols, hatches, dashed linetypes and editable text, sorted into layers created from the colours and line weights of the PDF.</p>
+          </div>
+          <figure class="zoom"><img src="img/f-entities.webp" srcset="img/f-entities-700.webp 700w, img/f-entities.webp 1400w" sizes="(max-width: 860px) 100vw, 640px" width="1400" height="635" loading="lazy" alt="Converted plan with dimensions and grid bubbles, next to its list of layers"></figure>
         </div>
+
         <div class="feature">
-          <svg viewBox="0 0 48 48" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M11 6h18l8 8v28H11z"/><path d="M29 6v8h8"/><path d="M6 27h36" stroke-dasharray="3 3"/><path d="M17 34h14M17 39h9"/></svg>
-          <div><h3>Scanned drawings too</h3>
-          <p>Lines, circles and arcs of a scan are traced, and its text is read in more than 50 languages, including Arabic.</p></div>
+          <div class="card">
+            <span class="label">Scanned drawings</span>
+            <h3>Scans become drawings</h3>
+            <p>Lines, circles and arcs of a scan are traced into vectors, and its text is read in more than 50 languages, Arabic included.</p>
+          </div>
+          <figure class="zoom"><img src="img/f-scan.webp" srcset="img/f-scan-700.webp 700w, img/f-scan.webp 1006w" sizes="(max-width: 860px) 100vw, 640px" width="1006" height="613" loading="lazy" alt="A scanned plan on the left, and on the right the same part traced into CAD lines with its text read by OCR"></figure>
         </div>
+
         <div class="feature">
-          <svg viewBox="0 0 48 48" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="10" width="26" height="22" rx="2"/><rect x="16" y="18" width="26" height="22" rx="2" stroke-dasharray="4 3"/><circle cx="31" cy="29" r="3" fill="currentColor" stroke="none"/></svg>
-          <div><h3>Checked before you save</h3>
-          <p>The scale is read from the title block or calibrated on two points. Measure with object snaps, overlay the PDF on the result and read the report. Doubtful values go to a review layer.</p></div>
+          <div class="card">
+            <span class="label">Scale and review</span>
+            <h3>Measure before you trust</h3>
+            <p>The scale is read from the title block or set on two points. Measure with object snaps, lay the PDF over the result and read the report.</p>
+          </div>
+          <figure class="zoom"><img src="img/f-measure.webp" srcset="img/f-measure-700.webp 700w, img/f-measure.webp 1400w" sizes="(max-width: 860px) 100vw, 640px" width="1400" height="989" loading="lazy" alt="A 12 m distance measured on the PDF, with an intersection snap marker"></figure>
         </div>
+
         <div class="feature">
-          <svg viewBox="0 0 48 48" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M8 10h32v24H8z"/><path d="M18 40h12M24 34v6"/><path d="M16 22h4m4 0h8"/></svg>
-          <div><h3>DXF and DWG, your way</h3>
-          <p>DXF from R12 to 2018 and DWG. One file or one file per sheet, a selected area only, or a whole folder at once from the command line.</p></div>
+          <div class="card">
+            <span class="label">Output</span>
+            <h3>DXF or DWG, your way</h3>
+            <p>DXF from R12 to 2018 or DWG. One file for all sheets or one per sheet, or only the area you select.</p>
+          </div>
+          <figure class="zoom tall"><img src="img/f-output.webp" width="696" height="1050" loading="lazy" alt="Output settings: file format, DXF version and multi-page output"></figure>
         </div>
-        <div class="feature private">
+
+        <div class="feature">
+          <div class="card">
+            <span class="label">Interface</span>
+            <h3>Your language, your theme</h3>
+            <p>English, French, Spanish, German or Arabic, in a dark or a light theme. Switch from the toolbar.</p>
+          </div>
+          <figure class="zoom"><img src="img/f-ui.webp" srcset="img/f-ui-700.webp 700w, img/f-ui.webp 1400w" sizes="(max-width: 860px) 100vw, 640px" width="1400" height="525" loading="lazy" alt="ConvertCAD in French with the light theme"></figure>
+        </div>
+
+        <div class="feature">
+          <div class="card">
+            <span class="label">Automation</span>
+            <h3>A whole folder at once</h3>
+            <p>Convert every PDF of a folder from the window, or script it from the command line: <code>ConvertCAD-cli plan.pdf -o plan.dwg</code></p>
+          </div>
+          <figure class="zoom"><img src="img/f-batch.webp" srcset="img/f-batch-700.webp 700w, img/f-batch.webp 1400w" sizes="(max-width: 860px) 100vw, 640px" width="1400" height="958" loading="lazy" alt="The Convert a folder window listing the PDF files to convert"></figure>
+        </div>
+      </div>
+
+      <div class="duo">
+        <div class="card">
           <svg viewBox="0 0 48 48" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M24 5l15 6v11c0 10-6.5 17.5-15 21-8.5-3.5-15-11-15-21V11z"/><path d="M17 24l5 5 9-10" stroke-linecap="round"/></svg>
-          <div><h3>Your drawings stay on your computer</h3>
-          <p>Every conversion runs locally. No account, no upload, no tracking. The program goes online only when you download an OCR language or check for a new version, and the update check is off by default.</p></div>
+          <h3>Your drawings stay on your computer</h3>
+          <p>Every conversion runs locally: no account, no upload, no tracking. Client and NDA drawings never leave your machine. You remain responsible for converting only documents their owner allows.</p>
         </div>
-        <div class="feature private">
+        <div class="card">
           <svg viewBox="0 0 48 48" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 14L7 24l10 10M31 14l10 10-10 10M27 10l-6 28"/></svg>
-          <div><h3>Open source, nothing hidden</h3>
-          <p>The full code is public under the GNU AGPL, so anyone can check what the program does. The portable version runs without installation or administrator rights.</p></div>
-        </div>
-      </div>
-
-      <div class="promise">
-        <svg viewBox="0 0 40 40" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="9" y="18" width="22" height="16" rx="2"/><path d="M14 18v-5a6 6 0 0 1 12 0v5"/><circle cx="20" cy="26" r="2" fill="currentColor" stroke="none"/></svg>
-        <div>
-          <strong>Confidential plans can be converted safely.</strong>
-          <span>Client drawings, tender documents and drawings under NDA never leave the computer you convert them on. You remain responsible for converting only documents their owner allows you to convert, and for respecting any confidentiality agreement (NDA) that covers them.</span>
+          <h3>Open source, nothing hidden</h3>
+          <p>The full code is public under the GNU AGPL. The portable version runs without installation or administrator rights.</p>
         </div>
       </div>
     </div>
@@ -356,8 +376,9 @@ footer a:hover { color: var(--ink) }
   <section id="download">
     <div class="wrap">
       <div class="section-head">
-        <h2>Download</h2>
-        <p class="release-line" id="release-line">Everything is included: the DWG converter and the text recognition. Nothing else to install.</p>
+        <span class="label">Download</span>
+        <h2>Everything included. Nothing else to install.</h2>
+        <p class="release-line" id="release-line">The DWG converter and the text recognition come with the program.</p>
       </div>
 
       <div class="platforms">
@@ -406,29 +427,27 @@ footer a:hover { color: var(--ink) }
           <p class="note">Make the AppImage executable first: <code>chmod +x ConvertCAD-*.AppImage</code></p>
         </div>
       </div>
-
-      <div class="policy" id="code-signing">
-        <h3>Code signing policy</h3>
-        <p>Free code signing provided by <a href="https://about.signpath.io">SignPath.io</a>, certificate by <a href="https://signpath.org">SignPath Foundation</a>. Only the Windows programs built from this project's public source code by its GitHub Actions workflow are signed, and each signing request is approved by hand.</p>
-        <p>Committers and reviewers: <a href="https://github.com/abdelhaouari-AE">abdelhaouari</a>. Approvers: <a href="https://github.com/abdelhaouari-AE">abdelhaouari</a>.</p>
-        <p>Privacy: ConvertCAD sends no data on its own. It goes online only when you download an OCR language, check for updates or open the feedback form. <a href="https://github.com/abdelhaouari-AE/ConvertCAD/blob/main/PRIVACY.md">Privacy policy</a> · <a href="https://github.com/abdelhaouari-AE/ConvertCAD/blob/main/CODE_SIGNING.md">Full code signing policy</a></p>
-      </div>
-
     </div>
   </section>
 </main>
 
 <footer>
   <div class="wrap">
-    <span>© 2026 abdelhaouari. ConvertCAD is free software under the GNU AGPL-3.0.</span>
-    <nav aria-label="Footer">
-      <a href="https://github.com/abdelhaouari-AE/ConvertCAD">GitHub</a>
-      <a href="https://github.com/abdelhaouari-AE/ConvertCAD/blob/main/LICENSE">Licence</a>
-      <a href="https://github.com/abdelhaouari-AE/ConvertCAD/blob/main/convertcad/resources/terms_en.md">Terms of use</a>
-      <a href="https://github.com/abdelhaouari-AE/ConvertCAD/blob/main/PRIVACY.md">Privacy</a>
-      <a href="#code-signing">Code signing policy</a>
-      <a href="https://github.com/abdelhaouari-AE/ConvertCAD/blob/main/THIRD_PARTY_NOTICES.md">Third-party licences</a>
-    </nav>
+    <div class="policy" id="code-signing">
+      <span class="label">Code signing policy</span>
+      <p>Free code signing provided by <a href="https://about.signpath.io">SignPath.io</a>, certificate by <a href="https://signpath.org">SignPath Foundation</a>. Only the Windows programs built from this project's public source code by its GitHub Actions workflow are signed, and each signing request is approved by hand.</p>
+      <p>Committers and reviewers: <a href="https://github.com/abdelhaouari-AE">abdelhaouari</a> · Approvers: <a href="https://github.com/abdelhaouari-AE">abdelhaouari</a> · <a href="https://github.com/abdelhaouari-AE/ConvertCAD/blob/main/PRIVACY.md">Privacy policy</a>: ConvertCAD sends no data on its own · <a href="https://github.com/abdelhaouari-AE/ConvertCAD/blob/main/CODE_SIGNING.md">Full policy</a></p>
+    </div>
+    <div class="foot">
+      <span>© 2026 abdelhaouari. ConvertCAD is free software under the GNU AGPL-3.0.</span>
+      <nav aria-label="Footer">
+        <a href="https://github.com/abdelhaouari-AE/ConvertCAD">GitHub</a>
+        <a href="https://github.com/abdelhaouari-AE/ConvertCAD/blob/main/LICENSE">Licence</a>
+        <a href="https://github.com/abdelhaouari-AE/ConvertCAD/blob/main/convertcad/resources/terms_en.md">Terms of use</a>
+        <a href="https://github.com/abdelhaouari-AE/ConvertCAD/blob/main/PRIVACY.md">Privacy</a>
+        <a href="https://github.com/abdelhaouari-AE/ConvertCAD/blob/main/THIRD_PARTY_NOTICES.md">Third-party licences</a>
+      </nav>
+    </div>
   </div>
 </footer>
 
@@ -451,7 +470,7 @@ footer a:hover { color: var(--ink) }
   window.addEventListener('blur', function () { body.classList.remove('pointer-in'); });
 })();
 
-/* 0b. Light / dark button: switches to the theme not shown now. */
+/* 1. Light / dark button: switches to the theme not shown now. */
 document.getElementById('theme-btn').addEventListener('click', function () {
   var root = document.documentElement;
   var dark = root.dataset.theme ? root.dataset.theme === 'dark'
@@ -460,29 +479,50 @@ document.getElementById('theme-btn').addEventListener('click', function () {
   try { localStorage.setItem('convertcad-theme', root.dataset.theme); } catch (e) {}
 });
 
-/* 1. Screenshot tabs (Source PDF / DXF result / Report). */
+/* 2. PDF / DXF comparison. Drag on the picture or move the bar under it.
+      When the picture first comes into view, the divider sweeps once from
+      side to side (not with "reduce motion", and never after the visitor
+      has touched it). */
 (function () {
-  var tabs = document.querySelectorAll('.window-bar [role="tab"]');
-  function show(tab) {
-    tabs.forEach(function (t) {
-      var on = t === tab;
-      t.setAttribute('aria-selected', on ? 'true' : 'false');
-      t.tabIndex = on ? 0 : -1;
-      document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
-    });
+  var box = document.getElementById('compare'), range = document.getElementById('compare-range');
+  var touched = false, anim = null;
+  function set(p) {
+    p = Math.max(0, Math.min(100, p));
+    box.style.setProperty('--pos', p + '%');
+    range.value = p;
   }
-  tabs.forEach(function (t, i) {
-    t.addEventListener('click', function () { show(t); });
-    t.addEventListener('keydown', function (e) {        // arrow keys move between tabs
-      var step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
-      if (!step) return;
-      var next = tabs[(i + step + tabs.length) % tabs.length];
-      next.focus(); show(next);
-    });
-  });
+  function stop() { touched = true; if (anim) cancelAnimationFrame(anim); anim = null; }
+  function fromEvent(e) {
+    var r = box.getBoundingClientRect();
+    set((e.clientX - r.left) / r.width * 100);
+  }
+  var dragging = false;
+  box.addEventListener('pointerdown', function (e) { stop(); dragging = true; box.setPointerCapture(e.pointerId); fromEvent(e); });
+  box.addEventListener('pointermove', function (e) { if (dragging) fromEvent(e); });
+  box.addEventListener('pointerup', function () { dragging = false; });
+  box.addEventListener('pointercancel', function () { dragging = false; });
+  range.addEventListener('input', function () { stop(); set(+range.value); });
+
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches || !('IntersectionObserver' in window)) return;
+  // 50 % -> 82 % -> 18 % -> 50 %, eased, 3.2 s
+  var keys = [50, 82, 18, 50], T = 3200;
+  function ease(t) { return t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+  new IntersectionObserver(function (entries, obs) {
+    if (!entries[0].isIntersecting || touched) return;
+    obs.disconnect();
+    var t0 = null;
+    function step(ts) {
+      if (touched) return;
+      if (t0 === null) t0 = ts;
+      var u = Math.min(1, (ts - t0) / T), seg = Math.min(2, Math.floor(u * 3)), k = ease(u * 3 - seg);
+      set(keys[seg] + (keys[seg + 1] - keys[seg]) * k);
+      if (u < 1) anim = requestAnimationFrame(step);
+    }
+    setTimeout(function () { if (!touched) anim = requestAnimationFrame(step); }, 500);
+  }, { threshold: 0.5 }).observe(box);
 })();
 
-/* 2. The visitor's system: highlight its column, name it on the main button. */
+/* 3. The visitor's system: highlight its column in the Download section. */
 var OS = /Windows/.test(navigator.userAgent) ? 'win'
        : (/Linux|X11/.test(navigator.userAgent) && !/Android/.test(navigator.userAgent)) ? 'linux' : '';
 if (OS) {
@@ -492,11 +532,9 @@ if (OS) {
   tag.className = 'yours-tag';
   tag.textContent = 'Your system';
   box.querySelector('.platform-head small').after(tag);
-  document.getElementById('hero-download-text').textContent =
-    OS === 'win' ? 'Download for Windows' : 'Download for Linux';
 }
 
-/* 3. Download links of the newest release, read from GitHub.
+/* 4. Download links of the newest release, read from GitHub.
       The OCR models release ("ocr-models-v1") is not a program version: skipped.
       If GitHub cannot be reached, the buttons keep pointing to the releases page. */
 (function () {
@@ -529,9 +567,9 @@ if (OS) {
       var version = best.tag_name.replace(/^v/, '');
       var date = new Date(best.published_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
       document.getElementById('release-line').textContent =
-        'Version ' + version + ', released ' + date + '. Everything is included: the DWG converter and the text recognition. Nothing else to install.';
+        'Version ' + version + ', released ' + date + '. The DWG converter and the text recognition come with the program.';
       document.getElementById('hero-facts').textContent =
-        'Version ' + version + '. Free and open source. Windows 10/11 and Linux.';
+        'Version ' + version + ' · Free and open source · Windows 10/11 and Linux';
       Object.keys(PATTERNS).forEach(function (id) {
         var asset = best.assets.filter(function (a) { return PATTERNS[id].test(a.name); })[0];
         if (!asset) return;
@@ -542,12 +580,6 @@ if (OS) {
         var size = document.querySelector('[data-size="' + id + '"]');
         if (size) size.textContent = Math.round(asset.size / 1048576) + ' MB';
       });
-      if (OS) {                                       // main button: the recommended file
-        var main = best.assets.filter(function (a) {
-          return PATTERNS[OS === 'win' ? 'win-setup' : 'appimage'].test(a.name);
-        })[0];
-        if (main) document.getElementById('hero-download').href = main.browser_download_url;
-      }
     })
     .catch(function () { /* offline or rate-limited: static links stay */ });
 })();

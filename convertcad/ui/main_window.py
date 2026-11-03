@@ -429,7 +429,8 @@ class MainWindow(QMainWindow):
         bar = QFrame()                   # Source PDF / DXF result / overlay
         bar.setObjectName("ViewBar")     # grey line under it, like the panels
         bl = QHBoxLayout(bar)
-        bl.setContentsMargins(8, 0, 8, 0)
+        # 1 px free at the bottom: the tabs must not cover the grey line
+        bl.setContentsMargins(8, 0, 8, 1)
         self.view_tabs = QTabBar()
         self.view_tabs.addTab(tr("Source PDF"))
         self.view_tabs.addTab(tr("DXF result"))
@@ -473,7 +474,9 @@ class MainWindow(QMainWindow):
 
         # right: settings / layers / report
         self.right_tabs = QTabWidget()
-        self.right_tabs.setDocumentMode(True)
+        # not "document mode": that mode draws a white line above the tabs.
+        # The grey line under the tabs is the pane's top border (theme.py).
+        self.right_tabs.setObjectName("RightTabs")
         self.options_panel = OptionsPanel(self.settings)
         self.layers_panel = LayersPanel()
         self.report_panel = ReportPanel(self.settings)

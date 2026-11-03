@@ -51,7 +51,8 @@ class PanelHeader(QFrame):
         super().__init__(parent)
         self.setObjectName("PanelHeader")
         lay = QHBoxLayout(self)
-        lay.setContentsMargins(10, 7, 6, 7)
+        lay.setContentsMargins(10, 0, 6, 0)          # slim title bar,
+        self.setFixedHeight(30)                      # same with or without buttons
         lay.setSpacing(4)
         self.title = QLabel(title)
         self.title.setObjectName("PanelTitle")

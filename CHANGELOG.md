@@ -2,6 +2,17 @@
 
 All notable changes to ConvertCAD. Versions follow *major.minor.patch*.
 
+## [Unreleased]
+
+### Changed
+- Interface polish: the language button has the size of the theme button and no frame;
+  no white line above the Settings / Layers / Report tabs; the grey line under the
+  Source PDF / DXF result tabs is continuous (blue only under the selected tab); panel
+  titles in regular weight and slimmer; no line between *Open PDF* and its arrow.
+- Sheets panel: the green "Vector" tag is gone, the paper size takes its place (scanned
+  and empty sheets are still named under the sheet).
+- Welcome screen: the step numbers are centred in their circles.
+
 ## [1.2.2] — 2026-11-02
 
 ### Fixed

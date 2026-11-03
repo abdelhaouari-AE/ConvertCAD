@@ -48,31 +48,32 @@ class _SheetRow(QWidget):
         self.check.toggled.connect(lambda _on: self.toggled.emit())
         top.addWidget(self.check)
         top.addStretch(1)
-        kind = {"vector": tr("Vector"), "scanned": tr("Scan"),
-                "empty": tr("Empty")}.get(info.kind, info.kind)
-        self.chip = QLabel(kind)
-        self.chip.setToolTip({
-            "vector": tr("Vector drawing: converted to exact CAD entities."),
-            "scanned": tr("Scanned sheet: traced and read with OCR."),
-            "empty": tr("No drawing content on this sheet.")}.get(info.kind, ""))
-        top.addWidget(self.chip)
+        # paper size on the right of the tick box (the "Vector" tag was
+        # removed: most sheets are vector drawings, only the others are named)
+        self.paper = label(tr_paper(info.paper), "caption")
+        top.addWidget(self.paper)
         lay.addLayout(top)
-        meta = tr_paper(info.paper)
+        notes = []
+        if info.kind == "scanned":
+            notes.append(tr("Scan"))
+        elif info.kind == "empty":
+            notes.append(tr("Empty"))
         if info.rotation:
-            meta += "   " + tr("Rotated {deg}°", deg=info.rotation)
-        lay.addWidget(label(meta, "caption"))
+            notes.append(tr("Rotated {deg}°", deg=info.rotation))
+        tip = {"vector": tr("Vector drawing: converted to exact CAD entities."),
+               "scanned": tr("Scanned sheet: traced and read with OCR."),
+               "empty": tr("No drawing content on this sheet.")}.get(info.kind, "")
+        self.paper.setToolTip(tip)
+        self.note = label("   ".join(notes), "caption")
+        self.note.setToolTip(tip)
+        self.note.setVisible(bool(notes))
+        lay.addWidget(self.note)
         self.apply_colors()
 
     def apply_colors(self) -> None:
         """(Re)apply theme colours — called again when the theme changes."""
         self.thumb.setStyleSheet(f"background:{theme.tok('input')};"
                                  f"border:1px solid {theme.tok('border')};")
-        color = {"vector": theme.tok("ok"), "scanned": theme.tok("warn"),
-                 "empty": theme.tok("text_faint")}.get(self.info.kind,
-                                                       theme.tok("text_faint"))
-        self.chip.setStyleSheet(f"color:{color}; border:1px solid {color};"
-                                f"border-radius:3px; padding:0 5px;"
-                                f"font-size:7.5pt; font-weight:600;")
 
     def set_thumbnail(self, pm: QPixmap) -> None:
         self.thumb.setPixmap(pm.scaled(self.thumb.size() - QSize(6, 6),

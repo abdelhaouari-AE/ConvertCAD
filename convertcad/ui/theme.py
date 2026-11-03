@@ -161,6 +161,10 @@ QToolBar#CommandBar {{
     background: {t['panel']}; border: 0;
     border-bottom: 1px solid {t['border']}; padding: 4px 6px; spacing: 2px;
 }}
+/* Open PDF: no line between the button and its arrow */
+QToolButton[popupMode="1"] {{ padding-right: 16px; }}
+QToolButton::menu-button {{ border: 0; width: 14px; background: transparent; }}
+QToolButton::menu-button:hover {{ background: {t['border']}; border-radius: 3px; }}
 QToolBar#CommandBar::separator {{
     background: {t['border']}; width: 1px; margin: 6px 6px;
 }}
@@ -255,11 +259,12 @@ QFrame#ViewBar {{
     background: {t['panel']}; border-bottom: 1px solid {t['border']};
 }}
 QToolButton#LanguageButton {{
-    padding: 2px 7px; border: 1px solid {t['border_strong']}; border-radius: 3px;
-    font-weight: 600; font-size: 8.5pt; min-width: 22px;
+    /* same box as the theme button next to it (18 px icon + padding) */
+    padding: 0; font-weight: 600; font-size: 9pt;
+    min-width: 36px; max-width: 36px; min-height: 28px; max-height: 28px;
 }}
 QToolButton#LanguageButton::menu-indicator {{ image: none; width: 0; }}
-QLabel#PanelTitle {{ font-weight: 600; font-size: 9.5pt; }}
+QLabel#PanelTitle {{ font-size: 9pt; }}
 QLabel[role="muted"] {{ color: {t['text_muted']}; }}
 QLabel[role="faint"] {{ color: {t['text_faint']}; }}
 QLabel[role="caption"] {{ color: {t['text_faint']}; font-size: 8pt; }}
@@ -272,6 +277,8 @@ QLabel[role="notice"] {{
     padding: 6px 8px; color: {t['text']};
 }}
 QTabWidget::pane {{ border: 0; background: {t['panel']}; }}
+QTabWidget#RightTabs::pane {{ border: 0; border-top: 1px solid {t['border']}; top: 0px; }}
+QTabWidget#RightTabs::tab-bar {{ left: 4px; }}
 QTabBar {{ background: {t['panel']}; }}
 QTabBar::tab {{
     background: transparent; color: {t['text_muted']};

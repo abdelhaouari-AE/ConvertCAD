@@ -10,7 +10,7 @@ width.
 """
 
 from PySide6.QtCore import QRectF, QSize, Qt, Signal
-from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen
+from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import QHBoxLayout, QSizePolicy, QWidget
 
 from ..i18n import tr
@@ -89,7 +89,7 @@ class _Strip(QWidget):
         p.drawPath(path)
         # panel name, written vertically (bottom to top on the left,
         # top to bottom on the right, like AutoCAD palette title bars)
-        f = theme.ui_font(9.0, QFont.Weight.DemiBold)
+        f = theme.ui_font(9.0)                       # regular, like the other labels
         p.setFont(f)
         p.setPen(QColor(color))
         p.save()
