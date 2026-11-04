@@ -1099,4 +1099,36 @@ STRINGS = {
         'تم فتح نموذج الملاحظات في متصفح الويب.',
     'Interface language':
         'لغة الواجهة',
+    'Check for updates automatically':
+        'البحث عن التحديثات تلقائيًا',
+    'Once a day, ask GitHub whether a newer version exists (nothing about you or your drawings is sent)':
+        'مرة واحدة يوميًا، سؤال GitHub عن وجود إصدار أحدث (لا يُرسَل أي شيء عنك أو عن رسوماتك)',
+    "What's new":
+        'ما الجديد',
+    'Update now':
+        'التحديث الآن',
+    'Skip this version':
+        'تخطي هذا الإصدار',
+    'Checking which files changed…':
+        'جارٍ البحث عن الملفات التي تغيّرت…',
+    'Downloading the update: {done} / {total} MB':
+        'جارٍ تنزيل التحديث: {done} / {total} ميغابايت',
+    'ConvertCAD {v} is ready to install: {size} MB downloaded instead of {full} MB.':
+        'ConvertCAD {v} جاهز للتثبيت: تم تنزيل {size} ميغابايت بدلًا من {full} ميغابايت.',
+    'ConvertCAD {v} is ready to install.':
+        'ConvertCAD {v} جاهز للتثبيت.',
+    'Restart now':
+        'إعادة التشغيل الآن',
+    'When I close ConvertCAD':
+        'عند إغلاق ConvertCAD',
+    'ConvertCAD was updated to {v}.':
+        'تم تحديث ConvertCAD إلى الإصدار {v}.',
+    'The update could not be installed: {e}':
+        'تعذّر تثبيت التحديث: {e}',
+    'Download the full version':
+        'تنزيل الإصدار الكامل',
+    'The update will be installed when you close ConvertCAD.':
+        'سيُثبَّت التحديث عند إغلاق ConvertCAD.',
+    'Update cancelled.':
+        'أُلغي التحديث.',
 }

@@ -81,7 +81,7 @@ Les textes de mesure non associés à une cote sont placés sur le calque **DIM_
 
 ## Mises à jour
 
-ConvertCAD ne se connecte jamais seul à internet. *Aide > Rechercher une mise à jour…* demande une fois à GitHub si une version plus récente existe ; *Aide > Rechercher les mises à jour au démarrage* le fait à chaque démarrage (désactivé par défaut). Rien n'est envoyé et rien n'est installé : quand une version plus récente existe, ConvertCAD affiche son numéro et peut ouvrir sa page de publication.
+ConvertCAD demande à GitHub, au plus une fois par jour au démarrage, si une version plus récente existe (à désactiver avec *Aide > Rechercher les mises à jour automatiquement*) ; *Aide > Rechercher une mise à jour…* ou le bouton *Mises à jour* le demandent à tout moment. Rien sur vous ni sur vos plans n'est envoyé. Quand une version plus récente existe, une barre sous la barre d'outils la propose : *Mettre à jour* télécharge seulement les fichiers modifiés (en général quelques Mo) et les met en place quand vous redémarrez ou fermez ConvertCAD ; en cas de problème, les fichiers précédents sont conservés. *Ignorer cette version* la masque jusqu'à la suivante. Sous Linux, et pour une installation pour tous les utilisateurs dans Program Files, la barre propose le téléchargement complet.
 
 ## Convertir un dossier entier
 

@@ -28,7 +28,10 @@ cd /d "%~dp0\.."
 if exist .venv\Scripts\python.exe (set "PY=.venv\Scripts\python.exe") else (set "PY=python")
 
 echo [1/5] Installing build tools ...
-%PY% -m pip install -r requirements-dev.txt --quiet
+REM exact versions of requirements-lock.txt (see CLAUDE.md, "Dependencies")
+%PY% -m pip install -r requirements-dev.txt -c requirements-lock.txt --quiet
+if errorlevel 1 goto :fail
+%PY% scripts\check_lock.py
 if errorlevel 1 goto :fail
 
 echo [2/5] Running the tests ...
@@ -42,8 +45,11 @@ if not exist "vendor\libredwg\win64\dxf2dwg.exe" (
 %PY% scripts\make_icon.py
 if errorlevel 1 goto :fail
 if /i "%~1"=="onefile" (set "CONVERTCAD_ONEFILE=1") else (set "CONVERTCAD_ONEFILE=0")
+REM fixed hash seed: two builds of the same code give identical files
+set "PYTHONHASHSEED=0"
 %PY% -m PyInstaller --noconfirm --clean ConvertCAD.spec
 if errorlevel 1 goto :fail
+set "PYTHONHASHSEED="
 
 echo [4/5] Code signing ...
 if "%CONVERTCAD_ONEFILE%"=="1" (
@@ -66,6 +72,11 @@ if "%CONVERTCAD_ONEFILE%"=="1" (
     copy /y LICENSE dist\ConvertCAD\ >nul
     copy /y THIRD_PARTY_NOTICES.md dist\ConvertCAD\ >nul
     copy /y CHANGELOG.md dist\ConvertCAD\ >nul
+    copy /y PRIVACY.md dist\ConvertCAD\ >nul
+    copy /y CODE_SIGNING.md dist\ConvertCAD\ >nul
+    REM list of files with their checksums (small updates): last, folder final
+    %PY% scripts\make_manifest.py dist\ConvertCAD
+    if errorlevel 1 goto :fail
     powershell -NoProfile -Command "Compress-Archive -Force -Path 'dist\ConvertCAD' -DestinationPath 'dist\ConvertCAD-%VER%-win64-portable.zip'"
     if errorlevel 1 goto :fail
     echo.

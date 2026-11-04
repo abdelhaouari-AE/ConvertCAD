@@ -63,7 +63,13 @@ class Settings:
     show_activity: bool = True
     sheets_panel_collapsed: bool = False      # side panels collapsed to
     settings_panel_collapsed: bool = False    # their bar (AutoCAD-like)
-    check_updates: bool = False               # opt-in: ask GitHub at startup
+    # Updates (core/updates.py, core/selfupdate.py): checked at most once a
+    # day at start-up. A new name on purpose: the old setting
+    # "check_updates" was off by default; the check is now on for everybody
+    # who has not switched it off.
+    auto_update_check: bool = True
+    last_update_check: float = 0.0            # time of the last check
+    skipped_version: str = ""                 # "Skip this version"
     window_geometry: str = ""                 # base64 (Qt saveGeometry)
     window_state: str = ""                    # base64 (Qt saveState)
 

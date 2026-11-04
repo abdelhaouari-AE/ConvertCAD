@@ -1,10 +1,10 @@
 # ConvertCAD — Development guide
 
-Complete technical description of **ConvertCAD 1.2.3**: the programming language and
+Complete technical description of **ConvertCAD 1.3.0**: the programming language and
 tools, the architecture and data flow, the content of every file, the algorithms, the
 options, the tests, the build and release process, and how to extend the application.
 
-*Author: abdelhaouari · Last update: 3 November 2026 · Applies to version 1.2.3*
+*Author: abdelhaouari · Last update: 4 November 2026 · Applies to version 1.3.0*
 
 How to build the downloads (portable, installer, AppImage, .deb) and sign them:
 [PACKAGING.md](PACKAGING.md).
@@ -360,7 +360,8 @@ ConvertCAD/
 | `postprocess.py` | After conversion: `layer_summary()` (rows of the layer table), `apply_layer_edits()` (remove / rename-merge / recolour), `finalize()` (copy to the final path with edits, images and log), `finalize_dwg()` (same, saved as DWG), `needs_reconversion_for_dwg()`, `describe_edits()`. |
 | `presets.py` | Six built-in presets (recommended, architectural, structural, scanned, geometry, CNC) and the functions that apply or store presets without touching drawing-specific values. |
 | `jobs.py` | `JobRunner`: runs `convert` / `convert_folder` in a child process and relays progress, results, errors and cancellation through a queue (§3.2). |
-| `updates.py` | Optional update check (off by default): one request to GitHub's public API for the releases, nothing sent, nothing installed; `check()`, `newest_release()` (the OCR models release is skipped), `is_newer()`, `UpdateError` (§5.18). |
+| `updates.py` | Update check (on by default, at most once a day, and on request): one request to GitHub's public API for the releases, nothing sent; `check()` returns `UpdateInfo` (newest version, release page, release files `assets`), `newest_release()` (the OCR models release is skipped), `is_newer()`, `UpdateError` (§5.18). |
+| `selfupdate.py` | Per-file updates (§5.19): list of files of a build (`write_manifest`), partial reading of the release zip by HTTP range requests (`prepare`, `download`), swap with rollback (`apply_pending`), clean-up of replaced files (`cleanup_old`), the applier process (`run_applier`, `--apply-update`), kind of installation (`install_kind`, `can_update_files`). No Qt. |
 | `licensing.py` | Licence hook: `check_license()` (called before every conversion) and `license_summary()` (About box). Always permissive; replacing this file adds licence management without touching anything else. |
 
 ### 4.4 `convertcad/ui/` — the desktop interface
@@ -421,7 +422,8 @@ folder is bundled into the exe by `ConvertCAD.spec`.
 | `test_i18n.py` | Every `tr("…")` string and menu action is translated in every language (French, Spanish, German, Arabic), as are the OCR catalogue names; no stale translation; placeholders survive translation; guides and terms exist in every language; Arabic is right to left; engine progress messages are translated. |
 | `test_text_fonts.py` | PDF fonts → CAD fonts (Arial, Times New Roman, Courier New, Arial Narrow, Calibri, ISOCPEUR, bold / italic), unknown fonts → Arial, width factor of condensed text, each font's capital height in the DXF, centred title-block paragraphs, accents kept in the DWG. |
 | `test_units_and_report.py` | Imperial scales read (1/4" = 1'-0", 1" = 20'…), inch / foot factors, imperial DXF header; the report's options, unit names and message shapes translated in every language; the log stays English. |
-| `test_updates.py` | Version comparison, the check is off by default, one request with nothing about the user, the newest program release chosen (OCR models release, drafts and pre-releases skipped), failures reported. |
+| `test_updates.py` | Version comparison, the check is on by default, one request with nothing about the user, the newest program release chosen (OCR models release, drafts and pre-releases skipped), release files listed, failures reported. |
+| `test_selfupdate.py` | Per-file updates over a local range-only web server: list of files, only changed files downloaded, swap, removed files, clean-up, rollback when a file is locked, damaged download refused, cancel, other system refused, kinds of installation. |
 | `test_ui_smoke.py` | The real window offscreen: open the sample, convert in the child process, edit layers, save through the real save code, switch theme twice; side panels collapse and reopen (bar, menu, Ctrl+0), Yes / No in French, *Convert a folder* next to *Open PDF*; select an area, convert, overlay on / off, save as DWG (with the automatic re-conversion); OCR languages list and status, *OCR languages and models…* window; selecting an entity in the result (layer selected, hidden layer clears the selection). |
 
 ### 4.7 `scripts/`
@@ -928,17 +930,79 @@ predefined, ezdxf's copy of `acadiso.pat`) at the measured scale and angle, its 
 points moved to the measured origin. R12 has no HATCH: the option is off there and the
 pieces stay lines.
 
-### 5.18 `updates.py` — optional update check
+### 5.18 `updates.py` — update check
 
-Off by default. *Help > Check for updates…* (or the startup option) calls `check()` in a
-`QThread`: one GET of `https://api.github.com/repos/abdelhaouari-AE/ConvertCAD/releases`
-with only `ConvertCAD/<version>` as User-Agent. `newest_release()` keeps the highest
-version tag (`v1.2.0`) and skips drafts, pre-releases and the OCR models release
-(`ocr-models-v1`, which GitHub may call "latest" — the reason the list is read instead of
-`releases/latest`); that version is compared with `APP_VERSION` (`is_newer`). Nothing is
-downloaded or installed: the interface shows the number and can open the release page.
-Any failure is reported (`UpdateError`), never fatal; while the repository is private the
-API answers 404 ("no published release").
+On by default since 1.3.0 (setting `auto_update_check`; the old `check_updates`, off by
+default, is ignored on purpose): at most once a day, 4 s after start-up
+(`last_update_check`), and whenever the user asks (*Help > Check for updates…*, the
+*Updates* button, `ConvertCAD-cli --check-update`). `check()` runs in a `QThread`: one
+GET of `https://api.github.com/repos/abdelhaouari-AE/ConvertCAD/releases` with only
+`ConvertCAD/<version>` as User-Agent. `newest_release()` keeps the highest version tag
+(`v1.2.0`) and skips drafts, pre-releases and the OCR models release (`ocr-models-v1`,
+which GitHub may call "latest" — the reason the list is read instead of
+`releases/latest`); that version is compared with `APP_VERSION` (`is_newer`) and its
+release files are kept (`UpdateInfo.assets`, `asset_url()`). A newer version is offered in
+the update bar (§5.19); the daily check stays quiet for a version the user skipped
+(`skipped_version`). Any failure is reported (`UpdateError`), never fatal.
+
+### 5.19 `selfupdate.py` — updates that download only the changed files
+
+**Why it works.** Builds are reproducible: the same code and the same library versions
+give byte-identical files (`PYTHONHASHSEED=0`, `SOURCE_DATE_EPOCH`, `requirements-lock.txt`,
+Python pinned — checked: two builds, 595 identical files). Our own code is collected as
+separate `.pyc` files in `_internal/convertcad/` (`OWN_CODE_AS_FILES` in `ConvertCAD.spec`)
+and the archives of the libraries' Python code sit beside the programs
+(`append_pkg=False`: `ConvertCAD.pkg`, `ConvertCAD-cli.pkg`), so `ConvertCAD.exe` itself is
+a small file. A code change therefore changes about 1 MB of files, not the 23 MB of the
+two programs of 1.2.x.
+
+**The list of files.** `scripts/make_manifest.py` writes
+`_internal/update-manifest.json` (every file: size, SHA-256, `exec` bit on Linux; skipped:
+`_update/`, `settings/`, `ConvertCAD.portable`, `*.cc-old`, `unins*`) as the LAST step of a
+build, after signing and copying the documents, so the portable zip and the installer
+contain it.
+
+**Preparing (`prepare`).** The release's portable zip (`-win64-portable.zip`, also the
+source for the installed version: same files) is read with HTTP range requests (GitHub's
+storage serves parts of a file and refuses `HEAD`: the size comes from `Content-Range` of
+a 1-byte request). `zipfile` reads only the table of contents (one or two 64 kB blocks),
+then the new list is read; each file of the list is compared with the local file (size,
+then SHA-256). Files in the old list but not in the new one are to be removed.
+
+**Downloading (`download`).** Each changed file is streamed (its local zip header, then
+exactly its compressed bytes), inflated, checked (size, CRC-32, SHA-256 of the list) and
+written to `_update/<version>/files/`. `_update/pending.json` is written last: it means
+"ready". Cancel and free-space checks are built in.
+
+**Applying (`apply_pending`, `run_applier`).** When the user chooses *Restart now* or
+*When I close ConvertCAD*, the window starts `ConvertCAD.exe --apply-update --wait-pid
+<pid>` just before it closes (`start_applier`). `main.py` / `convertcad_cli.py` hand this
+argument to `run_applier` before importing anything else. The applier waits for the
+window process to end, then for each file renames the current one `<name>.cc-old`
+(Windows allows renaming, not overwriting, a program file in use — the applier's own
+files included) and moves the new one in; removed files are renamed too. Any error →
+every rename is undone in reverse order, `failed.json` keeps the plan, `last-result.json`
+records the failure. Success → `last-result.json`, the Windows *Apps* entry
+(`HKCU\…\Uninstall\{AppId}_is1`: `DisplayVersion`, `DisplayName`) is updated, and the
+program is started again with `--update-done` (unless `--no-relaunch`). At the next start
+the interface shows the result (`take_result`) and deletes the `*.cc-old` files
+(`cleanup_old`, in a thread).
+
+**Where it applies.** `install_kind()`: `win-installed` (an `unins000.exe` is in the
+folder), `win-portable`, `linux-portable`, `appimage`, `deb`, `source`.
+`can_update_files()` needs one of the first three, the list of files and write access to
+the folder; the release has a Windows source zip only, so on Linux and for an
+installation for all users (Program Files, no write access) the bar offers the full
+download (`FULL_DOWNLOAD`). The installer deletes `_update\` and `*.cc-old` and, at
+uninstall, all of `_internal\` (files added by updates are not in its list).
+
+**Command line.** `ConvertCAD-cli --check-update`, `--update` (downloads, then the applier
+swaps the files when the command ends) and `--update-from <zip>` (a release zip by path or
+address). `scripts/update_selftest.py` uses them in the build workflow on the BUILT
+program (Windows and Linux): it makes a copy older, serves the release zip on a local
+range-only server, forces the files in use by the update itself (the CLI, its `.pkg`, the
+Python library, `base_library.zip`, `selfupdate.pyc`) to be replaced, then checks every
+SHA-256, the removed file, a conversion with the updated copy and the clean-up.
 
 ---
 
@@ -1171,9 +1235,12 @@ settings files and presets never break after an update.
 | Application log | same folder, `convertcad.log` | start-up information and unexpected errors (with traceback) |
 | Icon cache | same folder, `icons\` | checkbox tick SVG used by the style sheet |
 | Temporary results | system temp folder, `convertcad_*` | conversions under review; deleted when the window closes |
+| Update log | same folder as the settings, `update.log` | what the applier did (§5.19) |
+| Update work folder | `_update\` in the program folder | files of an update being prepared, `pending.json`, `last-result.json` |
 | Conversion outputs | chosen by the user | `<name>.dxf` or `<name>.dwg`, `<name>_log.txt`, `<name>_pN_imgK.png` (raster images) |
 
-Nothing is sent over the network.
+Nothing about the user or the drawings is sent over the network (update check and
+download, OCR models, feedback form: see `PRIVACY.md`).
 
 ---
 
@@ -1343,6 +1410,9 @@ build may end up in the bundle. On Linux, build on the oldest distribution you s
   `core/compat.py`), plus files never needed here: Qt's software OpenGL
   (`opengl32sw.dll`, ~20 MB) and OpenCV's video plugin (`opencv_videoio_ffmpeg*.dll`,
   ~25 MB) on Windows, Qt's GTK platform theme and the GTK libraries it pulls in on Linux.
+- **Small updates**: our code as `.pyc` files in `_internal/convertcad/`
+  (`module_collection_mode`), the program archives beside the programs (`append_pkg=False`,
+  `ConvertCAD.pkg`, `ConvertCAD-cli.pkg`) — see §5.19.
 - **Windows file properties** (version, description, copyright) generated from
   `convertcad/__init__.py`.
 - **UPX disabled** — compressed executables trigger antivirus false alarms.
@@ -1395,11 +1465,21 @@ PACKAGING.md for where to get a certificate), or run from source.
 - **`tests.yml`** — on every push to `main` and every pull request: Windows and Ubuntu ×
   Python 3.10 / 3.12 / 3.13; installs the Qt runtime libraries and the build tools on
   Linux; builds LibreDWG once and caches it (Windows uses the programs in
-  the repository); runs `ruff check .` and `pytest` (DWG tests included).
+  the repository); runs `ruff check .` and `pytest` (DWG tests included). Python 3.12
+  installs the exact versions of `requirements-lock.txt` (`scripts/check_lock.py` checks
+  them); 3.10 and 3.13 the newest versions `requirements.txt` allows (early warning). The
+  `audit` job runs `pip-audit` on the lock (known vulnerabilities).
+- **`security.yml`** — every Monday: `pip-audit` on the lock; a failure (e-mailed by GitHub)
+  means a locked library has a known vulnerability: update it (CLAUDE.md, "Dependencies").
+  `.github/dependabot.yml` asks Dependabot for security pull requests only.
 - **`build.yml`** — on a tag `v*` or manually. *Windows job*: tests, PyInstaller build,
   smoke test of the built CLI (PDF → DWG, `AC1015` checked; the sample scan read by the
   built-in OCR model), optional code signing (secrets `SIGN_PFX_BASE64`,
-  `SIGN_PFX_PASSWORD`), portable zip, installer with Inno Setup (Chocolatey). *Linux job*
+  `SIGN_PFX_PASSWORD`; SignPath, see `docs/PACKAGING.md`), list of files
+  (`make_manifest.py`), portable zip, per-file update test (`update_selftest.py`),
+  installer with Inno Setup (Chocolatey). Python 3.12.10 / 3.12.15 and the libraries of
+  `requirements-lock.txt` exactly; `PYTHONHASHSEED=0` and the commit time as
+  `SOURCE_DATE_EPOCH` (identical files for identical code). *Linux job*
   (Ubuntu 22.04): LibreDWG (cached), `build_linux.sh` (tests included), AppImage, .deb,
   smoke test (AppImage → DWG, OCR), and — for information only — an OCR model download from
   the built program. The five downloads are uploaded as workflow artifacts. *Release job*
@@ -1607,6 +1687,7 @@ All third-party licences: [`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md).
 
 | Version | Date | Highlights |
 |---|---|---|
+| 1.3.0 | 2026-11-04 | Updates that download only the changed files (`selfupdate.py`), update bar, daily update check on by default, reproducible builds, exact library versions (`requirements-lock.txt`, `check_lock.py`, pip-audit, Dependabot security updates, CLAUDE.md rule) |
 | 1.2.3 | 2026-11-03 | Interface polish: language button, tab lines, regular-weight slim panel titles, paper size instead of the Vector tag, centred welcome step numbers |
 | 1.2.2 | 2026-11-02 | Sheet tick-box error fixed; Feedback (Tally form, `core/feedback.py`, `FORM_URL`) and Updates buttons in the menu bar corner; language button (EN, FR…) replacing the "?" button; new icon; plotter-blue accent, blue snap buttons |
 | 1.2.1 | 2026-10-31 | Accents kept in DWG files; text in the PDF's font with its own size, length and alignment; imperial units and scales; collapsible side panels; AutoCAD-like model space with grid; report, Yes / No and Qt dialogs in the interface language; *Convert a folder* next to *Open PDF* |

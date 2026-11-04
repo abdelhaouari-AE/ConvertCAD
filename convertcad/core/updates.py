@@ -1,14 +1,15 @@
 """
-updates.py — optional check for a newer ConvertCAD. OFF by default.
+updates.py — check whether a newer ConvertCAD exists.
 
-It runs only when the user asks (Help > Check for updates…) or has switched
-on "Check for updates at startup". It makes ONE request to GitHub's public
+The check runs at most once a day at start-up (on by default; Help > Check
+for updates automatically) and whenever the user asks (Help > Check for
+updates…, or the Updates button). It makes ONE request to GitHub's public
 API for the list of ConvertCAD releases:
   * nothing is sent — no drawing, no file name, no identifier; the request
     only says "ConvertCAD/<version>" (its User-Agent);
-  * nothing is downloaded or installed: when a newer version exists the
-    program shows its number and, if the user wants, opens the release
-    page in the browser.
+  * nothing is installed without the user's click: when a newer version
+    exists the program offers to update (core/selfupdate.py downloads only
+    the files that changed) or to open the release page.
 Any failure (no internet, proxy, GitHub unreachable) is reported, never
 fatal.
 
@@ -21,8 +22,8 @@ import json
 import re
 import urllib.error
 import urllib.request
-from dataclasses import dataclass
-from typing import Optional, Tuple
+from dataclasses import dataclass, field
+from typing import Dict, Optional, Tuple
 
 from .ocr_store import _ssl_context, _user_agent
 
@@ -45,10 +46,26 @@ class UpdateInfo:
     current: str
     latest: str
     url: str                     # release page
+    # files of the release: name -> (download address, size in bytes)
+    assets: Dict[str, Tuple[str, int]] = field(default_factory=dict)
 
     @property
     def newer(self) -> bool:
         return is_newer(self.latest, self.current)
+
+    def asset_url(self, suffix: str) -> str:
+        """Download address of the release file ending with `suffix`
+        ('-win64-portable.zip'...), '' when there is none."""
+        for name, (url, _size) in self.assets.items():
+            if suffix and name.endswith(suffix):
+                return url
+        return ""
+
+    def asset_size(self, suffix: str) -> int:
+        for name, (_url, size) in self.assets.items():
+            if suffix and name.endswith(suffix):
+                return size
+        return 0
 
 
 def parse_version(text: str) -> Tuple[int, ...]:
@@ -108,5 +125,11 @@ def check(current: str = "") -> UpdateInfo:
     if rel is None:
         raise UpdateError("no published release was found")
     latest = ".".join(str(x) for x in parse_version(str(rel["tag_name"]).strip()))
+    assets = {}
+    for a in rel.get("assets") or []:
+        if isinstance(a, dict) and a.get("name") and a.get("browser_download_url"):
+            assets[str(a["name"])] = (str(a["browser_download_url"]),
+                                      int(a.get("size") or 0))
     return UpdateInfo(current=current, latest=latest,
-                      url=str(rel.get("html_url") or RELEASES_PAGE))
+                      url=str(rel.get("html_url") or RELEASES_PAGE),
+                      assets=assets)

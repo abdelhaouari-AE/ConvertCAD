@@ -27,6 +27,8 @@ import os
 import re
 import shutil
 import tempfile
+import threading
+import time
 from typing import List, Optional
 
 from PySide6.QtCore import QByteArray, QPointF, QRectF, Qt, QThread, QTimer, \
@@ -61,6 +63,7 @@ from .side_panel import STRIP_WIDTH, SidePanel
 from .pdf_view import PdfView, format_length
 from .report_panel import ActivityPanel, ReportPanel
 from .statusbar import TitleBlockBar
+from .update_bar import PatchThread, UpdateBar
 from .widgets import Toast, ask_yes_no, restyle
 
 
@@ -122,6 +125,9 @@ class MainWindow(QMainWindow):
         self._pending_save = ""                 # DWG save waiting for a run
         self._save_thread: Optional[_SaveThread] = None
         self._update_thread: Optional[_UpdateThread] = None
+        self._patch_thread = None                # ui/update_bar.PatchThread
+        self._update_info = None                 # newest release (updates.py)
+        self._update_on_close = ""               # "" | "restart" | "close"
 
         self._build_actions()
         self._build_menus()
@@ -131,8 +137,7 @@ class MainWindow(QMainWindow):
         self._restore_layout()
         self._update_state()
         self.activity.log(f"{APP_NAME} {APP_VERSION} — " + tr("Ready"))
-        if self.settings.check_updates:          # opt-in, off by default
-            QTimer.singleShot(4000, lambda: self.check_updates(quiet=True))
+        self._startup_update_state()
 
     # =====================================================================
     # Construction
@@ -234,9 +239,12 @@ class MainWindow(QMainWindow):
                                 "account needed). Do not attach confidential "
                                 "drawings.")
         self.a_feedback.setIconText(tr("Feedback"))
-        self.a_updates_auto = A("Check for updates at startup",
-                                self._toggle_update_check, checkable=True)
-        self.a_updates_auto.setChecked(bool(self.settings.check_updates))
+        self.a_updates_auto = A("Check for updates automatically",
+                                self._toggle_update_check, checkable=True,
+                                tip="Once a day, ask GitHub whether a newer "
+                                    "version exists (nothing about you or "
+                                    "your drawings is sent)")
+        self.a_updates_auto.setChecked(bool(self.settings.auto_update_check))
         self.a_settings_dir = A("Open the settings folder",
                                 lambda: open_folder(settings_dir()))
 
@@ -404,6 +412,9 @@ class MainWindow(QMainWindow):
         root = QVBoxLayout(central)
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
+        # new version offered here (hidden until there is one)
+        self.update_bar = UpdateBar()
+        root.addWidget(self.update_bar)
         self.main_split = QSplitter(Qt.Orientation.Horizontal)
         self.main_split.setChildrenCollapsible(False)
         root.addWidget(self.main_split, 1)
@@ -1352,22 +1363,68 @@ class MainWindow(QMainWindow):
         self.activity.log(tr("Feedback form opened in the web browser."))
         QDesktopServices.openUrl(QUrl(url))
 
-    # ---- updates (opt-in) ---------------------------------------------------
+    # ---- updates (core/updates.py, core/selfupdate.py, ui/update_bar.py) ----
+    # Checked at most once a day at start-up (on by default) and whenever the
+    # user asks (Help > Check for updates…, Updates button). A newer version
+    # is offered in the bar under the toolbar; "Update now" downloads only
+    # the files that changed; they are put in place when ConvertCAD closes
+    # (or restarts), by the applier process (core/selfupdate.run_applier).
+    CHECK_EVERY_S = 20 * 3600
+
     def _toggle_update_check(self, on: bool) -> None:
-        self.settings.check_updates = bool(on)
+        self.settings.auto_update_check = bool(on)
         self.settings.save()
+
+    def _startup_update_state(self) -> None:
+        """Result of the last update, update waiting to be installed,
+        clean-up of replaced files, then the daily check."""
+        from ..core import selfupdate as su
+        self.update_bar.action.connect(self._on_update_action)
+        app = su.program_dir()
+        if app:
+            result = su.take_result(app)
+            if result and result.get("ok"):
+                self.update_bar.show_done(str(result.get("version")))
+                self.activity.log(tr("ConvertCAD was updated to {v}.",
+                                     v=result.get("version")))
+            elif result:
+                self.update_bar.show_failed(str(result.get("message")))
+                self.activity.log(tr("The update could not be installed: {e}",
+                                     e=result.get("message")))
+            pending = su.read_pending(app)
+            if pending and not result:
+                self.update_bar.show_ready(str(pending.get("version")))
+            # the replaced files (*.cc-old) can be deleted now
+            QTimer.singleShot(5000, lambda: threading.Thread(
+                target=su.cleanup_old, args=(app,), daemon=True).start())
+        due = time.time() - float(self.settings.last_update_check or 0)
+        if (self.settings.auto_update_check and due >= self.CHECK_EVERY_S
+                and not self.update_bar.isVisible()
+                and not os.environ.get("CONVERTCAD_NO_UPDATE_CHECK")):
+            QTimer.singleShot(4000, lambda: self.check_updates(quiet=True))
 
     def check_updates(self, quiet: bool = False) -> None:
         """Ask GitHub for the latest version (one request, nothing sent).
-        quiet (startup check): only a newer version is shown."""
+        quiet (daily check): only a newer, not skipped, version is shown."""
         if self._update_thread is not None and self._update_thread.isRunning():
             return
+        if self._patch_thread is not None and self._patch_thread.isRunning():
+            return                              # already downloading
         self._update_quiet = quiet
         self._update_thread = _UpdateThread(self)
         self._update_thread.done.connect(self._on_update_checked)
         self._update_thread.start()
         if not quiet:
             self.status(tr("Checking for updates…"))
+
+    def _patch_source(self, info) -> str:
+        """Release zip to read the changed files from, '' when this
+        installation must download the full version."""
+        from ..core import selfupdate as su
+        ok, why = su.can_update_files()
+        if not ok:
+            return ""
+        return info.asset_url(su.PATCH_SOURCE.get(su.install_kind(), ""))
 
     def _on_update_checked(self, info, error: str) -> None:
         quiet = getattr(self, "_update_quiet", False)
@@ -1378,6 +1435,8 @@ class MainWindow(QMainWindow):
                     "The latest version could not be checked: {e}.",
                     e=error))
             return
+        self.settings.last_update_check = time.time()
+        self.settings.save()
         if not info.newer:
             self.activity.log(tr("ConvertCAD is up to date ({v}).",
                                  v=info.current))
@@ -1386,21 +1445,88 @@ class MainWindow(QMainWindow):
                     "ConvertCAD is up to date ({v}).", v=info.current))
             return
         self.activity.log(tr("ConvertCAD {v} is available.", v=info.latest))
-        box = QMessageBox(self)
-        box.setWindowTitle(APP_NAME)
-        box.setIcon(QMessageBox.Icon.Information)
-        box.setText(tr("ConvertCAD {v} is available (this one is {c}).",
-                       v=info.latest, c=info.current))
-        box.setInformativeText(tr("Nothing is installed automatically: "
-                                  "download it from its release page."))
-        go = box.addButton(tr("Open the release page"),
-                           QMessageBox.ButtonRole.AcceptRole)
-        box.addButton(tr("Later"), QMessageBox.ButtonRole.RejectRole)
-        box.exec()
-        if box.clickedButton() is go:
-            from PySide6.QtCore import QUrl
-            from PySide6.QtGui import QDesktopServices
-            QDesktopServices.openUrl(QUrl(info.url))
+        if quiet and info.latest == self.settings.skipped_version:
+            return                              # "Skip this version"
+        self._update_info = info
+        self.update_bar.show_available(info.latest, info.current,
+                                       patch=bool(self._patch_source(info)))
+
+    def _open_url(self, url: str) -> None:
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+        QDesktopServices.openUrl(QUrl(url))
+
+    def _on_update_action(self, name: str) -> None:
+        from ..core import selfupdate as su
+        info = self._update_info
+        bar = self.update_bar
+        if name == "notes":
+            self._open_url(info.url if info else
+                           "https://github.com/abdelhaouari-AE/ConvertCAD/releases")
+        elif name in ("later", "close"):
+            bar.hide()
+        elif name == "skip" and info:
+            self.settings.skipped_version = info.latest
+            self.settings.save()
+            bar.hide()
+        elif name == "download":
+            url = ""
+            if info:
+                url = (info.asset_url(su.FULL_DOWNLOAD.get(su.install_kind(), "?"))
+                       or info.url)
+            self._open_url(url or
+                           "https://github.com/abdelhaouari-AE/ConvertCAD/releases")
+            bar.hide()
+        elif name == "update" and info:
+            source = self._patch_source(info)
+            if not source:
+                self._on_update_action("download")
+                return
+            self._patch_thread = PatchThread(source, su.program_dir(), self)
+            self._patch_thread.progress.connect(bar.show_progress)
+            self._patch_thread.ready.connect(self._on_patch_ready)
+            self._patch_thread.failed.connect(self._on_patch_failed)
+            bar.show_checking()
+            self._patch_thread.start()
+        elif name == "cancel" and self._patch_thread is not None:
+            self._patch_thread.cancel()
+        elif name == "restart":
+            self._update_on_close = "restart"
+            if not self.close():                # the user kept the window
+                self._update_on_close = ""
+        elif name == "on_close":
+            self._update_on_close = "close"
+            bar.hide()
+            self.activity.log(tr("The update will be installed when you close "
+                                 "ConvertCAD."))
+
+    def _on_patch_ready(self, version: str, size_mb: float, full_mb: float):
+        self.activity.log(tr("ConvertCAD {v} is ready to install: {size} MB "
+                             "downloaded instead of {full} MB.", v=version,
+                             size=f"{size_mb:.1f}", full=f"{full_mb:.0f}"))
+        self.update_bar.show_ready(version, size_mb, full_mb)
+
+    def _on_patch_failed(self, message: str) -> None:
+        if not message:                         # cancelled
+            self.activity.log(tr("Update cancelled."))
+            self.update_bar.hide()
+            return
+        self.activity.log(tr("The update could not be installed: {e}",
+                             e=message))
+        self.update_bar.show_failed(message)
+
+    def _start_update_on_exit(self) -> None:
+        """Last thing before ConvertCAD closes: start the applier when an
+        update is ready and the user asked for it."""
+        from ..core import selfupdate as su
+        app = su.program_dir()
+        if not (self._update_on_close and app and su.read_pending(app)):
+            return
+        try:
+            su.start_applier(relaunch=self._update_on_close == "restart")
+        except OSError as exc:                  # pragma: no cover
+            self.activity.log(tr("The update could not be installed: {e}",
+                                 e=exc))
 
     def _fill_recent(self, menu: QMenu = None) -> None:
         menu = menu or self.recent_menu
@@ -1499,4 +1625,8 @@ class MainWindow(QMainWindow):
         if self.doc is not None:
             self.doc.close()
         shutil.rmtree(self.temp_root, ignore_errors=True)
+        if self._patch_thread is not None and self._patch_thread.isRunning():
+            self._patch_thread.cancel()
+            self._patch_thread.wait(5000)
+        self._start_update_on_exit()
         event.accept()

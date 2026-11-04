@@ -2,6 +2,30 @@
 
 All notable changes to ConvertCAD. Versions follow *major.minor.patch*.
 
+## [1.3.0] — 2026-11-04
+
+### Added
+- **Updates that download only the files that changed.** When a new version exists, a
+  bar under the toolbar offers it: *Update now* downloads only the changed files (usually
+  a few MB instead of 170 MB), checks each one, and puts them in place when you restart
+  or close ConvertCAD. If anything goes wrong, every file is put back as it was. Windows,
+  portable folder or installation for the current user; elsewhere the bar offers the full
+  download. Users of 1.2.x download 1.3.0 once in full (their version cannot do this yet).
+- **Update check on by default**, at most once a day at start-up (switch it off with
+  *Help > Check for updates automatically*). *Help > Check for updates…* and the *Updates*
+  button check at any time. *Skip this version* hides a version until the next one.
+- Command line: `--check-update`, `--update`, `--update-from <zip>`.
+
+### Changed
+- The program is packaged so that a code change touches only small files (our code as
+  separate files, the library archives beside the programs), and builds are
+  reproducible (identical files for identical code).
+- **Libraries:** the releases are built with exact library versions
+  (`requirements-lock.txt`, unchanged from 1.2.3) and a pinned Python; they change only
+  for a security fix or a needed feature. Known vulnerabilities are checked on every
+  change and every week.
+- Privacy policy: the daily update check and the update download are listed.
+
 ## [1.2.3] — 2026-11-03
 
 ### Changed

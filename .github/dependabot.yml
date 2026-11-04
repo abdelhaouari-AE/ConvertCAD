@@ -1,0 +1,17 @@
+# Dependabot: SECURITY updates only (open-pull-requests-limit 0 switches off
+# the routine "new version" pull requests). When a locked library or GitHub
+# action has a known vulnerability, Dependabot opens a pull request with the
+# fixed version (repository Settings > Code security: "Dependabot security
+# updates" must be on). Rule: CLAUDE.md, "Dependencies".
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0

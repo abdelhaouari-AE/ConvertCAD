@@ -145,6 +145,26 @@ Without them the build simply produces unsigned programs. Signing on your own co
 with a certificate of your own is still possible with `scripts\sign_windows.bat`
 (`CONVERTCAD_SIGN_PFX` / `CONVERTCAD_SIGN_THUMBPRINT`).
 
+## Library versions and small updates
+
+- The releases are built with the exact versions of `requirements-lock.txt` (every
+  library, build tools included) and a pinned Python (3.12.10 Windows, 3.12.15 Linux, in
+  `build.yml`). Install like the build:
+  `python -m pip install -r requirements-dev.txt -c requirements-lock.txt`, then
+  `python scripts/check_lock.py`.
+- Change a version only for a **security fix** (the `tests` / weekly `security` workflows
+  run `pip-audit` and fail; Dependabot opens security pull requests) or a **fix / feature
+  ConvertCAD needs**: `uv pip compile requirements-dev.txt --universal --python-version 3.12
+  --upgrade-package <name> -o requirements-lock.txt`, tests, a "Libraries" line in
+  `CHANGELOG.md`. The full rule is in `CLAUDE.md`.
+- Why: in-app updates download only the files that changed (`convertcad/core/selfupdate.py`).
+  Builds are reproducible (`PYTHONHASHSEED=0`, `SOURCE_DATE_EPOCH`), so a release that
+  changes only our code changes about 1 MB of files. A library update makes users download
+  that library's files once.
+- `scripts/make_manifest.py dist/ConvertCAD` must run last, on the final folder, before the
+  zip and the installer (the scripts and `build.yml` do it); `scripts/update_selftest.py`
+  checks a real update of the built program in the build workflow.
+
 ## Release checklist
 
 1. Update `APP_VERSION` in `convertcad/__init__.py` and `CHANGELOG.md`.
@@ -152,5 +172,6 @@ with a certificate of your own is still possible with `scripts\sign_windows.bat`
 3. Commit and push to `main`.
 4. *Actions → build → Run workflow*, tick **Publish the release** (or push the tag
    `v<version>`). The release `v<version>` is created with the five downloads and the
-   CHANGELOG section as notes; the website offers it at once.
+   CHANGELOG section as notes; the website offers it at once. Users of 1.3.0 and later
+   get it from the update bar (only the changed files on Windows).
 5. Only when `ocr_catalog.py` changed: run the **OCR models release** workflow.

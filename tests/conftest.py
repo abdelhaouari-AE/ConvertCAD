@@ -12,6 +12,8 @@ import warnings
 import pytest
 
 warnings.simplefilter("ignore", FutureWarning)
+# the interface must not ask GitHub for a new version during the tests
+os.environ["CONVERTCAD_NO_UPDATE_CHECK"] = "1"
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)

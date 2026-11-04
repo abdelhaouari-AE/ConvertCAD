@@ -25,7 +25,9 @@ cd "$(dirname "$0")/.."
 if [ -x .venv/bin/python ]; then PY=.venv/bin/python; else PY=python3; fi
 
 echo "[1/5] Python packages"
-"$PY" -m pip install -r requirements-dev.txt --quiet
+# exact versions of requirements-lock.txt (see CLAUDE.md, "Dependencies")
+"$PY" -m pip install -r requirements-dev.txt -c requirements-lock.txt --quiet
+"$PY" scripts/check_lock.py
 
 echo "[2/5] DWG converter (GNU LibreDWG)"
 if [ ! -x vendor/libredwg/linux-x86_64/dxf2dwg ]; then
@@ -43,12 +45,15 @@ fi
 
 echo "[4/5] Building (2 to 5 minutes)"
 "$PY" scripts/make_icon.py
-CONVERTCAD_ONEFILE=0 "$PY" -m PyInstaller --noconfirm --clean ConvertCAD.spec
-cp README.md LICENSE THIRD_PARTY_NOTICES.md CHANGELOG.md assets/icon.png \
-   dist/ConvertCAD/
+# fixed hash seed: two builds of the same code give identical files
+PYTHONHASHSEED=0 CONVERTCAD_ONEFILE=0 "$PY" -m PyInstaller --noconfirm --clean ConvertCAD.spec
+cp README.md LICENSE THIRD_PARTY_NOTICES.md CHANGELOG.md PRIVACY.md \
+   CODE_SIGNING.md assets/icon.png dist/ConvertCAD/
 # the bundled converter must be executable after PyInstaller's copy
 chmod +x dist/ConvertCAD/_internal/libredwg/dxf2dwg \
          dist/ConvertCAD/_internal/libredwg/dwg2dxf 2>/dev/null || true
+# list of files with their checksums (small updates): last, folder final
+"$PY" scripts/make_manifest.py dist/ConvertCAD
 
 echo "[5/5] Check and archive"
 dist/ConvertCAD/ConvertCAD-cli --version

@@ -1,20 +1,24 @@
 ﻿ConvertCAD privacy policy
 
-Applies to ConvertCAD 1.2.2 and later. Last update: 2 November 2026.
+Applies to ConvertCAD 1.3.0 and later. Last update: 4 November 2026.
 
 ConvertCAD converts drawings on your computer. Your PDF files, the converted
 DXF / DWG files and your settings are never sent anywhere. There is no account,
 no advertising, no analytics and no tracking.
 
-ConvertCAD connects to the internet only in these three cases, each started by you:
+ConvertCAD connects to the internet only in these cases:
 
-- You download an OCR language (Tools  OCR languages and models)
+- You download an OCR language (Tools > OCR languages and models)
   Contacted: GitHub (github.com) and, if GitHub fails, the ModelScope mirror (modelscope.cn)
   Sent: A normal download request (your IP address, as for any download)
 
-- You check for updates (Help  Check for updates, or the Updates button). The check at startup is off by default and can be switched off again in the Help menu
+- Update check: at most once a day when ConvertCAD starts (on by default; switch it off with Help > Check for updates automatically), and when you click Updates or Help > Check for updates
   Contacted: The GitHub API (api.github.com)
   Sent: A normal web request; nothing about you or your drawings
+
+- You click Update now: ConvertCAD downloads only the files that changed in the new version
+  Contacted: GitHub (github.com and its file storage)
+  Sent: Normal download requests; nothing about you or your drawings
 
 - You click Feedback
   Contacted: Your web browser opens the ConvertCAD form on Tally (tally.so)

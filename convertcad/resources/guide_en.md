@@ -81,7 +81,7 @@ Measurement texts that matched no dimension are put on layer **DIM_RAW** (red) s
 
 ## Updates
 
-ConvertCAD never connects to the internet by itself. *Help > Check for updates…* asks GitHub, once, whether a newer version exists; *Help > Check for updates at startup* does it at each start (off by default). Nothing is sent and nothing is installed: when a newer version exists, ConvertCAD shows its number and can open its release page.
+ConvertCAD asks GitHub, at most once a day when it starts, whether a newer version exists (switch this off with *Help > Check for updates automatically*); *Help > Check for updates…* or the *Updates* button ask at any time. Nothing about you or your drawings is sent. When a newer version exists, a bar under the toolbar offers it: *Update now* downloads only the files that changed (usually a few MB) and puts them in place when you restart or close ConvertCAD; if anything goes wrong, the previous files are kept. *Skip this version* hides it until the next one. On Linux, and for an installation for all users in Program Files, the bar offers the full download instead.
 
 ## Converting a whole folder
 

@@ -148,6 +148,17 @@ def _keep(entries):
             if not os.path.basename(e[0]).lower().startswith(DROP_PREFIXES)]
 
 
+# ---- small updates (convertcad/core/selfupdate.py) -------------------------
+# An update downloads only the files that changed. Two settings keep the files
+# that change at each version small:
+#  * our own code is collected as separate .pyc files in _internal/convertcad
+#    (not inside the program file): a code change replaces only those files;
+#  * the archive of the libraries' Python code is a separate file next to the
+#    program (ConvertCAD.pkg, ConvertCAD-cli.pkg), not appended to the .exe: the
+#    .exe (which changes at every version: version number, signature) stays a
+#    small file, and the .pkg changes only when a library version changes.
+OWN_CODE_AS_FILES = {"convertcad": "pyc"}
+
 a = Analysis(                                        # noqa: F821
     [os.path.join(ROOT, "main.py")],
     pathex=[ROOT],
@@ -155,6 +166,7 @@ a = Analysis(                                        # noqa: F821
     hiddenimports=hiddenimports,
     excludes=excludes,
     noarchive=False,
+    module_collection_mode=OWN_CODE_AS_FILES,
 )
 a.binaries = _keep(a.binaries)
 pyz = PYZ(a.pure)                                    # noqa: F821
@@ -174,7 +186,7 @@ if ONEFILE:
               runtime_tmpdir=None, **common)
 else:
     exe = EXE(pyz, a.scripts, [], exclude_binaries=True,  # noqa: F821
-              **common)
+              append_pkg=False, **common)
     # Console twin for scripts / batch files: ConvertCAD-cli.exe, same
     # folder, same libraries (no Qt needed).
     a_cli = Analysis(                                # noqa: F821
@@ -184,10 +196,11 @@ else:
         hiddenimports=_ocr_modules,
         excludes=excludes + ["PySide6", "shiboken6"],
         noarchive=False,
+        module_collection_mode=OWN_CODE_AS_FILES,
     )
     a_cli.binaries = _keep(a_cli.binaries)
     exe_cli = EXE(PYZ(a_cli.pure), a_cli.scripts, [],  # noqa: F821
-                  exclude_binaries=True,
+                  exclude_binaries=True, append_pkg=False,
                   **dict(common, name=f"{APP_NAME}-cli", console=True))
     coll = COLLECT(exe, exe_cli,                     # noqa: F821
                    a.binaries, a.datas, a_cli.binaries, a_cli.datas,

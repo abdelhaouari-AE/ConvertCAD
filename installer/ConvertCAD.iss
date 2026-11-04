@@ -101,8 +101,15 @@ Name: "sendto"; Description: "{cm:SendToTask}"; GroupDescription: "{cm:Additiona
 [InstallDelete]
 ; an update replaces the whole program: no file of the old version is left
 Type: filesandordirs; Name: "{app}\_internal"
+; and nothing of an in-app update (convertcad/core/selfupdate.py)
+Type: filesandordirs; Name: "{app}\_update"
+Type: files; Name: "{app}\*.cc-old"
 
 [UninstallDelete]
+; files added by in-app updates are not in the uninstaller's list
+Type: filesandordirs; Name: "{app}\_internal"
+Type: filesandordirs; Name: "{app}\_update"
+Type: files; Name: "{app}\*.cc-old"
 ; OCR models downloaded from the program (convertcad/core/ocr_store.py);
 ; an update keeps them, only uninstalling removes them
 Type: filesandordirs; Name: "{localappdata}\ConvertCAD\ocr_models"

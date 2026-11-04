@@ -331,3 +331,40 @@ def test_side_panels_collapse_and_questions_are_translated(qapp):
     finally:
         i18n.set_language("en")
     assert texts == ["Non", "Oui"]
+
+
+def test_update_bar_offers_and_skips_a_new_version(qapp):
+    """A newer version shows the bar; this source checkout cannot be updated
+    file by file, so the bar offers the download; Skip remembers it."""
+    from convertcad.config import Settings
+    from convertcad.core.updates import UpdateInfo
+    from convertcad.ui import main_window as mw
+
+    s = Settings()
+    s.terms_accepted = True
+    w = mw.MainWindow(s)
+    w.show()
+    _pump(50)
+    try:
+        assert not w.update_bar.isVisible()
+        info = UpdateInfo(current="1.0.0", latest="9.0.0",
+                          url="https://example.org/r")
+        w._update_quiet = True
+        w._on_update_checked(info, "")
+        assert w.update_bar.isVisible() and w.update_bar.state == "available"
+        assert s.last_update_check > 0
+        labels = [w.update_bar.buttons.itemAt(i).widget().text()
+                  for i in range(w.update_bar.buttons.count())]
+        assert "Download" in labels and "Update now" not in labels
+        w._on_update_action("skip")
+        assert s.skipped_version == "9.0.0" and not w.update_bar.isVisible()
+        w._on_update_checked(info, "")          # skipped: the daily check stays quiet
+        assert not w.update_bar.isVisible()
+        w.update_bar.show_ready("9.0.0", 2.4, 172)
+        assert "2.4 MB" in w.update_bar.text.text()
+        w.update_bar.show_progress(1.0, 2.0)    # ignored outside "working"
+        w.update_bar.show_checking()
+        w.update_bar.show_progress(1.0, 2.0)
+        assert w.update_bar.bar.value() == 500
+    finally:
+        w.close()

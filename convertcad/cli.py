@@ -13,6 +13,8 @@ Examples
     python -m convertcad.cli --list-presets
     python -m convertcad.cli --list-ocr                      # OCR models
     python -m convertcad.cli --get-ocr-model arabic latin_max
+    ConvertCAD-cli --check-update                            # newer version?
+    ConvertCAD-cli --update                                  # changed files only
 
 Exit code: 0 when every file converted, 1 otherwise, 2 on bad arguments.
 """
@@ -86,6 +88,16 @@ def build_parser() -> argparse.ArgumentParser:
                         "are installed, then exit")
     p.add_argument("--get-ocr-model", nargs="+", metavar="ID",
                    help="download OCR models (see --list-ocr), then exit")
+    p.add_argument("--check-update", action="store_true",
+                   help="say whether a newer ConvertCAD exists, then exit")
+    p.add_argument("--update", action="store_true",
+                   help="download the files that changed in the newest "
+                        "version; they are put in place when this command "
+                        "ends (Windows portable folder or installation for "
+                        "the current user)")
+    p.add_argument("--update-from", metavar="ZIP",
+                   help="with --update: read the files from this release "
+                        "zip (path or address) instead of GitHub")
     p.add_argument("--preset", choices=sorted(BUILTIN_PRESETS),
                    help="start from a built-in preset")
     p.add_argument("--options-json", metavar="FILE",
@@ -283,6 +295,58 @@ def _get_ocr_models(ids: List[str], quiet: bool) -> int:
     return code
 
 
+def _update(install: bool, source: Optional[str], quiet: bool) -> int:
+    """--check-update / --update: see core/selfupdate.py."""
+    from . import APP_VERSION
+    from .core import selfupdate, updates
+    if not source:
+        try:
+            info = updates.check(APP_VERSION)
+        except updates.UpdateError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+        if not info.newer:
+            print(f"ConvertCAD is up to date ({APP_VERSION}).")
+            return 0
+        print(f"ConvertCAD {info.latest} is available (this one is "
+              f"{APP_VERSION}): {info.url}")
+        if not install:
+            return 0
+        kind = selfupdate.install_kind()
+        source = info.asset_url(selfupdate.PATCH_SOURCE.get(kind, "?"))
+    app = selfupdate.program_dir()
+    ok, why = selfupdate.can_update_files(app)
+    if not ok or not source:
+        print(f"This installation cannot be updated file by file ({why}): "
+              "download the new version from the release page.",
+              file=sys.stderr)
+        return 1
+    try:
+        plan = selfupdate.prepare(source, app)
+        if not plan.files and not plan.removed:
+            print("All files are already up to date.")
+            return 0
+        mb = 1024 * 1024
+        print(f"{len(plan.files)} file(s) to download: "
+              f"{plan.download_bytes / mb:.1f} MB "
+              f"(the full version is {plan.full_bytes / mb:.0f} MB)")
+
+        def progress(done, total):
+            if not quiet and total:
+                print(f"\r  {done / mb:6.1f} / {total / mb:.1f} MB",
+                      end="", flush=True)
+        selfupdate.download(plan, app, progress)
+        if not quiet:
+            print()
+    except selfupdate.UpdateError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    selfupdate.start_applier(relaunch=False)
+    print(f"ConvertCAD {plan.version} is ready: the files are put in place "
+          "as soon as this command ends.")
+    return 0
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -294,6 +358,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         return _list_ocr()
     if args.get_ocr_model:
         return _get_ocr_models(args.get_ocr_model, args.quiet)
+    if args.check_update or args.update:
+        return _update(args.update, args.update_from, args.quiet)
     if not args.input:
         parser.print_usage(sys.stderr)
         return 2

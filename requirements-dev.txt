@@ -1,4 +1,6 @@
 # Development and build tools (on top of requirements.txt)
+# Build exactly like the releases:
+#   python -m pip install -r requirements-dev.txt -c requirements-lock.txt
 -r requirements.txt
 pytest>=8.0                    # test-suite:   python -m pytest
 pyinstaller>=6.6               # portable .exe: scripts\build_exe.bat

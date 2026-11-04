@@ -1,5 +1,5 @@
-"""Optional update check (off by default): version compare, one request,
-failures reported."""
+"""Update check (on by default, at most once a day): version compare, one
+request, failures reported, release files listed."""
 
 import io
 import json
@@ -21,8 +21,10 @@ def test_versions_compare():
     assert not updates.is_newer("", "1.0")
 
 
-def test_check_is_off_by_default():
-    assert Settings().check_updates is False
+def test_check_is_on_by_default():
+    s = Settings()
+    assert s.auto_update_check is True
+    assert s.skipped_version == "" and s.last_update_check == 0
 
 
 class _Answer(io.BytesIO):
@@ -39,7 +41,11 @@ RELEASES = [
     {"tag_name": "ocr-models-v1", "html_url": "https://example.org/ocr"},
     {"tag_name": "v9.9.0", "draft": True, "html_url": "https://example.org/d"},
     {"tag_name": "v9.5.0", "prerelease": True, "html_url": "https://example.org/p"},
-    {"tag_name": "v9.1", "html_url": "https://example.org/r"},
+    {"tag_name": "v9.1", "html_url": "https://example.org/r", "assets": [
+        {"name": "ConvertCAD-9.1-win64-portable.zip", "size": 1234,
+         "browser_download_url": "https://example.org/r/portable.zip"},
+        {"name": "ConvertCAD-9.1-win64-setup.exe", "size": 99,
+         "browser_download_url": "https://example.org/r/setup.exe"}]},
     {"tag_name": "v1.2.0", "html_url": "https://example.org/old"},
 ]
 
@@ -86,3 +92,12 @@ def test_check_failures_are_reported(monkeypatch, error, words):
     monkeypatch.setattr(updates.urllib.request, "urlopen", fake)
     with pytest.raises(updates.UpdateError, match=words):
         updates.check("1.2.0")
+
+
+def test_check_lists_the_release_files(monkeypatch):
+    _answer_with(monkeypatch, RELEASES)
+    info = updates.check("1.2.0")
+    assert info.asset_url("-win64-portable.zip") == "https://example.org/r/portable.zip"
+    assert info.asset_size("-win64-portable.zip") == 1234
+    assert info.asset_url("-win64-setup.exe").endswith("setup.exe")
+    assert info.asset_url(".AppImage") == ""

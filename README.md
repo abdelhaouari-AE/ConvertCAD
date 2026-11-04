@@ -271,9 +271,10 @@ Details: [CODE_SIGNING.md](CODE_SIGNING.md).
 
 ## Privacy
 
-ConvertCAD sends no data on its own: no account, no analytics, no tracking. It goes online
-only when you download an OCR language, check for updates (off at startup by default) or
-open the feedback form. Full text: [PRIVACY.md](PRIVACY.md).
+ConvertCAD sends nothing about you or your drawings: no account, no analytics, no
+tracking. It goes online only to check for a new version (at most once a day; can be
+switched off), to download an update or an OCR language, and when you open the feedback
+form. Full text: [PRIVACY.md](PRIVACY.md).
 
 ## Licence
 

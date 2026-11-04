@@ -1,5 +1,7 @@
-# ConvertCAD — runtime dependencies
+# ConvertCAD — runtime dependencies (allowed versions, to run from source)
 # Install:  python -m pip install -r requirements.txt
+# The RELEASES are built with the exact versions of requirements-lock.txt;
+# change those only for a security fix or a needed feature (CLAUDE.md).
 PySide6-Essentials>=6.6        # desktop interface (Qt 6, LGPL)
 PyMuPDF>=1.24.3                # PDF reading: vectors, text, images, rendering
 ezdxf>=1.3                     # DXF writing + DXF preview rendering

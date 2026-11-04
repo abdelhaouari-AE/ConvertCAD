@@ -1,0 +1,25 @@
+# Every week: are the locked library versions (requirements-lock.txt) hit by
+# a known security vulnerability? The workflow fails when one is found, and
+# GitHub e-mails the repository owner. Then follow CLAUDE.md, "Dependencies":
+# update that library, run the tests, release.
+name: security
+
+on:
+  schedule:
+    - cron: "17 5 * * 1"          # Mondays, 05:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: python -m pip install pip-audit
+      - name: Known vulnerabilities in the locked versions
+        run: python -m pip_audit -r requirements-lock.txt --no-deps --disable-pip --progress-spinner off

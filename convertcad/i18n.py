@@ -940,3 +940,38 @@ _fr({
     'Interface language':
         "Langue de l'interface",
 })
+
+_fr({
+    'Check for updates automatically':
+        'Rechercher les mises à jour automatiquement',
+    'Once a day, ask GitHub whether a newer version exists (nothing about you or your drawings is sent)':
+        "Une fois par jour, demander à GitHub si une version plus récente existe (rien sur vous ni sur vos plans n'est envoyé)",
+    "What's new":
+        'Nouveautés',
+    'Update now':
+        'Mettre à jour',
+    'Skip this version':
+        'Ignorer cette version',
+    'Checking which files changed…':
+        'Recherche des fichiers modifiés…',
+    'Downloading the update: {done} / {total} MB':
+        'Téléchargement de la mise à jour : {done} / {total} Mo',
+    'ConvertCAD {v} is ready to install: {size} MB downloaded instead of {full} MB.':
+        'ConvertCAD {v} est prêt à être installé : {size} Mo téléchargés au lieu de {full} Mo.',
+    'ConvertCAD {v} is ready to install.':
+        'ConvertCAD {v} est prêt à être installé.',
+    'Restart now':
+        'Redémarrer maintenant',
+    'When I close ConvertCAD':
+        'À la fermeture de ConvertCAD',
+    'ConvertCAD was updated to {v}.':
+        'ConvertCAD a été mis à jour en version {v}.',
+    'The update could not be installed: {e}':
+        "La mise à jour n'a pas pu être installée : {e}",
+    'Download the full version':
+        'Télécharger la version complète',
+    'The update will be installed when you close ConvertCAD.':
+        'La mise à jour sera installée à la fermeture de ConvertCAD.',
+    'Update cancelled.':
+        'Mise à jour annulée.',
+})

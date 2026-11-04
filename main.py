@@ -25,6 +25,9 @@ import sys  # noqa: E402
 def main() -> int:
     multiprocessing.freeze_support()          # required by the .exe build
     frozen = getattr(sys, "frozen", False)    # True inside ConvertCAD.exe
+    if "--apply-update" in sys.argv[1:]:      # update: swap the files
+        from convertcad.core.selfupdate import run_applier
+        return run_applier(sys.argv[1:])
     if not frozen:
         from convertcad.launcher import (ensure_dependencies,
                                          pause_if_double_clicked)

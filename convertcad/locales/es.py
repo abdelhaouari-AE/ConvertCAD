@@ -1099,4 +1099,36 @@ STRINGS = {
         'Formulario de comentarios abierto en el navegador.',
     'Interface language':
         'Idioma de la interfaz',
+    'Check for updates automatically':
+        'Buscar actualizaciones automáticamente',
+    'Once a day, ask GitHub whether a newer version exists (nothing about you or your drawings is sent)':
+        'Una vez al día, preguntar a GitHub si existe una versión más reciente (no se envía nada sobre usted ni sobre sus planos)',
+    "What's new":
+        'Novedades',
+    'Update now':
+        'Actualizar ahora',
+    'Skip this version':
+        'Omitir esta versión',
+    'Checking which files changed…':
+        'Buscando los archivos modificados…',
+    'Downloading the update: {done} / {total} MB':
+        'Descargando la actualización: {done} / {total} MB',
+    'ConvertCAD {v} is ready to install: {size} MB downloaded instead of {full} MB.':
+        'ConvertCAD {v} está listo para instalarse: {size} MB descargados en lugar de {full} MB.',
+    'ConvertCAD {v} is ready to install.':
+        'ConvertCAD {v} está listo para instalarse.',
+    'Restart now':
+        'Reiniciar ahora',
+    'When I close ConvertCAD':
+        'Al cerrar ConvertCAD',
+    'ConvertCAD was updated to {v}.':
+        'ConvertCAD se ha actualizado a la versión {v}.',
+    'The update could not be installed: {e}':
+        'No se pudo instalar la actualización: {e}',
+    'Download the full version':
+        'Descargar la versión completa',
+    'The update will be installed when you close ConvertCAD.':
+        'La actualización se instalará al cerrar ConvertCAD.',
+    'Update cancelled.':
+        'Actualización cancelada.',
 }

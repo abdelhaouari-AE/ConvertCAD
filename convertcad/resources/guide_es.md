@@ -81,7 +81,7 @@ Los textos de medida que no corresponden a ninguna cota se colocan en la capa **
 
 ## Actualizaciones
 
-ConvertCAD nunca se conecta a internet por sí solo. *Ayuda > Buscar actualizaciones…* pregunta una vez a GitHub si existe una versión más reciente; *Ayuda > Buscar actualizaciones al iniciar* lo hace en cada inicio (desactivado por defecto). No se envía nada y no se instala nada: cuando existe una versión más reciente, ConvertCAD muestra su número y puede abrir su página de publicación.
+ConvertCAD pregunta a GitHub, como mucho una vez al día al iniciarse, si existe una versión más reciente (se desactiva con *Ayuda > Buscar actualizaciones automáticamente*); *Ayuda > Buscar actualizaciones…* o el botón *Actualizaciones* lo preguntan en cualquier momento. No se envía nada sobre usted ni sobre sus planos. Cuando existe una versión más reciente, una barra bajo la barra de herramientas la ofrece: *Actualizar ahora* descarga solo los archivos modificados (normalmente unos pocos MB) y los coloca al reiniciar o cerrar ConvertCAD; si algo falla, se conservan los archivos anteriores. *Omitir esta versión* la oculta hasta la siguiente. En Linux, y en una instalación para todos los usuarios en Program Files, la barra ofrece la descarga completa.
 
 ## Convertir una carpeta entera
 

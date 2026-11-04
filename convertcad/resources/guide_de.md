@@ -81,7 +81,7 @@ Maßtexte, die zu keiner Bemaßung passen, kommen auf den Layer **DIM_RAW** (rot
 
 ## Updates
 
-ConvertCAD verbindet sich nie von selbst mit dem Internet. *Hilfe > Nach Updates suchen…* fragt GitHub einmal, ob es eine neuere Version gibt; *Hilfe > Beim Start nach Updates suchen* tut dies bei jedem Start (standardmäßig aus). Nichts wird gesendet und nichts wird installiert: gibt es eine neuere Version, zeigt ConvertCAD ihre Nummer und kann ihre Veröffentlichungsseite öffnen.
+ConvertCAD fragt GitHub höchstens einmal täglich beim Start, ob es eine neuere Version gibt (abschalten mit *Hilfe > Automatisch nach Updates suchen*); *Hilfe > Nach Updates suchen…* oder die Schaltfläche *Updates* fragen jederzeit. Nichts über Sie oder Ihre Zeichnungen wird gesendet. Gibt es eine neuere Version, bietet eine Leiste unter der Symbolleiste sie an: *Jetzt aktualisieren* lädt nur die geänderten Dateien herunter (meist wenige MB) und setzt sie beim Neustart oder Schließen von ConvertCAD ein; geht etwas schief, bleiben die bisherigen Dateien erhalten. *Diese Version überspringen* blendet sie bis zur nächsten aus. Unter Linux und bei einer Installation für alle Benutzer unter Program Files bietet die Leiste den vollständigen Download an.
 
 ## Einen ganzen Ordner konvertieren
 
