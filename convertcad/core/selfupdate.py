@@ -520,7 +520,7 @@ def download(plan: UpdatePlan, app_dir: str,
             digest = _read_member(src, member, fh, cancelled, step)
         if digest != new_files[rel]["sha256"]:
             raise UpdateError(f"the downloaded file does not match ({rel})")
-        os.replace(dest + ".part", dest)
+        _rename(dest + ".part", dest)        # an antivirus may scan it first
         if new_files[rel].get("exec") and os.name != "nt":
             os.chmod(dest, os.stat(dest).st_mode | 0o111)
     # the new list of files goes in place with the files
@@ -713,6 +713,8 @@ def _update_windows_entry(app_dir: str, version: str, log) -> None:
                     winreg.SetValueEx(key, name, 0, winreg.REG_DWORD, value)
                 except OSError:
                     pass
+    except FileNotFoundError:                # portable folder: no entry
+        pass
     except OSError as exc:
         log(f"Windows Apps entry not updated: {exc!r}")
 
