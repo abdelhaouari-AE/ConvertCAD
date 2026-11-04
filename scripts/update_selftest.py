@@ -10,9 +10,10 @@ program (run by the build workflow on Windows and Linux).
    a local web server that answers only by parts (HTTP range requests, like
    GitHub);
 3. runs  <copy>/ConvertCAD-cli --update --update-from http://127.0.0.1/...
-   while forcing the program files IN USE by the update itself (the .exe, its
-   .pkg, the Python library, base_library.zip, the updater's own code) to
-   be downloaded again: on Windows they can only be renamed, not overwritten;
+   while forcing the files the update program itself runs from (the .exe,
+   its .pkg, the Python library, base_library.zip, the updater's own code)
+   to be downloaded again: on Windows the update runs from a copy of them
+   (_update/runner) so that the originals can be replaced;
 4. waits for the applier, then checks that every file matches the new list,
    that the extra file is gone, that the copy still converts a drawing, and
    that the replaced files (*.cc-old) can be deleted.
@@ -173,6 +174,8 @@ def main() -> int:
     su.cleanup_old(old)
     left = glob.glob(os.path.join(old, "**", "*" + su.OLD_SUFFIX), recursive=True)
     check(not left, "the replaced files are deleted afterwards")
+    check(not os.path.exists(os.path.join(old, su.UPDATE_DIR, su.RUNNER)),
+          "the copy of the update helper is deleted afterwards")
     httpd.shutdown()
     shutil.rmtree(work, ignore_errors=True)
     print("SUCCESS: per-file update works")

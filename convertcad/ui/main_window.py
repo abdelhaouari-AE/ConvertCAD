@@ -128,6 +128,7 @@ class MainWindow(QMainWindow):
         self._patch_thread = None                # ui/update_bar.PatchThread
         self._update_info = None                 # newest release (updates.py)
         self._update_on_close = ""               # "" | "restart" | "close"
+        self._applier_exe = ""                   # checked update helper
 
         self._build_actions()
         self._build_menus()
@@ -1490,15 +1491,24 @@ class MainWindow(QMainWindow):
             self._patch_thread.start()
         elif name == "cancel" and self._patch_thread is not None:
             self._patch_thread.cancel()
-        elif name == "restart":
-            self._update_on_close = "restart"
-            if not self.close():                # the user kept the window
-                self._update_on_close = ""
-        elif name == "on_close":
-            self._update_on_close = "close"
-            bar.hide()
-            self.activity.log(tr("The update will be installed when you close "
-                                 "ConvertCAD."))
+        elif name in ("restart", "on_close"):
+            # the helper that swaps the files is prepared and checked now,
+            # while the window is still open: if it cannot start, nothing
+            # is closed and the user is told
+            try:
+                self._applier_exe = su.prepare_applier()
+            except su.UpdateError as exc:
+                self._on_patch_failed(str(exc))
+                return
+            if name == "restart":
+                self._update_on_close = "restart"
+                if not self.close():            # the user kept the window
+                    self._update_on_close = ""
+            else:
+                self._update_on_close = "close"
+                bar.hide()
+                self.activity.log(tr("The update will be installed when you "
+                                     "close ConvertCAD."))
 
     def _on_patch_ready(self, version: str, size_mb: float, full_mb: float):
         self.activity.log(tr("ConvertCAD {v} is ready to install: {size} MB "
@@ -1520,10 +1530,12 @@ class MainWindow(QMainWindow):
         update is ready and the user asked for it."""
         from ..core import selfupdate as su
         app = su.program_dir()
-        if not (self._update_on_close and app and su.read_pending(app)):
+        if not (self._update_on_close and self._applier_exe and app
+                and su.read_pending(app)):
             return
         try:
-            su.start_applier(relaunch=self._update_on_close == "restart")
+            su.launch_applier(self._applier_exe,
+                              relaunch=self._update_on_close == "restart")
         except OSError as exc:                  # pragma: no cover
             self.activity.log(tr("The update could not be installed: {e}",
                                  e=exc))

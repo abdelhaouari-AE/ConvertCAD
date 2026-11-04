@@ -341,7 +341,11 @@ def _update(install: bool, source: Optional[str], quiet: bool) -> int:
     except selfupdate.UpdateError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
-    selfupdate.start_applier(relaunch=False)
+    try:
+        selfupdate.start_applier(relaunch=False, app_dir=app)
+    except selfupdate.UpdateError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
     print(f"ConvertCAD {plan.version} is ready: the files are put in place "
           "as soon as this command ends.")
     return 0

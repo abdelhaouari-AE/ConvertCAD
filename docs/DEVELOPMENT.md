@@ -975,18 +975,25 @@ written to `_update/<version>/files/`. `_update/pending.json` is written last: i
 "ready". Cancel and free-space checks are built in.
 
 **Applying (`apply_pending`, `run_applier`).** When the user chooses *Restart now* or
-*When I close ConvertCAD*, the window starts `ConvertCAD.exe --apply-update --wait-pid
-<pid>` just before it closes (`start_applier`). `main.py` / `convertcad_cli.py` hand this
-argument to `run_applier` before importing anything else. The applier waits for the
-window process to end, then for each file renames the current one `<name>.cc-old`
-(Windows allows renaming, not overwriting, a program file in use — the applier's own
-files included) and moves the new one in; removed files are renamed too. Any error →
+*When I close ConvertCAD*, the window first prepares and checks the helper
+(`prepare_applier`): on Windows a running PyInstaller program cannot rename its own files
+(the build test showed it: `WinError 32`), so `make_runner` copies `ConvertCAD-cli.exe`, its
+`.pkg`, the files at the top of `_internal` (the Python runtime, about 30 MB) and our
+`.pyc` files to `_update\runner\` — Qt and the big libraries are in sub-folders and are
+not copied — and the copy must answer `--apply-update --check`; on Linux the command-line
+program itself is used (POSIX renames files in use). If the helper cannot start, nothing
+is closed and the bar says why. Just before the window closes it starts the helper
+(`launch_applier`: `--apply-update --app-dir <folder> --wait-pid <pid>`). `main.py` /
+`convertcad_cli.py` hand `--apply-update` to `run_applier` before importing anything
+else. The applier waits for the window process to end, then for each file renames the
+current one `<name>.cc-old` and moves the new one in; removed files are renamed too. A
+file still in use by another program (a second ConvertCAD window) makes it stop. Any error →
 every rename is undone in reverse order, `failed.json` keeps the plan, `last-result.json`
 records the failure. Success → `last-result.json`, the Windows *Apps* entry
 (`HKCU\…\Uninstall\{AppId}_is1`: `DisplayVersion`, `DisplayName`) is updated, and the
-program is started again with `--update-done` (unless `--no-relaunch`). At the next start
-the interface shows the result (`take_result`) and deletes the `*.cc-old` files
-(`cleanup_old`, in a thread).
+window program is started again with `--update-done` (unless `--no-relaunch`). At the
+next start the interface shows the result (`take_result`) and deletes the `*.cc-old` files
+and the helper's copy (`cleanup_old`, in a thread).
 
 **Where it applies.** `install_kind()`: `win-installed` (an `unins000.exe` is in the
 folder), `win-portable`, `linux-portable`, `appimage`, `deb`, `source`.

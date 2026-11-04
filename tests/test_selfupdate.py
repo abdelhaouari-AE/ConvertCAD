@@ -185,7 +185,7 @@ def test_failed_swap_puts_every_file_back(tmp_path, server, monkeypatch):
         real(a, b, tries=1)
     monkeypatch.setattr(su, "_rename", flaky)
     ok, version, msg = su.apply_pending(app)
-    assert not ok and "file in use" in msg
+    assert not ok and "in use by another program" in msg
     after = _read_tree(app)
     for rel, data in before.items():
         if not rel.startswith(su.UPDATE_DIR + "/"):
@@ -231,3 +231,27 @@ def test_install_kinds(tmp_path, monkeypatch):
     _make_folder(app, {"unins000.exe": b""})
     assert su.install_kind(app) == "win-installed"         # by the installer
     assert su.FULL_DOWNLOAD["win-installed"] == "-win64-setup.exe"
+
+
+def test_helper_copy_has_the_runtime_but_not_the_big_libraries(tmp_path):
+    app = _make_folder(str(tmp_path / "app"), {
+        su.CLI_EXE: b"exe", su.CLI_PKG: b"pkg",
+        "_internal/python312.dll": b"python", "_internal/base_library.zip": b"z",
+        "_internal/convertcad/core/selfupdate.pyc": b"code",
+        "_internal/convertcad/resources/guide_en.md": b"guide",
+        "_internal/PySide6/Qt6Core.dll": b"qt" * 1000,
+        "_internal/old.dll.cc-old": b"old"})
+    exe = su.make_runner(app)
+    runner = os.path.join(app, su.UPDATE_DIR, su.RUNNER)
+    assert exe == os.path.join(runner, su.CLI_EXE)
+    assert set(_read_tree(runner)) == {
+        su.CLI_EXE, su.CLI_PKG, "_internal/python312.dll",
+        "_internal/base_library.zip", "_internal/convertcad/core/selfupdate.pyc"}
+    su.cleanup_old(app)                      # the new version deletes it
+    assert not os.path.exists(runner)
+    assert not os.path.exists(os.path.join(app, "_internal", "old.dll.cc-old"))
+
+
+def test_helper_check_answers(capsys):
+    assert su.run_applier(["--apply-update", "--check"]) == 0
+    assert "runner ok" in capsys.readouterr().out

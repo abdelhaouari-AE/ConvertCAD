@@ -11,13 +11,18 @@ How it works
    compares the list with the files on the computer, and downloads only the
    files that are different. Each file is checked against its SHA-256.
 3. The files are prepared in <program folder>/_update/<version>/files/ and
-   put in place when ConvertCAD closes: a short "applier" process (the same
-   program started with --apply-update) waits until ConvertCAD has closed,
-   swaps the files and, if asked, starts the new version.
-   On Windows a program file in use cannot be overwritten but it CAN be
-   renamed: each old file becomes "<name>.cc-old" and the new file takes its
-   name; the new version deletes the .cc-old files at its next start.
-   If anything fails, every file is put back as it was: never half-updated.
+   put in place when ConvertCAD closes: a short "applier" process (the
+   command-line program started with --apply-update) waits until ConvertCAD
+   has closed, swaps the files and, if asked, starts the new version.
+   Each old file is renamed "<name>.cc-old" and the new file takes its name;
+   the new version deletes the .cc-old files at its next start. If anything
+   fails, every file is put back as it was: never half-updated.
+   On Windows a running program cannot rename its own files (PyInstaller
+   keeps them open): the applier runs from a COPY of the command-line program
+   and of the Python runtime (_update/runner/, about 40 MB, without Qt or the
+   big libraries), so that no file of the program folder is in use. The copy
+   is checked (it must start) before ConvertCAD closes, and deleted by the
+   new version.
 
 Per-file updates need write access to the program folder: Windows portable
 folder, or the normal Windows installation (for the current user). In the
@@ -60,6 +65,11 @@ PORTABLE_MARKER = "ConvertCAD.portable"   # (config.py) portable settings
 INNO_APP_ID = "{6E0B5D1A-3C7F-4B2E-9A64-C0F2D8A1B7E3}"
 TIMEOUT_S = 30
 CHUNK = 256 * 1024
+
+RUNNER = "runner"                         # _update/runner: the applier's copy
+CLI_EXE = "ConvertCAD-cli.exe" if sys.platform == "win32" else "ConvertCAD-cli"
+GUI_EXE = "ConvertCAD.exe" if sys.platform == "win32" else "ConvertCAD"
+CLI_PKG = "ConvertCAD-cli.pkg"
 
 # Test hook (used by scripts/update_selftest.py in the build workflow): file
 # paths, separated by commas, downloaded again even when they are identical
@@ -625,6 +635,11 @@ def apply_pending(app_dir: str, log: Callable[[str], None] = lambda s: None
                 journal.append((dst, old))
     except Exception as exc:                          # put everything back
         log(f"update to {version} failed: {exc!r}; restoring the files")
+        if isinstance(exc, PermissionError):
+            exc = UpdateError(
+                "a file of ConvertCAD is in use by another program "
+                f"({os.path.basename(getattr(exc, 'filename', '') or '?')}): "
+                "close every ConvertCAD window and try again")
         for a, b in reversed(journal):
             try:
                 _rename(b, a)
@@ -664,15 +679,16 @@ def take_result(app_dir: str) -> Optional[dict]:
 
 
 def cleanup_old(app_dir: str) -> int:
-    """Delete the replaced files (*.cc-old) and the folders left empty.
-    Files still in use stay for next time. Returns the number deleted."""
+    """Delete the replaced files (*.cc-old), the folders left empty and the
+    applier's copy (_update/runner). Files still in use stay for next time.
+    Returns the number of files deleted."""
     if not app_dir or not os.path.isdir(app_dir):
         return 0
-    count = 0
-    for dirpath, _dirnames, filenames in os.walk(app_dir, topdown=False):
-        rel_dir = os.path.relpath(dirpath, app_dir).replace(os.sep, "/")
-        if rel_dir.split("/")[0] in (UPDATE_DIR, "settings"):
-            continue
+    count, folders = 0, []
+    for dirpath, dirnames, filenames in os.walk(app_dir):
+        if os.path.abspath(dirpath) == os.path.abspath(app_dir):
+            dirnames[:] = [d for d in dirnames if d not in (UPDATE_DIR, "settings")]
+        folders.append(dirpath)
         for name in filenames:
             if name.endswith(OLD_SUFFIX):
                 try:
@@ -680,11 +696,14 @@ def cleanup_old(app_dir: str) -> int:
                     count += 1
                 except OSError:
                     pass
-        if rel_dir.startswith(CONTENTS + "/") and not os.listdir(dirpath):
+    internal = os.path.join(app_dir, CONTENTS) + os.sep
+    for dirpath in reversed(folders):                 # deepest first
+        if dirpath.startswith(internal):
             try:
-                os.rmdir(dirpath)
+                os.rmdir(dirpath)                     # only when empty
             except OSError:
                 pass
+    shutil.rmtree(os.path.join(app_dir, UPDATE_DIR, RUNNER), ignore_errors=True)
     return count
 
 
@@ -727,16 +746,16 @@ def wait_for_exit(pid: int, timeout_s: float = 120.0) -> bool:
     if pid <= 0:
         return True
     if sys.platform == "win32":
-        import ctypes
-        kernel32 = ctypes.windll.kernel32
+        import _winapi                       # built into Python, no ctypes
         synchronize = 0x00100000
-        handle = kernel32.OpenProcess(synchronize, False, pid)
-        if not handle:                       # already ended
+        try:
+            handle = _winapi.OpenProcess(synchronize, False, pid)
+        except OSError:                      # already ended
             return True
         try:
-            return kernel32.WaitForSingleObject(handle, int(timeout_s * 1000)) == 0
+            return _winapi.WaitForSingleObject(handle, int(timeout_s * 1000)) == 0
         finally:
-            kernel32.CloseHandle(handle)
+            _winapi.CloseHandle(handle)
     end = time.time() + timeout_s
     while time.time() < end:
         try:
@@ -765,16 +784,72 @@ def _spawn(cmd: List[str], cwd: str) -> None:
     subprocess.Popen(cmd, start_new_session=True, **kwargs)
 
 
-def start_applier(relaunch: bool, args: Optional[List[str]] = None) -> None:
-    """Called by ConvertCAD just before it closes: start the applier, which
-    waits for this process to end, then swaps the files."""
-    exe = sys.executable
-    cmd = [exe, "--apply-update", "--wait-pid", str(os.getpid())]
+def make_runner(app_dir: str) -> str:
+    """Copy the command-line program and the Python runtime (the files at the
+    top of _internal, and our code) to _update/runner/. Returns the copied
+    program. About 40 MB on Windows: Qt and the big libraries are in
+    sub-folders of _internal and are not copied."""
+    runner = os.path.join(app_dir, UPDATE_DIR, RUNNER)
+    shutil.rmtree(runner, ignore_errors=True)
+    os.makedirs(os.path.join(runner, CONTENTS), exist_ok=True)
+    for name in (CLI_EXE, CLI_PKG):
+        shutil.copy2(os.path.join(app_dir, name), os.path.join(runner, name))
+    internal = os.path.join(app_dir, CONTENTS)
+    for name in os.listdir(internal):
+        src = os.path.join(internal, name)
+        if os.path.isfile(src) and not name.endswith(OLD_SUFFIX):
+            shutil.copy2(src, os.path.join(runner, CONTENTS, name))
+    own = os.path.join(internal, "convertcad")
+    for dirpath, _dirnames, filenames in os.walk(own):
+        rel = os.path.relpath(dirpath, internal)
+        for name in filenames:
+            if name.endswith(".pyc"):
+                os.makedirs(os.path.join(runner, CONTENTS, rel), exist_ok=True)
+                shutil.copy2(os.path.join(dirpath, name),
+                             os.path.join(runner, CONTENTS, rel, name))
+    return os.path.join(runner, CLI_EXE)
+
+
+def prepare_applier(app_dir: str = "") -> str:
+    """Program to run the applier with, checked: on Windows the copy of
+    make_runner() (it must answer --apply-update --check), elsewhere the
+    command-line program itself (POSIX systems rename files in use).
+    Raises UpdateError when it cannot start."""
+    app = app_dir or program_dir()
+    exe = os.path.join(app, CLI_EXE)
+    try:
+        if sys.platform == "win32":
+            exe = make_runner(app)
+        flags = 0x08000000 if sys.platform == "win32" else 0   # no window
+        check = subprocess.run([exe, "--apply-update", "--check"],
+                               capture_output=True, text=True, timeout=120,
+                               stdin=subprocess.DEVNULL, creationflags=flags)
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise UpdateError(f"the update helper cannot be prepared ({exc})") from exc
+    if check.returncode != 0 or "runner ok" not in (check.stdout or ""):
+        detail = (check.stderr or check.stdout or "").strip()[-300:]
+        raise UpdateError(f"the update helper does not start ({detail})")
+    return exe
+
+
+def launch_applier(exe: str, relaunch: bool, args: Optional[List[str]] = None,
+                   app_dir: str = "") -> None:
+    """Called just before ConvertCAD closes: start the applier, which waits
+    for this process to end, then swaps the files."""
+    app = app_dir or program_dir()
+    cmd = [exe, "--apply-update", "--app-dir", app,
+           "--wait-pid", str(os.getpid())]
     if not relaunch:
         cmd.append("--no-relaunch")
     if args:
         cmd += ["--"] + list(args)
     _spawn(cmd, os.path.dirname(exe))
+
+
+def start_applier(relaunch: bool, args: Optional[List[str]] = None,
+                  app_dir: str = "") -> None:
+    """prepare_applier() then launch_applier()."""
+    launch_applier(prepare_applier(app_dir), relaunch, args, app_dir)
 
 
 def _log_to_file(text: str) -> None:
@@ -789,22 +864,36 @@ def _log_to_file(text: str) -> None:
         pass
 
 
+def _arg(args: List[str], name: str, default: str = "") -> str:
+    try:
+        return args[args.index(name) + 1]
+    except (ValueError, IndexError):
+        return default
+
+
 def run_applier(argv: List[str]) -> int:
-    """Entry of 'ConvertCAD --apply-update [--wait-pid N] [--no-relaunch]
-    [-- arguments for the relaunched program]'. Returns the exit code."""
+    """Entry of 'ConvertCAD-cli --apply-update --app-dir <folder>
+    [--wait-pid N] [--no-relaunch] [-- arguments for the relaunched
+    program]', and of '--apply-update --check' (the helper starts).
+    Returns the exit code."""
     args = list(argv)
     rest: List[str] = []
     if "--" in args:
         i = args.index("--")
         args, rest = args[:i], args[i + 1:]
-    pid = 0
-    if "--wait-pid" in args:
-        try:
-            pid = int(args[args.index("--wait-pid") + 1])
-        except (IndexError, ValueError):
-            pid = 0
+    if "--check" in args:                    # can this copy do the work?
+        from ..config import settings_dir   # noqa: F401  (the update log)
+        if sys.platform == "win32":
+            import _winapi  # noqa: F401
+            import winreg  # noqa: F401
+        print("runner ok", flush=True)
+        return 0
+    try:
+        pid = int(_arg(args, "--wait-pid", "0"))
+    except ValueError:
+        pid = 0
     relaunch = "--no-relaunch" not in args
-    app = program_dir() or os.getcwd()
+    app = _arg(args, "--app-dir") or program_dir() or os.getcwd()
     _log_to_file(f"applier started (pid {os.getpid()}), waiting for {pid}")
     if not wait_for_exit(pid):
         _log_to_file("ConvertCAD did not close: update not applied")
@@ -813,6 +902,6 @@ def run_applier(argv: List[str]) -> int:
         time.sleep(0.3)                      # let Windows release the files
         ok, version, message = apply_pending(app, _log_to_file)
     if relaunch:
-        _spawn([sys.executable, "--update-done" if ok else "--update-failed"]
-               + rest, app)
+        _spawn([os.path.join(app, GUI_EXE),
+                "--update-done" if ok else "--update-failed"] + rest, app)
     return 0 if ok else 1

@@ -60,7 +60,10 @@ Other AI assistants read AGENTS.md, which points here. People: same rules.
     signing and copying the documents), before the zip and the installer;
     the portable zip must contain `ConvertCAD/_internal/update-manifest.json`;
   - the applier (`--apply-update`, in `main.py` and `convertcad_cli.py`)
-    runs before any other import;
+    runs before any other import; on Windows it runs from a copy
+    (`make_runner`: the CLI program, its `.pkg`, the top-level files of
+    `_internal`, our `.pyc`), because a running program cannot rename its
+    own files — keep the code it imports to the standard library;
   - `scripts/update_selftest.py` (build workflow, Windows and Linux) must
     pass.
 - A release built without these breaks the updates of every user.
