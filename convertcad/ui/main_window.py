@@ -1495,11 +1495,14 @@ class MainWindow(QMainWindow):
             # the helper that swaps the files is prepared and checked now,
             # while the window is still open: if it cannot start, nothing
             # is closed and the user is told
-            try:
+            QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+            try:                                # about one second
                 self._applier_exe = su.prepare_applier()
             except su.UpdateError as exc:
                 self._on_patch_failed(str(exc))
                 return
+            finally:
+                QApplication.restoreOverrideCursor()
             if name == "restart":
                 self._update_on_close = "restart"
                 if not self.close():            # the user kept the window
