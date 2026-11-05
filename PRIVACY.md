@@ -23,5 +23,14 @@ Data stored on your computer: settings and the log file in the folder
 ConvertCAD removes the program and the downloaded OCR models; the settings
 folder can be deleted by hand.
 
+## The website
+
+The ConvertCAD website (`abdelhaouari-AE.github.io/ConvertCAD`) counts its
+visits with [GoatCounter](https://www.goatcounter.com/privacy): no cookies,
+no IP address stored, no tracking across sites. Only totals are kept: pages
+viewed, clicks on the download buttons, referring site, country, browser,
+operating system, language and screen width. The program itself sends none
+of this.
+
 Questions: open the Feedback form or an issue on
 <https://github.com/abdelhaouari-AE/ConvertCAD/issues>.
