@@ -101,6 +101,7 @@ class UpdateBar(QFrame):
         while self.buttons.count():
             w = self.buttons.takeAt(0).widget()
             if w is not None:
+                w.hide()                # gone at once, freed a bit later
                 w.deleteLater()
         for label, name, primary in buttons:
             b = QPushButton(label)
