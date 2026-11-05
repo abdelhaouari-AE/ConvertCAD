@@ -228,10 +228,9 @@ section { padding-block: 104px 0 }
 .files .what { flex: 1; min-width: 0 }
 .files .what b { font-weight: 600; display: block }
 .files .what span { color: var(--muted); font-size: .93rem }
-.files .size { color: var(--muted); font: .84rem var(--f-mono); white-space: nowrap }
 .files .btn { padding: 10px 18px; font-size: .95rem }
 .note { margin-top: 14px; font-size: .9rem; color: var(--muted) }
-.note-warn { color: #fff }
+.note-warn { color: #fff; font-weight: 500 }
 .note-warn b { color: #fff }
 
 /* ---------- footer: code signing policy (required by SignPath Foundation), links ---------- */
@@ -407,13 +406,11 @@ footer a:hover { color: var(--ink) }
           </div>
           <ul class="files">
             <li>
-              <div class="what"><b>Portable</b><span>A zip to unpack anywhere, even on a USB stick.</span></div>
-              <span class="size" data-size="win-portable"></span>
+              <div class="what"><b>Portable</b><span>A zip to unpack anywhere. Just unzip and run the app.</span></div>
               <a class="btn btn-main" data-file="win-portable" data-goatcounter-click="download-win-portable" href="https://github.com/abdelhaouari-AE/ConvertCAD/releases">Download</a>
             </li>
             <li>
               <div class="what"><b>Installer</b><span>An .exe that installs ConvertCAD in your programs.</span></div>
-              <span class="size" data-size="win-setup"></span>
               <a class="btn btn-plain" data-file="win-setup" data-goatcounter-click="download-win-setup" href="https://github.com/abdelhaouari-AE/ConvertCAD/releases">Download</a>
             </li>
           </ul>
@@ -428,17 +425,14 @@ footer a:hover { color: var(--ink) }
           <ul class="files">
             <li>
               <div class="what"><b>AppImage</b><span>One file that runs on most distributions.</span></div>
-              <span class="size" data-size="appimage"></span>
               <a class="btn btn-main" data-file="appimage" data-goatcounter-click="download-appimage" href="https://github.com/abdelhaouari-AE/ConvertCAD/releases">Download</a>
             </li>
             <li>
               <div class="what"><b>Debian and Ubuntu package</b><span>Installs with your package manager.</span></div>
-              <span class="size" data-size="deb"></span>
               <a class="btn btn-plain" data-file="deb" data-goatcounter-click="download-deb" href="https://github.com/abdelhaouari-AE/ConvertCAD/releases">Download</a>
             </li>
             <li>
               <div class="what"><b>Portable archive</b><span>A tar.gz to unpack anywhere.</span></div>
-              <span class="size" data-size="tar"></span>
               <a class="btn btn-plain" data-file="tar" data-goatcounter-click="download-tar" href="https://github.com/abdelhaouari-AE/ConvertCAD/releases">Download</a>
             </li>
           </ul>
@@ -615,8 +609,6 @@ if (OS) {
           a.href = asset.browser_download_url;
           a.title = asset.name;
         });
-        var size = document.querySelector('[data-size="' + id + '"]');
-        if (size) size.textContent = Math.round(asset.size / 1048576) + ' MB';
       });
     })
     .catch(function () { /* offline or rate-limited: static links stay */ });
