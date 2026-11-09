@@ -30,13 +30,37 @@ from .spatial import (GridIndex, angle_deg, angle_diff_mod180,
                       segment_intersection)
 
 # Text that *looks like* a measurement: "3500", "3 500", "3.50", "12,5",
-# "R25", "Ø60", "45°", "1200 mm", "⌒785"...
-DIAMETER_SIGNS = "Ø\u00f8\u2300\u2205\u03a6\u03c6"    # Ø ø ⌀ ∅ Φ φ
-ARC_SIGN = "\u2312"                                     # ⌒ (arc length)
-DIM_TEXT_RE = re.compile(
-    r"^[~±≈R" + DIAMETER_SIGNS + ARC_SIGN + r"]?\s?"
-    r"(?:\d{1,3}(?:[   ]\d{3})+|\d{1,7})"
-    r"(?:[.,]\d{1,3})?\s*(?:mm|cm|m|°)?$")
+# "R25", "Ø60", "45°", "1200 mm", "⌒785", "3⁵⁰" (metres with the
+# centimetres written small), feet-inches "12'-6\"", "4'-3 1/2\"", "10'"...
+DIAMETER_SIGNS = "Øø⌀∅Φφ"    # Ø ø ⌀ ∅ Φ φ
+ARC_SIGN = "⌒"                                     # ⌒ (arc length)
+_NUMBER = (r"(?:\d{1,3}(?:[   ]\d{3})+|\d{1,7})"
+           r"(?:[.,]\d{1,3})?")
+_METRIC = _NUMBER + r"(?:[⁰¹²³⁴⁵⁶⁷⁸⁹]{1,2})?\s*(?:mm|cm|m|MM|CM|M|°)?"
+_FRACTION = r"(?:\d{1,3}/\d{1,3}|[½¼¾⅛⅜⅝⅞])"
+_INCHES = (r"(?:\d{1,3}(?:[.,]\d{1,4})?(?:[\s-]?" + _FRACTION + r")?|"
+           + _FRACTION + r")\s?[\"″”]")
+_FEET = r"\d{1,5}(?:[.,]\d{1,4})?\s?['′’]"
+_IMPERIAL = r"(?:" + _FEET + r"(?:\s?-?\s?" + _INCHES + r")?|" + _INCHES + ")"
+_MEASURE = (r"[~±≈R" + DIAMETER_SIGNS + ARC_SIGN + r"]?\s?(?:" + _IMPERIAL
+            + "|" + _METRIC + ")")
+DIM_TEXT_RE = re.compile("^" + _MEASURE + "$")
+# The VALUE of a dimension may also carry a label, a count, brackets, a
+# tolerance or a remark: "L=3500", "2x1500", "(3500)", "3500 ±5",
+# "25 +0.1/-0.2", "Ø20 H7", "3500 (TYP.)", "3500*", or be "EQ". Such a text
+# is accepted when terminators and line agree; when nothing matches it stays
+# an ordinary text (often a note), it does not go to DIM_RAW.
+_LABEL = r"(?:[A-Za-z]{1,3}\.?\s?[=:]\s?|[1-9]\s?[xX×]\s?)"   # L= / 2x
+_TOLERANCE = (r"(?:\s?(?:±|\+/-)\s?\d{1,4}(?:[.,]\d{1,3})?"
+              r"|\s?[+-]\d{1,4}(?:[.,]\d{1,3})?\s?/\s?[+-]?\d{1,4}"
+              r"(?:[.,]\d{1,3})?"
+              r"|\s?[A-Za-z]{1,2}\d{1,2}(?:/[a-z]{1,2}\d{1,2})?)")
+_REMARK = (r"(?:\s?\*|\s*\(?\s*(?:TYP|Typ|typ|MAX|Max|max|MIN|Min|min|"
+           r"ENV|Env|env|CA|ca|EQ|Eq|eq|c/c|C/C)\.?\s*\)?)")
+DIM_VALUE_RE = re.compile(
+    "^(?:" + _LABEL + r")?(?:\(\s?" + _MEASURE + r"\s?\)|" + _MEASURE
+    + ")(?:" + _TOLERANCE + ")?(?:" + _REMARK + "){0,2}$"
+    r"|^(?:EQ|Eq|eq)\.?$")
 # Radius "R25", "R 12.5"; diameter "Ø60", "2xØ12", "%%c60" (AutoCAD code)
 RADIUS_RE = re.compile(r"^(?:\d{1,3}\s?[xX×]\s?)?R\s?\d")
 DIAMETER_RE = re.compile(r"^(?:\d{1,3}\s?[xX×]\s?)?(?:[" + DIAMETER_SIGNS
@@ -49,9 +73,16 @@ ANGLE_RE = re.compile(
 
 
 class ATol:
-    """Annotation tolerances, in page points."""
-    ARROW_MAX_AREA = 14.0      # filled triangle area above this -> not an arrow
-    ARROW_MIN_AREA = 0.15
+    """Annotation tolerances, in page points.
+
+    Sizes are given for values written about REF_SIZE points high (2.5 mm
+    letters); on drawings with larger values (printed larger, "fit to
+    paper") the size limits of arrows, ticks and notes grow in proportion,
+    never shrink."""
+    REF_SIZE = 10.0            # usual font size of dimension values
+    ARROW_MAX_AREA = 14.0      # filled triangle area above this -> not an
+    ARROW_REL_AREA = 0.35      # arrow, unless below this x (value size)²
+    ARROW_MIN_AREA = 0.15      # (arrows up to ~2x the letter height)
     OPPOSITE_DEG = 25.0        # paired arrows must point in opposite directions
     COLLINEAR_OFF = 1.5        # arrow tips must lie on a common line
     TEXT_NEAR = 6.0            # text-to-dimension-line distance (x text height)
@@ -118,6 +149,15 @@ class DimensionEntity:
     kind: str = "arrow"        # "arrow" | "tick"
     tip1: Optional[Point] = None          # terminator positions on the line
     tip2: Optional[Point] = None
+    # --- measured in the PDF, so the CAD dimension looks the same ---
+    text_rotation: Optional[float] = None  # degrees, direction of the value
+    value: Optional[RawText] = None        # the PDF text (font, letter size)
+    terminator: float = 0.0    # arrow length / tick length (points)
+    ext1: bool = False         # extension line found at def_point1 / 2
+    ext2: bool = False         # (otherwise the CAD one is not drawn)
+    ext_beyond: Optional[float] = None    # extension lines pass the
+                                          # dimension line by (points)
+    line_beyond: float = 0.0   # dimension line passes the ticks by (points)
 
 
 @dataclass
@@ -163,6 +203,7 @@ class LeaderEntity:
     text: RawText              # the line closest to the landing
     lines: List[RawText] = field(default_factory=list)   # all lines, top
                                                          # to bottom
+    arrow: float = 0.0         # arrowhead length (points)
 
 
 @dataclass
@@ -196,8 +237,14 @@ def _dedupe(pts: List[Point], tol: float = 0.05) -> List[Point]:
     return out
 
 
-def find_arrowheads(fills: List[RawFill]) -> List[Arrowhead]:
-    """Small filled triangles are arrowheads; tip = the sharpest vertex."""
+def find_arrowheads(fills: List[RawFill],
+                    value_size: float = 0.0) -> List[Arrowhead]:
+    """Small filled triangles are arrowheads; tip = the sharpest vertex.
+
+    value_size: usual font size of the dimension values (points). The
+    largest arrow accepted grows with it, so arrows drawn larger than usual
+    (3.5 mm and more, or a sheet printed larger) are still found."""
+    max_area = max(ATol.ARROW_MAX_AREA, ATol.ARROW_REL_AREA * value_size ** 2)
     arrows: List[Arrowhead] = []
     for f in fills:
         if len(f.points) > 12:
@@ -206,7 +253,7 @@ def find_arrowheads(fills: List[RawFill]) -> List[Arrowhead]:
         if not 3 <= len(pts) <= 4:
             continue
         area = _polygon_area(pts)
-        if not ATol.ARROW_MIN_AREA <= area <= ATol.ARROW_MAX_AREA:
+        if not ATol.ARROW_MIN_AREA <= area <= max_area:
             continue
         best_tip, best_d, best_base = None, -1.0, (0.0, 0.0)
         for i, p in enumerate(pts):
@@ -247,10 +294,19 @@ class _Context:
         for pl in self.lines:
             self.line_index.insert_segment(pl, pl.points[0], pl.points[1])
         texts = rp.page.texts
-        self.dim_texts = [t for t in texts if DIM_TEXT_RE.match(t.text)]
+        # possible dimension values (strict measurements AND values with a
+        # label / count / remark: "L=3500", "2x1500", "3500 (TYP.)"...)
+        self.dim_texts = [t for t in texts
+                          if DIM_VALUE_RE.match(t.text.strip())]
         heights = [t.height for t in self.dim_texts] or [2.5]
         self.text_margin = ATol.TEXT_NEAR * max(statistics.median(heights),
                                                 1.0) * 2
+        # usual size of the values (PDF font size): arrows, ticks and gaps
+        # grow with it when a drawing is printed larger ("fit to paper")
+        sized = self.dim_texts if len(self.dim_texts) >= 3 else texts
+        self.size = statistics.median([t.height for t in sized]) \
+            if sized else 0.0
+        self.k = max(1.0, self.size / ATol.REF_SIZE)
         self.dim_text_index: GridIndex[RawText] = GridIndex(24.0)
         for t in self.dim_texts:
             c = t.center()
@@ -362,7 +418,7 @@ def _nearest_dim_text(ctx: _Context, res: AnnotationResult,
 
 
 def _find_extension(ctx: _Context, tip: Point, axis: Tuple[float, float]
-                    ) -> Optional[Tuple[Point, EPolyline]]:
+                    ) -> Optional[Tuple[Point, EPolyline, float]]:
     """Extension line crossing the dimension line at `tip`: a line roughly
     perpendicular to the axis that passes through (or ends at) the tip.
 
@@ -371,7 +427,9 @@ def _find_extension(ctx: _Context, tip: Point, axis: Tuple[float, float]
     stub (<= EXT_OVERSHOOT) on one side and run clearly longer on the other.
     Extension lines shared by stacked dimensions (chain + overall) are
     ambiguous -> None, and the dimension keeps its tips as definition points
-    (the measured distance is identical; the drawn line stays as geometry)."""
+    (the measured distance is identical; the drawn line stays as geometry).
+
+    Returns (measured point, line, how far it passes the dimension line)."""
     axis_ang = angle_deg(axis)
     p2 = (tip[0] + axis[0], tip[1] + axis[1])
     for pl in ctx.line_index.near(tip[0], tip[1], ATol.EXT_THROUGH + 0.5):
@@ -387,7 +445,7 @@ def _find_extension(ctx: _Context, tip: Point, axis: Tuple[float, float]
         db = point_line_distance(b, tip, p2)
         short, long_ = min(da, db), max(da, db)
         if short <= ATol.EXT_OVERSHOOT and long_ >= 2.0 * max(short, 1.0):
-            return (a if da >= db else b), pl
+            return (a if da >= db else b), pl, short
         return None                                     # ambiguous: keep tip
     return None
 
@@ -409,7 +467,8 @@ def _consume_dim_line(ctx: _Context, tip1: Point, tip2: Point) -> None:
 
 def _make_dimension(ctx: _Context, res: AnnotationResult, t1: Point,
                     t2: Point, text: RawText, kind: str,
-                    consume_ext: bool = True) -> DimensionEntity:
+                    consume_ext: bool = True, terminator: float = 0.0,
+                    line_beyond: float = 0.0) -> DimensionEntity:
     span = math.dist(t1, t2)
     axis = ((t2[0] - t1[0]) / span, (t2[1] - t1[1]) / span)
     e1 = _find_extension(ctx, t1, axis)
@@ -421,6 +480,7 @@ def _make_dimension(ctx: _Context, res: AnnotationResult, t1: Point,
             if e:
                 e[1].consumed = True
                 ctx.ext_ids.add(id(e[1]))
+    beyond = [e[2] for e in (e1, e2) if e]
     res.consumed_texts.add(id(text))
     _consume_dim_line(ctx, t1, t2)
     return DimensionEntity(def_point1=p1, def_point2=p2,
@@ -428,7 +488,13 @@ def _make_dimension(ctx: _Context, res: AnnotationResult, t1: Point,
                                        (t1[1] + t2[1]) / 2),
                            text=text.text, height=text.height,
                            text_center=text.center(), kind=kind,
-                           tip1=t1, tip2=t2)
+                           tip1=t1, tip2=t2, text_rotation=text.rotation,
+                           value=text, terminator=terminator,
+                           ext1=bool(e1) and consume_ext,
+                           ext2=bool(e2) and consume_ext,
+                           ext_beyond=(sum(beyond) / len(beyond)
+                                       if beyond else None),
+                           line_beyond=line_beyond)
 
 
 # ---------------------------------------------------------------------------
@@ -488,7 +554,8 @@ def _arrow_dimensions(ctx: _Context, arrows: List[Arrowhead],
             a1.used = a2.used = True
             res.consumed_fills.update({id(a1.fill), id(a2.fill)})
             res.dimensions.append(
-                _make_dimension(ctx, res, a1.tip, a2.tip, text, "arrow"))
+                _make_dimension(ctx, res, a1.tip, a2.tip, text, "arrow",
+                                terminator=(a1.length + a2.length) / 2.0))
             break
 
 
@@ -498,16 +565,17 @@ def _arrow_dimensions(ctx: _Context, arrows: List[Arrowhead],
 def _tick_dimensions(ctx: _Context, res: AnnotationResult) -> None:
     ticks = []
     tick_index: GridIndex[int] = GridIndex(12.0)
+    tick_max = ATol.TICK_MAX_LEN * ctx.k        # longer ticks on larger prints
     for pl in ctx.lines:
         if pl.consumed:
             continue
         a, b = pl.points
         L = math.dist(a, b)
-        if ATol.TICK_MIN_LEN <= L <= ATol.TICK_MAX_LEN:
+        if ATol.TICK_MIN_LEN <= L <= tick_max:
             mid = ((a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0)
             ang = angle_deg((b[0] - a[0], b[1] - a[1])) % 180.0
             k = len(ticks)
-            ticks.append((mid, ang, pl))
+            ticks.append((mid, ang, pl, L))
             tick_index.insert(k, (mid[0], mid[1], mid[0], mid[1]))
     if len(ticks) < 2:
         return
@@ -521,17 +589,17 @@ def _tick_dimensions(ctx: _Context, res: AnnotationResult) -> None:
             continue
         u = ((b[0] - a[0]) / L, (b[1] - a[1]) / L)
         line_ang = angle_deg(u)
-        m = ATol.TICK_ON_LINE + ATol.TICK_MAX_LEN
+        m = ATol.TICK_ON_LINE + tick_max
         on_line = []
         for k in tick_index.query(min(a[0], b[0]) - m, min(a[1], b[1]) - m,
                                   max(a[0], b[0]) + m, max(a[1], b[1]) + m):
-            mid, ang, tpl = ticks[k]
+            mid, ang, tpl, _ = ticks[k]
             if used[k] or tpl is line or tpl.consumed:
                 continue
             if point_line_distance(mid, a, b) > ATol.TICK_ON_LINE:
                 continue
             t = (mid[0] - a[0]) * u[0] + (mid[1] - a[1]) * u[1]
-            if not -ATol.TICK_MAX_LEN <= t <= L + ATol.TICK_MAX_LEN:
+            if not -tick_max <= t <= L + tick_max:
                 continue
             rel = angle_diff_mod180(ang, line_ang)
             if ATol.TICK_OBLIQUE_LO <= rel <= ATol.TICK_OBLIQUE_HI:
@@ -539,7 +607,7 @@ def _tick_dimensions(ctx: _Context, res: AnnotationResult) -> None:
         if len(on_line) < 2:
             continue
         on_line.sort()
-        made, intervals = 0, 0
+        made, intervals = [], 0
         for (t_a, ka), (t_b, kb) in zip(on_line, on_line[1:]):
             if t_b - t_a < ATol.TICK_PAIR_MIN:
                 continue
@@ -551,11 +619,18 @@ def _tick_dimensions(ctx: _Context, res: AnnotationResult) -> None:
             for k in (ka, kb):            # consume ticks BEFORE looking for
                 used[k] = True            # extension lines (a steep tick must
                 ticks[k][2].consumed = True   # not pass for one)
-            dim = _make_dimension(ctx, res, p1, p2, text, "tick")
+            dim = _make_dimension(ctx, res, p1, p2, text, "tick",
+                                  terminator=(ticks[ka][3] + ticks[kb][3]) / 2)
             res.dimensions.append(dim)
-            made += 1
-        if made and made == intervals:
+            made.append(dim)
+        if made and len(made) == intervals:
             line.consumed = True
+            # the line passes the end ticks (CAD "dimension line extension"):
+            # the CAD dimensions draw it, never longer than in the PDF
+            ends = (on_line[0][0], L - on_line[-1][0])
+            if min(ends) > 0.5:
+                for dim in made:
+                    dim.line_beyond = min(ends)
 
 
 # ---------------------------------------------------------------------------
@@ -1074,7 +1149,8 @@ def _landing_texts(ctx: _Context, res: AnnotationResult,
     2. Otherwise the text nearest the tail, within LEADER_REACH heights."""
     a, b = pts[-2], pts[-1]
     tail = b
-    reach = ATol.LEADER_TEXT + ctx.max_text_len
+    near = ATol.LEADER_TEXT * ctx.k          # larger on larger prints
+    reach = near + ctx.max_text_len
     seg = angle_deg((b[0] - a[0], -(b[1] - a[1])))
     above = below = None
     if math.dist(a, b) > 1e-6:
@@ -1111,7 +1187,7 @@ def _landing_texts(ctx: _Context, res: AnnotationResult,
         if id(t) in res.consumed_texts:
             continue
         d = _text_distance(t, tail)
-        if d <= min(ATol.LEADER_TEXT, ATol.LEADER_REACH * max(t.height, 1.0)) \
+        if d <= min(near, ATol.LEADER_REACH * max(t.height, 1.0)) \
                 and d < bd:
             best, bd = t, d
     return [best] if best is not None else []
@@ -1166,6 +1242,22 @@ def _leader_start(ar: Arrowhead, index: "GridIndex"):
     return best
 
 
+def _ends_at_arrow(ar: Arrowhead, p: Point, tips: "GridIndex",
+                   longest: float) -> bool:
+    """Does the far end of a leader path touch ANOTHER arrowhead (its tip
+    or its base)? A line with an arrow at each end is a dimension line whose
+    value was not recognised, not a leader."""
+    for other in tips.near(p[0], p[1], ATol.LEADER_NEAR + longest):
+        if other is ar:
+            continue
+        base = (other.tip[0] - other.direction[0] * other.length,
+                other.tip[1] - other.direction[1] * other.length)
+        if min(math.dist(p, other.tip), math.dist(p, base)) \
+                <= ATol.LEADER_NEAR:
+            return True
+    return False
+
+
 def _leaders(ctx: _Context, arrows: List[Arrowhead],
              res: AnnotationResult) -> None:
     open_polys = [pl for pl in ctx.rp.polylines
@@ -1177,6 +1269,10 @@ def _leaders(ctx: _Context, arrows: List[Arrowhead],
             end_index.insert((pl, end), (p[0], p[1], p[0], p[1]))
     heights = [t.height for t in ctx.rp.page.texts] or [2.5]
     usual = statistics.median(heights)
+    tips: GridIndex[Arrowhead] = GridIndex(8.0)
+    for a in arrows:
+        tips.insert(a, (a.tip[0], a.tip[1], a.tip[0], a.tip[1]))
+    longest = max((a.length for a in arrows), default=0.0)
     for ar in arrows:
         if ar.used:
             continue
@@ -1188,6 +1284,8 @@ def _leaders(ctx: _Context, arrows: List[Arrowhead],
         pts[0] = ar.tip
         if len(pts) < 2:
             continue
+        if _ends_at_arrow(ar, pts[-1], tips, longest):
+            continue                  # arrows at both ends: a dimension line
         length = sum(math.dist(p, q) for p, q in zip(pts, pts[1:]))
         lines = _landing_texts(ctx, res, pts)
         if not lines:
@@ -1208,7 +1306,8 @@ def _leaders(ctx: _Context, arrows: List[Arrowhead],
         res.consumed_fills.add(id(ar.fill))
         for t in lines:
             res.consumed_texts.add(id(t))
-        res.leaders.append(LeaderEntity(vertices=pts, text=txt, lines=lines))
+        res.leaders.append(LeaderEntity(vertices=pts, text=txt, lines=lines,
+                                        arrow=ar.length))
 
 
 # ---------------------------------------------------------------------------
@@ -1226,7 +1325,7 @@ def reconstruct(rp: RebuiltPage, enable_dims: bool = True,
     res = AnnotationResult()
     page: PageData = rp.page
     ctx = _Context(rp)
-    arrows = find_arrowheads(page.fills)
+    arrows = find_arrowheads(page.fills, ctx.size)
     if enable_dims:
         # curved dimensions first: their arrows could otherwise pass for a
         # linear dimension (two nearly opposite arrows on a flat arc)
@@ -1238,7 +1337,10 @@ def reconstruct(rp: RebuiltPage, enable_dims: bool = True,
     if enable_leaders:
         _leaders(ctx, arrows, res)
     for t in ctx.dim_texts:
-        if id(t) not in res.consumed_texts and not _is_label(ctx, t):
+        # unmatched plain measurements only ("L=3500", "2x1500"... are
+        # often notes: they stay ordinary texts)
+        if id(t) not in res.consumed_texts and not _is_label(ctx, t) \
+                and DIM_TEXT_RE.match(t.text.strip()):
             res.dim_raw_texts.append(t)
     return res
 

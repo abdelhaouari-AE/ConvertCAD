@@ -703,7 +703,9 @@ class DxfWriter:
     def _write_dimension(self, d: DimensionEntity, tr) -> None:
         """Emit a LINEAR (rotated) dimension: its line lies exactly on the
         PDF dimension line (through the tips), whatever the depth of the
-        two measured points. The value shown is the original PDF text."""
+        two measured points. The value shown is the original PDF text, at
+        its PDF place and in its PDF direction; arrows / ticks, extension
+        lines and gaps take their PDF sizes."""
         try:
             p1, p2 = tr.pt(d.def_point1), tr.pt(d.def_point2)
             t1 = tr.pt(d.tip1 if d.tip1 is not None else d.def_point1)
@@ -711,9 +713,27 @@ class DxfWriter:
             if math.dist(t1, t2) < 1e-9:
                 return
             angle = math.degrees(math.atan2(t2[1] - t1[1], t2[0] - t1[0]))
-            override = self._dim_override(d.height, tr)
-            if d.kind == "tick":
-                override["dimtsz"] = override["dimtxt"] * 0.6  # ticks
+            override = self._dim_override(d.height, tr, d.value)
+            turned = _text_direction(angle, d.text_rotation, override)
+            ext1, ext2 = d.ext1, d.ext2
+            if abs((turned - angle + 180.0) % 360.0 - 180.0) > 90.0:
+                # turned around: the measured points follow (the CAD puts
+                # the arrows outside when p1 -> p2 runs against the angle)
+                p1, p2, ext1, ext2 = p2, p1, ext2, ext1
+            angle = turned
+            self._measured_sizes(d, tr, override, ext1, ext2)
+            if d.text_center is not None:
+                # a CAD cuts the dimension line where the text box (+ gap)
+                # covers it: keep the gap inside the PDF clearance, so a
+                # line drawn whole under its value stays whole
+                c = tr.pt(d.text_center)
+                ux, uy = (t2[0] - t1[0], t2[1] - t1[1])
+                n = math.hypot(ux, uy)
+                dist = abs((c[0] - t1[0]) * uy - (c[1] - t1[1]) * ux) / n
+                clear = dist - override["dimtxt"] / 2.0
+                if clear > 0:
+                    override["dimgap"] = min(override["dimgap"],
+                                             0.9 * clear / 0.75)
             dim = self.msp.add_linear_dim(
                 base=tr.pt(d.line_point), p1=p1, p2=p2, angle=angle,
                 text=d.text, dimstyle="Standard", override=override,
@@ -730,13 +750,47 @@ class DxfWriter:
         except Exception as exc:
             self._warn_once("dim", f"Some dimensions fell back: {exc}")
 
-    def _dim_override(self, height_pt: float, tr) -> dict:
-        """Dimension sizes in drawing units, from the PDF text height."""
-        h = max(tr.length(height_pt) * self.s.text_height_factor, 1e-6)
+    @staticmethod
+    def _measured_sizes(d: DimensionEntity, tr, override: dict,
+                        ext1: bool, ext2: bool) -> None:
+        """Arrow / tick size, extension lines and dimension line extension
+        as measured in the PDF (drawing units). ext1 / ext2: is there a PDF
+        extension line at the first / second measured point."""
+        if d.terminator > 0:
+            size = tr.length(d.terminator)
+            if d.kind == "tick":                 # CAD tick: 2*sqrt(2)*DIMTSZ
+                override["dimtsz"] = size / (2.0 * math.sqrt(2.0))
+            else:
+                override["dimasz"] = size
+        elif d.kind == "tick":
+            override["dimtsz"] = override["dimtxt"] * 0.6
+        if ext1 or ext2:
+            # the measured points are where the PDF extension lines start
+            override["dimexo"] = 0.0
+            if d.ext_beyond is not None:
+                override["dimexe"] = tr.length(d.ext_beyond)
+        # no extension line in the PDF (or kept as a line): none drawn
+        if not ext1:
+            override["dimse1"] = 1
+        if not ext2:
+            override["dimse2"] = 1
+        if d.kind == "tick" and d.line_beyond > 0:
+            override["dimdle"] = tr.length(d.line_beyond)
+
+    def _dim_override(self, height_pt: float, tr,
+                      value: Optional[RawText] = None) -> dict:
+        """Dimension sizes in drawing units, from the PDF text height (the
+        letter height and font of the PDF value when known)."""
+        if value is not None:
+            h = self._text_height(value, tr)
+            style = self._style(self._font(value))
+        else:
+            h = max(tr.length(height_pt) * self.s.text_height_factor, 1e-6)
+            style = TEXT_STYLE
         return {"dimtxt": h, "dimasz": h * 0.9, "dimexe": h * 0.5,
                 "dimexo": h * 0.3, "dimgap": h * 0.25,
                 "dimclrd": 0, "dimclre": 0, "dimclrt": 0,
-                "dimtxsty": TEXT_STYLE}
+                "dimtxsty": style}
 
     def _undo_from(self, count: int) -> None:
         """Remove what a failed ezdxf call left in model space (it may add
@@ -852,70 +906,38 @@ class DxfWriter:
                 pass
 
     def _write_leader(self, ld: LeaderEntity, tr) -> None:
-        """MULTILEADER (R2007+) or classic LEADER + text. Multi-line notes
-        (tag above the landing, "(HOLD 18)" below...) stay one paragraph."""
+        """MULTILEADER (R2007+) or classic LEADER + text, drawn like the PDF:
+        the note keeps its place and direction, and the leader meets it
+        where it does in the PDF (middle of the first line, underline...).
+        Multi-line notes (tag above the landing, "(HOLD 18)" below...) stay
+        one paragraph."""
         verts = [tr.pt(p) for p in ld.vertices]
         lines = ld.lines or [ld.text]
         top = lines[0]
+        font = self._font(top)
         h = self._text_height(top, tr)
         a = math.radians(top.rotation)
         up = (-math.sin(a), -math.cos(a))                   # page coords
-        cap = top.height * self.s.text_height_factor
+        cap = top.cap_height or top.height * self._ratio(font)
         corner = tr.pt((top.origin[0] + up[0] * cap,       # top-left of
                         top.origin[1] + up[1] * cap))      # the note
-        content = "\\P".join(t.text for t in lines)
-        modern = self.s.dxf_version not in ("R12", "R2000", "R2004")
+        content = "\\P".join(_mtext_escape(t.text) for t in lines)
+        before = len(self.msp)
         try:
-            if modern:
-                from ezdxf.render import mleader
-                b = self.msp.add_multileader_mtext("Standard")
-                b.set_content(content, char_height=h,
-                              alignment=mleader.TextAlignment.left,
-                              style=TEXT_STYLE)
-                # A horizontal last segment is the PDF "landing" (the line
-                # the note is written on): it becomes the MLEADER dogleg and
-                # the note is underlined by it, exactly like the PDF.
-                pts = list(verts)
-                width = max(tr.length(t.width or 0.55 * t.height * len(t.text))
-                            for t in lines)
-                landing = len(pts) >= 2 and abs(pts[-1][1] - pts[-2][1]) \
-                    <= 1e-3 * max(abs(pts[-1][0] - pts[-2][0]), 1e-9)
-                if landing:
-                    shaft = pts[-2]
-                    pts = pts[:-1] if len(pts) >= 3 else pts
-                    left = corner[0] >= shaft[0] - width / 2
-                    edge = corner[0] if left else corner[0] + width
-                    dogleg = max(abs(edge - shaft[0]), h * 0.2)
-                    joint = mleader.HorizontalConnection.\
-                        bottom_of_top_line_underline
-                else:
-                    left = corner[0] >= pts[-1][0]
-                    dogleg = h * 0.6
-                    joint = mleader.HorizontalConnection.middle_of_top_line
-                # sizes in drawing units (the style defaults are tiny)
-                b.set_arrow_properties(size=h * 0.9)
-                b.set_connection_properties(landing_gap=h * 0.15,
-                                            dogleg_length=dogleg)
-                b.set_connection_types(left=joint, right=joint)
-                side = (mleader.ConnectionSide.left if left
-                        else mleader.ConnectionSide.right)
-                b.add_leader_line(side, [Vec2(p) for p in pts])
-                b.build(insert=Vec2(corner))
-                b.multileader.dxf.layer = LAYER_LEADER
-                b.multileader.dxf.color = 256
+            if self.s.dxf_version not in ("R12", "R2000", "R2004"):
+                try:
+                    self._write_multileader(ld, tr, verts, lines, h, corner,
+                                            content, font)
+                except Exception as exc:
+                    # never lose a note: classic LEADER + text instead
+                    self._undo_from(before)
+                    self._warn_once("mleader", "Some leaders were written as "
+                                    f"classic leaders ({exc})")
+                    self._write_classic_leader(verts, lines, h, corner,
+                                               content, tr)
             elif not self.r12:
-                self.msp.add_leader(vertices=verts,
-                                    dxfattribs={"layer": LAYER_LEADER})
-                if len(lines) > 1:
-                    mt = self.msp.add_mtext(content, dxfattribs={
-                        "layer": LAYER_LEADER, "char_height": h,
-                        "style": TEXT_STYLE, "rotation": top.rotation})
-                    mt.set_location(corner, attachment_point=1)
-                else:
-                    txt = self.msp.add_text(top.text, dxfattribs={
-                        "layer": LAYER_LEADER, "height": h,
-                        "style": TEXT_STYLE, "rotation": top.rotation})
-                    txt.set_placement(tr.pt(top.origin))
+                self._write_classic_leader(verts, lines, h, corner, content,
+                                           tr)
             else:
                 self.msp.add_polyline2d(verts, dxfattribs={
                     "layer": LAYER_LEADER})
@@ -928,6 +950,120 @@ class DxfWriter:
             self._count(LAYER_LEADER)
         except Exception as exc:
             self._warn_once("leader", f"Some leaders fell back: {exc}")
+
+    def _write_classic_leader(self, verts, lines, h, corner, content,
+                              tr) -> None:
+        """LEADER entity through the PDF vertices + the note as text."""
+        top = lines[0]
+        self.msp.add_leader(vertices=verts, dxfattribs={"layer": LAYER_LEADER})
+        if len(lines) > 1:
+            mt = self.msp.add_mtext(content, dxfattribs={
+                "layer": LAYER_LEADER, "char_height": h,
+                "style": TEXT_STYLE, "rotation": top.rotation})
+            mt.set_location(corner, attachment_point=1)
+        else:
+            txt = self.msp.add_text(top.text, dxfattribs={
+                "layer": LAYER_LEADER, "height": h,
+                "style": TEXT_STYLE, "rotation": top.rotation})
+            txt.set_placement(tr.pt(top.origin))
+
+    def _write_multileader(self, ld: LeaderEntity, tr, verts, lines, h,
+                           corner, content, font) -> None:
+        """MULTILEADER that looks like the PDF leader.
+
+        Everything is worked out in the frame of the note (x along its
+        lines, y up, origin at the top-left of its first line): which side
+        the leader comes from, where it meets the note (the MULTILEADER
+        "connection": middle of the first line, middle of the note,
+        underline...), the landing ("dogleg") and the gap before the
+        text."""
+        from ezdxf.render import mleader
+        from ezdxf.tools.text import leading
+        HC = mleader.HorizontalConnection
+        top = lines[0]
+        r = math.radians(top.rotation)
+        ux, uy = math.cos(r), math.sin(r)          # along the note (DXF)
+        vx, vy = -uy, ux                           # 'up' of the note
+
+        def local(p):
+            dx, dy = p[0] - corner[0], p[1] - corner[1]
+            return (dx * ux + dy * uy, dx * vx + dy * vy)
+
+        def world(x, y):
+            return (corner[0] + ux * x + vx * y, corner[1] + uy * x + vy * y)
+
+        # extent of the note along its lines
+        starts, ends = [], []
+        for t in lines:
+            x = local(tr.pt(t.origin))[0]
+            starts.append(x)
+            ends.append(x + tr.length(t.width or 0.55 * t.height
+                                      * len(t.text)))
+        x0, x1 = min(starts), max(ends)
+        pts = [local(p) for p in verts]
+        end = pts[-1]
+        dx = end[0] - pts[-2][0]
+        flat = abs(dx) > 1e-9 and abs(end[1] - pts[-2][1]) <= 0.02 * abs(dx)
+        # the side the leader arrives from: where its landing starts (a
+        # landing may run on under the whole note), else its end
+        arrive = pts[-2] if flat else end
+        left = arrive[0] <= (x0 + x1) / 2.0        # leader on the left
+        near = x0 if left else x1                  # edge of the note it meets
+        sign = 1.0 if left else -1.0               # towards the note
+        # line spacing as in the PDF
+        n = len(lines)
+        factor = 1.0
+        if n > 1:
+            gaps = [math.dist(p.origin, q.origin)
+                    for p, q in zip(lines, lines[1:])]
+            spacing = tr.length(statistics.mean(gaps))
+            factor = max(0.25, min(4.0, spacing / max(h * 5.0 / 3.0, 1e-9)))
+        height = h * n + (leading(h, factor) - h) * (n - 1)
+        under = 0.2 * h                            # CAD underline distance
+        levels = [(HC.middle_of_top_line, -h / 2.0),
+                  (HC.top_of_top_line, 0.0),
+                  (HC.middle_of_text, -height / 2.0),
+                  (HC.middle_of_bottom_line, -height + h / 2.0),
+                  (HC.bottom_of_top_line, -h - under),
+                  (HC.bottom_of_bottom_line, -height - under)]
+        underlines = [(HC.bottom_of_top_line_underline, -h - under),
+                      (HC.bottom_of_bottom_line_underline, -height - under)]
+        landing = flat and len(pts) >= 3           # shaft + horizontal landing
+        if flat and sign * (end[0] - near) > 0.5 * h:
+            # the landing runs on under the note: the note is written ON it
+            # (the underline starts at the end of the landing, so the small
+            # gap leaves no hole; with none, the underline would be drawn
+            # the wrong way by some readers)
+            joint = min(underlines, key=lambda c: abs(c[1] - end[1]))[0]
+            gap = 0.1 * h
+        else:
+            # the leader stops before the note: meet it at the same height
+            joint = min(levels, key=lambda c: abs(c[1] - end[1]))[0]
+            gap = max(0.0, sign * (near - end[0]))
+        joint_x = near - sign * gap
+        dogleg = abs(joint_x - pts[-2][0]) if landing else 0.0
+        # the PDF path up to the shaft's end: the MULTILEADER adds the
+        # elbow, the landing and the gap itself
+        keep = verts[:-2] if landing else verts[:-1]
+        b = self.msp.add_multileader_mtext("Standard")
+        b.set_content(content, char_height=h,
+                      alignment=(mleader.TextAlignment.left if left
+                                 else mleader.TextAlignment.right),
+                      style=self._style(font))
+        if n > 1:
+            b.context.mtext.line_spacing_factor = factor
+        b.set_arrow_properties(size=tr.length(ld.arrow) if ld.arrow > 0
+                               else h * 0.9)
+        b.set_connection_properties(landing_gap=gap,
+                                    dogleg_length=dogleg if dogleg > 1e-6
+                                    else 0.0)
+        b.set_connection_types(left=joint, right=joint)
+        b.add_leader_line(mleader.ConnectionSide.left if left
+                          else mleader.ConnectionSide.right,
+                          [Vec2(p) for p in keep])
+        b.build(insert=Vec2(world(near, 0.0)), rotation=top.rotation)
+        b.multileader.dxf.layer = LAYER_LEADER
+        b.multileader.dxf.color = 256
 
     # ---- blocks -------------------------------------------------------------------
     def write_blocks(self, br: BlockResult, tr) -> None:
@@ -976,6 +1112,25 @@ class DxfWriter:
     # ---- save --------------------------------------------------------------------
     def save(self, path: str) -> None:
         self.doc.saveas(path)
+
+
+def _text_direction(angle: float, text_rotation: Optional[float],
+                    override: dict) -> float:
+    """Direction to give a linear dimension (degrees, DXF) so that its value
+    reads like in the PDF. A CAD dimension writes its value along its own
+    direction: a value written along the line turns the direction its way
+    (never upside down); a value written horizontally on a sloping line
+    asks for horizontal text (DIMTIH / DIMTOH)."""
+    if text_rotation is None:                # unknown: read from bottom/right
+        text_rotation = angle % 180.0
+        if text_rotation > 90.0:
+            text_rotation -= 180.0
+    if angle_diff_mod180(angle, text_rotation) <= 30.0:
+        if abs((angle - text_rotation + 180.0) % 360.0 - 180.0) > 90.0:
+            angle += 180.0
+    else:
+        override["dimtih"] = override["dimtoh"] = 1
+    return (angle + 180.0) % 360.0 - 180.0
 
 
 def _image_corner(m, tr, x: float, y: float):

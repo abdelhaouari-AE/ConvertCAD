@@ -2,6 +2,24 @@
 
 All notable changes to ConvertCAD. Versions follow *major.minor.patch*.
 
+## [Unreleased]
+
+### Changed
+- **Dimension values read like in the PDF**: never upside down whatever the order in
+  which the PDF draws the arrows, and horizontal when the PDF writes them horizontally on
+  a vertical dimension. The dimension line is no longer cut under its value.
+- **Dimensions take the PDF sizes**: arrow length, tick size, extension lines (where they
+  start and how far they pass the dimension line), dimension line passing the end ticks;
+  no extension line is added where the PDF has none.
+- **Leaders drawn like in the PDF**: the landing meets the note where it does in the PDF
+  (middle of the first line — AutoCAD's default —, underline…), without the extra kink
+  and underline of 1.3.0; notes turned 90° stay turned; notes on the left of a leader are
+  anchored on their right edge.
+- **More dimensions recognised**: arrows larger than about 3 mm and sheets printed larger
+  ("fit to paper"); values with a label, count, brackets, tolerance or remark (`L=3500`,
+  `2x1500`, `(3500)`, `3500 ±5`, `3500 (TYP.)`, `3500*`, `EQ`); feet-inches (`12'-6"`).
+  A dimension line whose value is not recognised no longer becomes a leader.
+
 ## [1.3.0] — 2026-11-04
 
 ### Added

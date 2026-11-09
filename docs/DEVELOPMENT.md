@@ -411,6 +411,7 @@ folder is bundled into the exe by `ConvertCAD.spec`.
 | `test_dwg.py` | DXF prepared for LibreDWG (handles, no duplicates), missing converter, DWG written and read back by the pipeline, rotated / mirrored blocks identical after the DWG round trip, INSERT scale completion (skipped when LibreDWG is not built). |
 | `test_geometry.py` | Arc and circle fitting, arc merging, exact splines, polylines, duplicates, curve precision. |
 | `test_annotations.py` | Arrow and tick dimensions, extension lines, leaders (text left or right), grid bubbles not taken as values, `DIM_RAW` fallback; radius, diameter, angle and arc length dimensions (values that disagree with the drawing are not rebuilt), written in R2018, R12 and DWG. |
+| `test_annotation_quality.py` | Dimensions and leaders drawn like CAD plots, compared with the same PDF converted without them: large arrows and sheets printed larger, values with labels / remarks and feet-inches, no leader along a dimension line; value direction whatever the drawing order, horizontal values on vertical dimensions, arrow / tick / extension sizes measured, no extension line where the PDF has none; MULTILEADER drawn on the PDF lines with the note at its place (landing at mid-height, note on the left, underline, no landing, rotated note). |
 | `test_textures.py` | Texture hatches recognised exactly (dots, gravel, earth, brick, insulation — scale, angle, pieces replaced), sand on its statistics, text and tile grids left alone, HATCH written with the drawn boundary, R12 keeps the lines, option off. |
 | `test_blocks.py` | Repeated symbols become blocks; walls do not glue symbols; sample plan: doors ×3, columns ×20; rotated and mirrored copies (all 8 orientations) give exactly the drawn lines once the INSERTs are exploded; copies turned by any angle (and mirrored) become one block with the right rotations. |
 | `test_writer.py` | Every DXF version, scale and units, ACI mapping, ByLayer, dimension angles, R12 fallbacks. |
@@ -593,16 +594,33 @@ to the nearest DXF lineweight enum. Names are sanitised for AutoCAD (`<>/\":;?*|
 
 ### 5.6 Step 4 — `annotations.py`
 
-**Arrow dimensions.** Small filled triangles (`ARROW_MIN_AREA`–`ARROW_MAX_AREA`) are
-arrowheads; the tip is the sharpest vertex. Arrow pairs pointing in opposite directions
-along a common axis (bucketed by `_axis_key` for speed) are candidates. A pair becomes a
-dimension only when a **measurement text** sits along the segment between the tips
-(`_nearest_dim_text`). Extension lines are searched conservatively (`_find_extension`):
-roughly perpendicular, passing through the tip, overshooting by at most `EXT_OVERSHOOT`, the
-long side at least twice the short side — shared extension lines are reused by chained
-dimensions (`ext_ids`). The DXF dimension is a rotated linear dimension at the exact angle
-of the tips, its definition points on the extension lines, and the **PDF text kept as text
-override**.
+**Sizes follow the drawing.** The usual font size of the values (`_Context.size`, median
+of the dimension values, or of all texts when there are fewer than 3) sets the scale of
+the size limits: on a drawing whose values are larger than `REF_SIZE` (10 pt, i.e. 2.5 mm
+letters) — larger arrows, or a sheet printed larger ("fit to paper") — the largest arrow
+(`ARROW_REL_AREA` × size², never less than `ARROW_MAX_AREA`), the longest tick
+(`TICK_MAX_LEN` × k) and the note distance of leaders (`LEADER_TEXT` × k) grow in
+proportion; they never shrink below the fixed values.
+
+**Values** (`DIM_VALUE_RE`): plain measurements (`DIM_TEXT_RE`: `3500`, `3 500`, `3,50`,
+`R25`, `Ø60`, `45°`, `1200 mm`, `3⁵⁰`, feet-inches `12'-6"`, `4'-3 1/2"`, `10'`, `6"`)
+and the same with a label or count (`L=3500`, `H = 2.50`, `2x1500`), brackets
+(`(3500)`), a tolerance (`3500 ±5`, `25 +0.1/-0.2`, `Ø20 H7`), a remark (`3500 (TYP.)`,
+`3500*`, `1500 c/c`) or `EQ`. Only plain measurements go to `DIM_RAW` when nothing
+matches (a labelled text is often a note).
+
+**Arrow dimensions.** Small filled triangles are arrowheads; the tip is the sharpest
+vertex. Arrow pairs pointing in opposite directions along a common axis (bucketed by
+`_axis_key` for speed) are candidates. A pair becomes a dimension only when a **value**
+sits along the segment between the tips (`_nearest_dim_text`). Extension lines are
+searched conservatively (`_find_extension`): roughly perpendicular, passing through the
+tip, overshooting by at most `EXT_OVERSHOOT`, the long side at least twice the short side —
+shared extension lines are reused by chained dimensions (`ext_ids`). The DXF dimension is
+a rotated linear dimension at the exact angle of the tips, its definition points on the
+extension lines, and the **PDF text kept as text override**. `DimensionEntity` also
+carries what the writer needs to draw it like the PDF: the value's direction and font,
+the arrow / tick length, which extension lines exist and how far they pass the
+dimension line, and how far a tick dimension line passes its end ticks.
 
 **Tick dimensions** (architecture): short oblique strokes (25°–75° to the dimension line)
 at both ends of a line, with a value — same rules, written with architectural ticks.
@@ -634,11 +652,12 @@ nearly opposite arrows on a flat arc would otherwise pass for a linear dimension
 through up to `LEADER_HOPS` joined pieces (`_walk_leader`); the note is the text sitting
 **on** the landing, or just **under** it, else the nearest one within reach
 (`_landing_texts`), with several lines kept together. Direction words of stairs and ramps
-("UP", "DN", "MONTEE"…), big titles and texts lying along the shaft are not notes. Written
-as MULTILEADER (multi-line content, top-left anchored, underline connection, dogleg from
-the shaft to the text edge) or LEADER + MTEXT for R12–R2004.
+("UP", "DN", "MONTEE"…), big titles and texts lying along the shaft are not notes, and a
+line that ends at another arrowhead is a dimension line whose value was not recognised,
+never a leader (`_ends_at_arrow`). Written as MULTILEADER (see 5.8) or LEADER + MTEXT for
+R12–R2004.
 
-**Safety.** Texts that look like measurements but matched nothing go to `DIM_RAW`. Grid
+**Safety.** Plain measurements (`DIM_TEXT_RE`) that matched nothing go to `DIM_RAW`. Grid
 bubble numbers and item marks (`_is_label`: a single character, or a text inside a small
 circle) are not treated as values. Consumed lines, fills and texts are marked so they are not written twice.
 
@@ -698,8 +717,28 @@ circle) are not treated as values. Consumed lines, fills and texts are marked so
   (more lines, then the tightest alignment); the MTEXT attachment is top-left, top-centre
   or top-right accordingly, with `\W` for a condensed paragraph.
 - Linear dimensions: `msp.add_linear_dim(base, p1, p2, angle, text=PDF value,
-  dimstyle="Standard", override={arrow/tick size, text height, colours…})` — the sizes
-  come from `_dim_override()`, shared by every kind of dimension.
+  dimstyle="Standard", override={…})`, the value placed at its PDF position
+  (`set_location`). A CAD writes the value along the dimension direction, so
+  `_text_direction()` turns the direction (and swaps p1 / p2, or the arrows would be
+  drawn outside) until the value reads like in the PDF — never upside down — or asks for
+  horizontal text (`DIMTIH` / `DIMTOH`) when the PDF value is horizontal on a sloping
+  line. `_dim_override()` (shared by every kind of dimension) gives the text height and
+  style of the PDF value; `_measured_sizes()` the PDF sizes: arrow length (`DIMASZ`),
+  tick size (`DIMTSZ` = tick length / 2√2), extension lines starting at the PDF line ends
+  (`DIMEXO` 0) and passing the dimension line like in the PDF (`DIMEXE`), no extension
+  line where the PDF has none (`DIMSE1` / `DIMSE2`), dimension line passing the end ticks
+  (`DIMDLE`). `DIMGAP` stays within the PDF clearance between value and line, so a line
+  drawn whole under its value is not cut by the CAD.
+- Leaders (`_write_multileader`): everything is worked out in the frame of the note (x
+  along its lines, y up, origin at the top-left of its first line), so rotated notes
+  work too. The leader side (left / right of the note) is where the landing starts; the
+  MTEXT is anchored on that side (top-left or top-right, like AutoCAD's justification),
+  with the PDF line spacing. The connection is the one whose height matches the PDF
+  landing: middle of the first line (AutoCAD's default), top, middle of the note, middle
+  of the last line, bottom — or an underline when the landing runs on under the note.
+  The dogleg goes from the shaft's end to the landing's end, the landing gap is the PDF
+  gap before the note, and a leader without landing gets no dogleg. If ezdxf fails, a
+  classic LEADER + text is written instead (`_write_classic_leader`).
 - Radius / diameter: `add_radius_dim` / `add_diameter_dim` with `location` on the PDF line
   (text aligned with it, or horizontal with a landing); angle: `add_angular_dim_3p` (the
   y flip reverses the angles: DXF p1 = PDF end point); arc length: `add_arc_dim_3p`, kept
@@ -1650,6 +1689,12 @@ Where the speed comes from:
 - Dimensions: linear (aligned/rotated), radius, diameter, angle (3 points) and arc length;
   ordinate, jogged-radius and 2-line angular dimensions remain geometry + text. Arc length
   dimensions are written as ARC_DIMENSION from DXF 2007 only (their drawing otherwise).
+  Terminators recognised: filled arrows and oblique ticks — open or outline arrows and
+  dots are not (dimensions and leaders stay geometry + text). A value drawn as lines
+  without hidden text (no SHX comment) cannot be read. On scanned drawings no arrowhead
+  is traced, so no dimension or leader is rebuilt (values go to `DIM_RAW`).
+- Leaders: straight pieces only (a curved leader stays geometry); a note of several lines
+  with the leader at its middle keeps only the line at the landing.
 - Scanned drawings: tracing is approximate by nature (lines, circles and arcs; no
   splines); always compare with the locked scan layer.
 - Hatch patterns are rebuilt when they are made of straight parallel lines (single
