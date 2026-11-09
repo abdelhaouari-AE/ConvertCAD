@@ -465,6 +465,51 @@ def _consume_dim_line(ctx: _Context, tip1: Point, tip2: Point) -> None:
             pl.consumed = True
 
 
+def _consume_chain_lines(ctx: _Context, res: AnnotationResult) -> None:
+    """A dimension line drawn once for a whole chain (or joined to its
+    neighbours when the geometry was rebuilt), or running past arrows drawn
+    outside, lies inside no single dimension: it is consumed when the arrow
+    dimensions on its line cover it (otherwise it would stay as a duplicate
+    line under the dimensions)."""
+    dims = [d for d in res.dimensions
+            if d.kind == "arrow" and d.tip1 is not None and d.tip2 is not None]
+    if not dims:
+        return
+    index: GridIndex[DimensionEntity] = GridIndex(24.0)
+    for d in dims:
+        index.insert(d, (min(d.tip1[0], d.tip2[0]), min(d.tip1[1], d.tip2[1]),
+                         max(d.tip1[0], d.tip2[0]), max(d.tip1[1], d.tip2[1])))
+    for pl in ctx.lines:
+        if pl.consumed:
+            continue
+        a, b = pl.points
+        L = math.dist(a, b)
+        if L < ATol.MIN_SPAN:
+            continue
+        u = ((b[0] - a[0]) / L, (b[1] - a[1]) / L)
+        spans = []
+        for d in index.query(min(a[0], b[0]) - 1, min(a[1], b[1]) - 1,
+                             max(a[0], b[0]) + 1, max(a[1], b[1]) + 1):
+            if (point_line_distance(d.tip1, a, b) > ATol.COLLINEAR_OFF
+                    or point_line_distance(d.tip2, a, b) > ATol.COLLINEAR_OFF):
+                continue
+            s1 = (d.tip1[0] - a[0]) * u[0] + (d.tip1[1] - a[1]) * u[1]
+            s2 = (d.tip2[0] - a[0]) * u[0] + (d.tip2[1] - a[1]) * u[1]
+            spans.append((min(s1, s2), max(s1, s2), 2.5 * d.terminator + 1.0))
+        if not spans:
+            continue
+        spans.sort()
+        lo, hi, end_lo = spans[0][0], spans[0][1], spans[0][2]
+        end_hi = spans[0][2]
+        for s0, s1, e in spans[1:]:
+            if s0 > hi + 1.0:                 # a gap: not one chain
+                break
+            if s1 > hi:
+                hi, end_hi = s1, e
+        if lo - end_lo <= 0.0 and hi + end_hi >= L:
+            pl.consumed = True
+
+
 def _make_dimension(ctx: _Context, res: AnnotationResult, t1: Point,
                     t2: Point, text: RawText, kind: str,
                     consume_ext: bool = True, terminator: float = 0.0,
@@ -1332,6 +1377,7 @@ def reconstruct(rp: RebuiltPage, enable_dims: bool = True,
         _radial_dimensions(ctx, arrows, res)
         _angular_dimensions(ctx, arrows, res, units_per_pt)
         _arrow_dimensions(ctx, arrows, res)
+        _consume_chain_lines(ctx, res)
         if enable_ticks:
             _tick_dimensions(ctx, res)
     if enable_leaders:

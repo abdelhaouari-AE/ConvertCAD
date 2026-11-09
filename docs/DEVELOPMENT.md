@@ -411,7 +411,7 @@ folder is bundled into the exe by `ConvertCAD.spec`.
 | `test_dwg.py` | DXF prepared for LibreDWG (handles, no duplicates), missing converter, DWG written and read back by the pipeline, rotated / mirrored blocks identical after the DWG round trip, INSERT scale completion (skipped when LibreDWG is not built). |
 | `test_geometry.py` | Arc and circle fitting, arc merging, exact splines, polylines, duplicates, curve precision. |
 | `test_annotations.py` | Arrow and tick dimensions, extension lines, leaders (text left or right), grid bubbles not taken as values, `DIM_RAW` fallback; radius, diameter, angle and arc length dimensions (values that disagree with the drawing are not rebuilt), written in R2018, R12 and DWG. |
-| `test_annotation_quality.py` | Dimensions and leaders drawn like CAD plots, compared with the same PDF converted without them: large arrows and sheets printed larger, values with labels / remarks and feet-inches, no leader along a dimension line; value direction whatever the drawing order, horizontal values on vertical dimensions, arrow / tick / extension sizes measured, no extension line where the PDF has none; MULTILEADER drawn on the PDF lines with the note at its place (landing at mid-height, note on the left, underline, no landing, rotated note). |
+| `test_annotation_quality.py` | Dimensions and leaders drawn like CAD plots, compared with the same PDF converted without them: large arrows and sheets printed larger, values with labels / remarks and feet-inches, no leader along a dimension line, no duplicate line under a chain; value direction whatever the drawing order, horizontal values on vertical dimensions, arrow / tick / extension sizes measured, no extension line where the PDF has none; MULTILEADER drawn on the PDF lines with the note at its place (landing at mid-height, note on the left, underline, no landing, rotated note). |
 | `test_textures.py` | Texture hatches recognised exactly (dots, gravel, earth, brick, insulation — scale, angle, pieces replaced), sand on its statistics, text and tile grids left alone, HATCH written with the drawn boundary, R12 keeps the lines, option off. |
 | `test_blocks.py` | Repeated symbols become blocks; walls do not glue symbols; sample plan: doors ×3, columns ×20; rotated and mirrored copies (all 8 orientations) give exactly the drawn lines once the INSERTs are exploded; copies turned by any angle (and mirrored) become one block with the right rotations. |
 | `test_writer.py` | Every DXF version, scale and units, ACI mapping, ByLayer, dimension angles, R12 fallbacks. |
@@ -617,7 +617,10 @@ searched conservatively (`_find_extension`): roughly perpendicular, passing thro
 tip, overshooting by at most `EXT_OVERSHOOT`, the long side at least twice the short side —
 shared extension lines are reused by chained dimensions (`ext_ids`). The DXF dimension is
 a rotated linear dimension at the exact angle of the tips, its definition points on the
-extension lines, and the **PDF text kept as text override**. `DimensionEntity` also
+extension lines, and the **PDF text kept as text override**. A dimension line drawn once
+for a whole chain (or joined to its neighbours by the geometry step), or running past
+arrows drawn outside, is consumed when the arrow dimensions on its line cover it
+(`_consume_chain_lines`), so no duplicate line stays under them. `DimensionEntity` also
 carries what the writer needs to draw it like the PDF: the value's direction and font,
 the arrow / tick length, which extension lines exist and how far they pass the
 dimension line, and how far a tick dimension line passes its end ticks.

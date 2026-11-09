@@ -10,7 +10,8 @@ All notable changes to ConvertCAD. Versions follow *major.minor.patch*.
   a vertical dimension. The dimension line is no longer cut under its value.
 - **Dimensions take the PDF sizes**: arrow length, tick size, extension lines (where they
   start and how far they pass the dimension line), dimension line passing the end ticks;
-  no extension line is added where the PDF has none.
+  no extension line is added where the PDF has none, and no duplicate line is left under
+  a chain of dimensions.
 - **Leaders drawn like in the PDF**: the landing meets the note where it does in the PDF
   (middle of the first line — AutoCAD's default —, underline…), without the extra kink
   and underline of 1.3.0; notes turned 90° stay turned; notes on the left of a leader are

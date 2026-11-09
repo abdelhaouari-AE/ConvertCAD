@@ -192,6 +192,23 @@ def test_unmatched_labelled_value_stays_a_text(pdf_factory):
     assert [t.text for t in ann.dim_raw_texts] == ["3.50"]
 
 
+def test_no_duplicate_line_under_a_chain(pdf_factory, tmp_path):
+    """One dimension line drawn for the whole chain: consumed by the
+    dimensions, not left as a line under them."""
+    def draw(page):
+        y = 100
+        for x in (100, 220, 330):
+            _line(page, (x, y + 20), (x, y - 2 * MM))
+        _line(page, (100, y), (330, y))
+        for a, b, v in ((100, 220, "3000"), (220, 330, "2750")):
+            _arrow(page, (a, y), (-1, 0))
+            _arrow(page, (b, y), (1, 0))
+            _text(page, ((a + b) / 2 - 9, y - 1.5), v)
+    on, _ = _both(pdf_factory(draw), tmp_path)
+    kinds = sorted(e.dxftype() for e in on.modelspace())
+    assert kinds == ["DIMENSION", "DIMENSION"]
+
+
 def test_dimension_line_is_never_a_leader(pdf_factory):
     """Arrows at both ends, value not recognised: not a leader to the
     nearest note."""
