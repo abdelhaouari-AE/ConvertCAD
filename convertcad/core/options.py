@@ -16,6 +16,7 @@ from .constants import (CURVE_PRECISION, DEFAULT_DXF_VERSION,
                         DWG_DXF_VERSION, LAYER_MODES, OCR_QUALITIES,
                         OUTPUT_FORMATS, UNITS)
 from .ocr_catalog import language_set
+from .text_export import FORMATS as TEXT_LIST_FORMATS
 from .units import effective_denominator
 
 
@@ -83,6 +84,9 @@ class Options:
     page_mode: str = DEFAULT_PAGE_MODE     # single | split
     page_gap_factor: float = 1.10          # spacing between pages (single)
     write_log: bool = True                 # <name>_log.txt next to the DXF
+    export_texts: str = ""                 # list of every text with its
+                                           # sheet and position, next to the
+                                           # DXF: "" (none) | csv | txt | both
 
     # -------------------------------------------------------------------------
     def to_dict(self) -> dict:
@@ -107,6 +111,8 @@ class Options:
             opt.ocr_quality = "standard"
         if opt.output_format not in OUTPUT_FORMATS:
             opt.output_format = "dxf"
+        if opt.export_texts not in TEXT_LIST_FORMATS:
+            opt.export_texts = ""
         opt.clip_rect = normalize_rect(opt.clip_rect)
         return opt
 
@@ -199,6 +205,9 @@ class Options:
                   languages=t(language_set(self.ocr_lang).label),
                   quality=quality) if self.ocr else t("off")),
             t("Raster images"): on(self.include_images),
+            t("List of texts"): {"csv": ".csv", "txt": ".txt",
+                                 "both": ".csv + .txt"}.get(
+                                     self.export_texts, t("off")),
             t("Engine version"): APP_VERSION,
         }
 

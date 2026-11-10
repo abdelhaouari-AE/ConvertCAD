@@ -219,8 +219,6 @@ STRINGS = {
         "أبعاد بعلامات مائلة",
     "Leaders (arrow + note)":
         "خطوط دالة (سهم + ملاحظة)",
-    "Values always keep the original PDF text. Unmatched values go to layer DIM_RAW for review.":
-        "تحتفظ القيم دائماً بنص PDF الأصلي. القيم غير المطابقة توضع في الطبقة DIM_RAW لمراجعتها.",
     "Layers and blocks":
         "الطبقات والكتل",
     "Keep the PDF's own layers":
@@ -621,8 +619,6 @@ STRINGS = {
         "من",
     "unknown producer":
         "منتج غير معروف",
-    "Verify the scale on a known distance, spot-check layer DIM and review layer DIM_RAW.":
-        "تحقق من المقياس على مسافة معروفة، وافحص عينات من الطبقة DIM، وراجع الطبقة DIM_RAW.",
     "Lines":
         "خطوط",
     "Polylines":
@@ -969,8 +965,6 @@ STRINGS = {
         "ConvertCAD محدَّث ({v}).",
     "ConvertCAD {v} is available.":
         "الإصدار {v} من ConvertCAD متاح.",
-    "ConvertCAD {v} is available (this one is {c}).":
-        "الإصدار {v} من ConvertCAD متاح (هذا الإصدار {c}).",
     "Nothing is installed automatically: download it from its release page.":
         "لا يُثبَّت أي شيء تلقائياً: نزّله من صفحة إصداره.",
     "Open the release page":
@@ -1105,10 +1099,6 @@ STRINGS = {
         'مرة واحدة يوميًا، سؤال GitHub عن وجود إصدار أحدث (لا يُرسَل أي شيء عنك أو عن رسوماتك)',
     "What's new":
         'ما الجديد',
-    'Update now':
-        'التحديث الآن',
-    'Skip this version':
-        'تخطي هذا الإصدار',
     'Checking which files changed…':
         'جارٍ البحث عن الملفات التي تغيّرت…',
     'Downloading the update: {done} / {total} MB':
@@ -1117,10 +1107,6 @@ STRINGS = {
         'ConvertCAD {v} جاهز للتثبيت: تم تنزيل {size} ميغابايت بدلًا من {full} ميغابايت.',
     'ConvertCAD {v} is ready to install.':
         'ConvertCAD {v} جاهز للتثبيت.',
-    'Restart now':
-        'إعادة التشغيل الآن',
-    'When I close ConvertCAD':
-        'عند إغلاق ConvertCAD',
     'ConvertCAD was updated to {v}.':
         'تم تحديث ConvertCAD إلى الإصدار {v}.',
     'The update could not be installed: {e}':
@@ -1131,4 +1117,32 @@ STRINGS = {
         'سيُثبَّت التحديث عند إغلاق ConvertCAD.',
     'Update cancelled.':
         'أُلغي التحديث.',
+    "Values always keep the original PDF text. Dimensions to check go to layer DIM_CHECK, unmatched values to layer DIM_RAW.":
+        "تحتفظ القيم دائمًا بنص PDF الأصلي. تذهب الأبعاد التي يجب التحقق منها إلى الطبقة DIM_CHECK، والقيم غير المطابقة إلى الطبقة DIM_RAW.",
+    "Verify the scale on a known distance, spot-check layer DIM and review layers DIM_CHECK and DIM_RAW.":
+        "تحقق من المقياس على مسافة معروفة، وافحص الطبقة DIM بعينات، وراجع الطبقتين DIM_CHECK وDIM_RAW.",
+    "Dimensions to check (DIM_CHECK)":
+        "أبعاد للتحقق (DIM_CHECK)",
+    "Dimensions grouped (DIM_RAW)":
+        "أبعاد مجمّعة (DIM_RAW)",
+    "{n} dimension(s) to check on layer DIM_CHECK (value not confirmed by the scale).":
+        "{n} بُعد (أبعاد) للتحقق على الطبقة DIM_CHECK (القيمة غير مؤكدة بالمقياس).",
+    "{n} dimension(s) not rebuilt: grouped with their value on layer DIM_RAW.":
+        "{n} بُعد (أبعاد) لم يُعَد بناؤه: جُمّع مع قيمته على الطبقة DIM_RAW.",
+    "List of all texts (.csv + .txt)":
+        "قائمة بكل النصوص (‎.csv + .txt‎)",
+    "Every text with its sheet and its position, saved next to the drawing: to search the drawings or feed a search engine.":
+        "كل نص مع ورقته وموضعه، محفوظ بجانب الرسم: للبحث في المخططات أو لتغذية محرك بحث.",
+    "List of texts":
+        "قائمة النصوص",
+    "Update available":
+        "تحديث متاح",
+    "ConvertCAD {v} is available":
+        "ConvertCAD {v} متاح",
+    "This one is {c}.":
+        "الإصدار الحالي: {c}.",
+    "Update and restart":
+        "تحديث وإعادة التشغيل",
+    "Restarting ConvertCAD…":
+        "جارٍ إعادة تشغيل ConvertCAD…",
 }

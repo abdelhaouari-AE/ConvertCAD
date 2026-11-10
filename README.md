@@ -33,7 +33,7 @@ ConvertCAD rebuilds the **intent** of the drawing:
 | Curves made of Bezier pieces | True **ARC** / **CIRCLE**, or one exact **SPLINE** |
 | Touching segments | One **LWPOLYLINE** (closed when it loops) |
 | Dash patterns, or dashes drawn as separate pieces | One line with a linetype **CENTER**, **DASHED**, **DASHDOT**, **PHANTOM**… measured on the PDF |
-| Arrows + line + value, oblique ticks + line + value | Real **DIMENSION** entities (the PDF value is kept) |
+| Arrows + line + value, oblique ticks + line + value | Real **DIMENSION** entities (the PDF value is kept) — filled, open or outlined arrows, dots, crosses, or any end the sheet repeats |
 | Arrow on a circle + "R…" / "Ø…"; two arrows on an arc + "45°" or an arc length | Real **RADIUS**, **DIAMETER**, **ANGULAR** and **ARC LENGTH** dimensions |
 | Arrow + polyline + note | **MULTILEADER** (classic **LEADER** for older DXF versions) |
 | The same symbol repeated (columns, doors, bolts…), even turned by any angle or mirrored | One **BLOCK** + one **INSERT** per occurrence |
@@ -45,9 +45,11 @@ ConvertCAD rebuilds the **intent** of the drawing:
 | Colours, line weights, PDF layers | Organised **layers** (`GEO_BLACK_050_CENTER`, `DIM`, `TEXT`, …) |
 
 **Safe by design:** a dimension is rebuilt only when arrows, line and text all agree (an
-angle or an arc length only when its value agrees with the drawn arc); a texture becomes a
-standard pattern only when that pattern, drawn again, reproduces the PDF. Measurement
-texts that matched nothing go to the red layer `DIM_RAW` for review. Nothing is invented.
+angle or an arc length only when its value agrees with the drawn arc), and its value is
+checked against the drawing scale: a value that does not match goes to the magenta layer
+`DIM_CHECK` for review. A texture becomes a standard pattern only when that pattern,
+drawn again, reproduces the PDF. Measurement texts that matched nothing go to the red
+layer `DIM_RAW`. Nothing is invented.
 
 ## Features
 
@@ -78,6 +80,8 @@ texts that matched nothing go to the red layer `DIM_RAW` for review. Nothing is 
 - **Big drawings** — an A0 sheet with 40 000 entities previews smoothly; the window opens
   in about half a second (libraries load in the background).
 - **Batch** — convert a whole folder (sub-folders included), each file with its log.
+- **List of all texts** — every text with its sheet and position, in a `.csv` and a
+  `.txt` next to the drawing: to search the drawings or feed a search engine.
 - **Command line** — `ConvertCAD-cli.exe` / `python -m convertcad --cli` for scripts.
 - **Portable or installed** — portable zip (no installation, no admin rights, settings and
   OCR models can live next to the program on a USB stick) or a normal installer; no drawing
@@ -158,12 +162,14 @@ builds it once with `./scripts/build_libredwg.sh linux`.
 3. **Convert** (Ctrl+Enter) — runs in the background, cancellable.
 4. **Review and save** — check the *DXF result* (*Overlay* shows the PDF underneath), adjust
    the *Layers*, read the *Report*, then **Save DXF…** or **Save DWG…** (Ctrl+S).
-   A `<name>_log.txt` is written next to the drawing.
+   A `<name>_log.txt` is written next to the drawing (and, with *Settings → Output →
+   List of all texts*, `<name>_texts.csv` / `.txt`).
 
 To convert only part of a sheet, use **Select area** (A) before converting.
 
 Engineering checklist after every conversion: measure a known distance in CAD, spot-check
-layer `DIM` against the PDF, review layer `DIM_RAW`, read the report warnings.
+layer `DIM` against the PDF, review layers `DIM_CHECK` and `DIM_RAW`, read the report
+warnings.
 
 The complete user guide is in the application (*Help → User guide*, F1) and in
 [`convertcad/resources/guide_en.md`](convertcad/resources/guide_en.md)
@@ -177,6 +183,7 @@ ConvertCAD-cli plan.pdf -o out\plan.dxf --scale 100 --units mm
 ConvertCAD-cli plan.pdf -o plan.dwg                       :: native DWG (AutoCAD 2000 format)
 ConvertCAD-cli plan.pdf --area 20,30,420,290              :: only that rectangle (mm on the sheet)
 ConvertCAD-cli plan.pdf --pages 1-3,5 --split-pages --dxf-version R2013
+ConvertCAD-cli plan.pdf --texts                           :: + plan_texts.csv / .txt (every text)
 ConvertCAD-cli drawings\ -o dxf\ --recursive --preset structural
 ConvertCAD-cli scan.pdf --preset scanned --ocr-lang latin+arabic --json report.json
 ConvertCAD-cli --list-presets
@@ -253,8 +260,8 @@ PDF, sélection d'une entité dans le résultat. Les plans scannés sont vectori
 cercles, arcs) et lus par OCR (modèles PP-OCR : anglais, français et autres langues latines
 intégrés ; arabe, cyrillique, grec… téléchargeables en un clic depuis *Réglages → Pages
 scannées → Langues et modèles OCR…*). Après chaque conversion,
-vérifiez l'échelle sur une cote connue, contrôlez le calque `DIM` et passez en revue le
-calque `DIM_RAW`. Guide complet : *Aide → Guide d'utilisation* ou
+vérifiez l'échelle sur une cote connue, contrôlez le calque `DIM` et passez en revue les
+calques `DIM_CHECK` et `DIM_RAW`. Guide complet : *Aide → Guide d'utilisation* ou
 [`guide_fr.md`](convertcad/resources/guide_fr.md).
 
 ## Code signing policy
@@ -272,9 +279,9 @@ Details: [CODE_SIGNING.md](CODE_SIGNING.md).
 ## Privacy
 
 ConvertCAD sends nothing about you or your drawings: no account, no analytics, no
-tracking. It goes online only to check for a new version (at most once a day; can be
-switched off), to download an update or an OCR language, and when you open the feedback
-form. Full text: [PRIVACY.md](PRIVACY.md).
+tracking. It goes online only to check for a new version (at most once a day, during a
+quiet moment; can be switched off), to download an update or an OCR language, and when
+you open the feedback form. Full text: [PRIVACY.md](PRIVACY.md).
 
 ## Licence
 

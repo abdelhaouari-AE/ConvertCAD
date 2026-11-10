@@ -46,7 +46,7 @@ F3 schaltet den Fang ein oder aus.
 | Sand, Beton, Kies, Erde, Ziegel, Dämmung oder Punkte, als viele Striche und Punkte gezeichnet | Eine **HATCH** mit dem Standardmuster (AR-SAND, AR-CONC, GRAVEL, EARTH, BRICK, INSUL, DOTS…) mit dem auf dem PDF gemessenen Maßstab und Winkel |
 | Text | **TEXT** in der Schrift des PDFs (Arial, Times New Roman, Courier New, Calibri…, fett und kursiv), mit ihrer Größe und Länge; gestapelte Zeilen werden ein **MTEXT**-Absatz, links, zentriert oder rechts ausgerichtet wie im PDF |
 | Als Striche gezeichneter AutoCAD-SHX-Text | Echter **TEXT** auf dem Layer TEXT_SHX (die Striche bleiben auf dem ausgeblendeten Layer TEXT_SHX_STROKES) |
-| Pfeil + Linie + Pfeil + Wert | Echte **DIMENSION** (Layer DIM) — der Wert behält den PDF-Text |
+| Pfeil + Linie + Pfeil + Wert | Echte **DIMENSION** (Layer DIM) — der Wert behält den PDF-Text. Jedes Maßende: gefüllte, offene oder leere Pfeile, Punkte, Kreuze oder eine Form, die das Blatt an den Enden seiner Bemaßungen wiederholt (vom Blatt gelernt) |
 | Schrägstriche + Linie + Wert | Echte **DIMENSION** mit Architekturstrichen |
 | Pfeil auf einem Kreis oder Bogen + Wert „R…“ / „Ø…“ | Echte **RADIUS**- / **DURCHMESSER**-Bemaßung |
 | Zwei Pfeile auf einem Bogen + ein Winkel („45°“) oder eine Bogenlänge | Echte **WINKEL**- / **BOGENLÄNGEN**-Bemaßung — nur wenn der Wert zum gezeichneten Bogen passt |
@@ -55,7 +55,7 @@ F3 schaltet den Fang ein oder aus.
 | Gescannte Blätter | **LINE**, **CIRCLE** und **ARC** auf dem Layer TRACE_LINES, Text per OCR gelesen |
 | Eingebettete Bilder, Scans | Bild auf dem gesperrten Layer IMG_RASTER |
 
-Maßtexte, die zu keiner Bemaßung passen, kommen auf den Layer **DIM_RAW** (rot), damit Sie sie prüfen können. Nichts wird erfunden: ein Muster oder eine Bemaßung wird nur rekonstruiert, wenn es das PDF wiedergibt; sonst bleiben seine Teile unverändert. Die Bogenlängenbemaßung wird ab DXF 2007 als echte ARC_DIMENSION geschrieben; bei älteren Versionen und DWG bleibt sie als Zeichnung auf dem Layer DIM erhalten.
+Jede Bemaßung wird gemessen und ihr Wert mit dem Zeichnungsmaßstab verglichen: ein Wert, der nicht passt, wird auf dem Layer **DIM_CHECK** (magenta) zur Prüfung rekonstruiert. Maßtexte, die zu keiner Bemaßung passen, kommen auf den Layer **DIM_RAW** (rot); eine Bemaßung, die nicht rekonstruiert werden konnte, hält Wert, Linie und Pfeile als eine Gruppe auf DIM_RAW zusammen. Nichts wird erfunden: ein Muster oder eine Bemaßung wird nur rekonstruiert, wenn es das PDF wiedergibt; sonst bleiben seine Teile unverändert. Die Bogenlängenbemaßung wird ab DXF 2007 als echte ARC_DIMENSION geschrieben; bei älteren Versionen und DWG bleibt sie als Zeichnung auf dem Layer DIM erhalten.
 
 ## Die Einstellungen
 
@@ -71,7 +71,7 @@ Maßtexte, die zu keiner Bemaßung passen, kommen auf den Layer **DIM_RAW** (rot
 
 **Gescannte Seiten** — Linien, Kreise und Bögen vektorisieren; Text per OCR lesen (PP-OCR-Modelle, auf diesem Computer); *OCR-Sprachen*: Englisch, Französisch… (lateinische Schrift, integriert), eine andere Schrift (Arabisch, Kyrillisch, Griechisch…) oder beide für gemischte Zeichnungen — nur die installierten werden angezeigt; *OCR-Genauigkeit*: Standard (integriertes Modell) oder Maximal (größere Modelle, langsamer); **OCR-Sprachen und -Modelle…** lädt die anderen Sprachen und die Modelle für maximale Genauigkeit herunter oder installiert sie auf einem Computer ohne Internet aus Dateien (siehe *Hilfe > OCR-Anleitung*); Scan-Auflösung (200–600 dpi); die Textebene des PDF verwenden, wenn der Scan bereits durchsuchbar ist; Rasterbilder auf einem gesperrten Layer behalten.
 
-**Ausgabe** — *Dateiformat*: DXF oder DWG (AutoCAD-2000-Format: öffnet sich in jedem AutoCAD seit 2000 und in jeder aktuellen CAD-Software; geschrieben vom enthaltenen Konverter GNU LibreDWG und nach dem Schreiben geprüft); DXF-Version (R2018 für aktuelle Software, R12 für alte CNC-Maschinen); bei mehreren Blättern ein DXF mit den Blättern nebeneinander oder ein DXF pro Blatt; ein Konvertierungsprotokoll neben das DXF schreiben; den Ordner nach dem Speichern öffnen.
+**Ausgabe** — *Dateiformat*: DXF oder DWG (AutoCAD-2000-Format: öffnet sich in jedem AutoCAD seit 2000 und in jeder aktuellen CAD-Software; geschrieben vom enthaltenen Konverter GNU LibreDWG und nach dem Schreiben geprüft); DXF-Version (R2018 für aktuelle Software, R12 für alte CNC-Maschinen); bei mehreren Blättern ein DXF mit den Blättern nebeneinander oder ein DXF pro Blatt; ein Konvertierungsprotokoll neben das DXF schreiben; *Liste aller Texte* (.csv + .txt, siehe unten); den Ordner nach dem Speichern öffnen.
 
 **Profile** — fertige Einstellungen: Empfohlen, Architekturpläne, Tragwerks- / Schalungspläne, Gescannte Archivzeichnungen, Nur Geometrie, CNC / Laser. *Als Profil speichern…* bewahrt Ihre eigenen Kombinationen.
 
@@ -81,7 +81,7 @@ Maßtexte, die zu keiner Bemaßung passen, kommen auf den Layer **DIM_RAW** (rot
 
 ## Updates
 
-ConvertCAD fragt GitHub höchstens einmal täglich beim Start, ob es eine neuere Version gibt (abschalten mit *Hilfe > Automatisch nach Updates suchen*); *Hilfe > Nach Updates suchen…* oder die Schaltfläche *Updates* fragen jederzeit. Nichts über Sie oder Ihre Zeichnungen wird gesendet. Gibt es eine neuere Version, bietet eine Leiste unter der Symbolleiste sie an: *Jetzt aktualisieren* lädt nur die geänderten Dateien herunter (meist wenige MB) und setzt sie beim Neustart oder Schließen von ConvertCAD ein; geht etwas schief, bleiben die bisherigen Dateien erhalten. *Diese Version überspringen* blendet sie bis zur nächsten aus. Unter Linux und bei einer Installation für alle Benutzer unter Program Files bietet die Leiste den vollständigen Download an.
+Einmal täglich, in einem ruhigen Moment — nie beim Start von ConvertCAD und nie, während Sie arbeiten oder eine Konvertierung läuft — fragt ConvertCAD GitHub, ob es eine neuere Version gibt (abschalten mit *Hilfe > Automatisch nach Updates suchen*); die Schaltfläche *Updates* (oben rechts) oder *Hilfe > Nach Updates suchen…* fragen jederzeit. Nichts über Sie oder Ihre Zeichnungen wird gesendet. Gibt es eine neuere Version, bietet ein Fenster sie an, mit einem Link *Neuigkeiten*: *Aktualisieren und neu starten* lädt nur die geänderten Dateien herunter (meist wenige MB), dann startet ConvertCAD mit der neuen Version neu; geht etwas schief, bleiben die bisherigen Dateien erhalten. *Später* schließt das Fenster: die Prüfung am nächsten Tag bietet die Version erneut an. Unter Linux und bei einer Installation für alle Benutzer unter Program Files bietet das Fenster den vollständigen Download an.
 
 ## Einen ganzen Ordner konvertieren
 
@@ -89,11 +89,15 @@ ConvertCAD fragt GitHub höchstens einmal täglich beim Start, ob es eine neuere
 
 Dieselben Konvertierungen lassen sich mit dem Konsolenprogramm *ConvertCAD-cli.exe* (neben ConvertCAD.exe) automatisieren — geben Sie `ConvertCAD-cli --help` in einer Eingabeaufforderung ein.
 
+## Liste aller Texte
+
+Ist *Einstellungen > Ausgabe > Liste aller Texte* eingeschaltet, schreibt das Speichern einer Zeichnung auch `<Name>_texts.csv` und `<Name>_texts.txt` daneben: jeden Text der Zeichnung (Notizen, Absätze, Maßwerte, Hinweistexte, SHX- und OCR-Texte), Blatt für Blatt in Lesereihenfolge, mit seiner Position in der Zeichnung (x, y in Zeichnungseinheiten, wie im CAD) und auf dem Papierblatt (mm ab der oberen linken Ecke des Blatts). Die .txt-Datei ist zum Lesen oder für eine Suchmaschine; die .csv-Datei (UTF-8, durch Kommas getrennt: in Excel *Daten > Aus Text/CSV* verwenden) hat die Spalten pdf, drawing, page, kind, layer, text, x, y, rotation, height, sheet_x_mm, sheet_y_mm. Vor dem Speichern vorgenommene Layer-Änderungen werden angewendet. Befehlszeile: `--texts` (oder `--texts csv`, `--texts txt`).
+
 ## Kontrolle nach jeder Konvertierung
 
 1. Messen Sie im CAD einen bekannten Abstand, um den Maßstab zu bestätigen.
 2. Zeigen Sie nur den Layer DIM und vergleichen Sie einige Werte mit dem PDF.
-3. Prüfen Sie den Layer DIM_RAW.
+3. Prüfen Sie die Layer DIM_CHECK (zu prüfende Bemaßungen) und DIM_RAW.
 4. Lesen Sie die Warnungen des Berichts.
 
 ## Fehlerbehebung

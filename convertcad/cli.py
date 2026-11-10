@@ -124,6 +124,11 @@ def build_parser() -> argparse.ArgumentParser:
     g.add_argument("--layer-mode", choices=sorted(LAYER_MODES))
     g.add_argument("--true-color", action="store_true",
                    help="keep exact RGB colours instead of the ACI palette")
+    g.add_argument("--texts", nargs="?", const="both",
+                   choices=["csv", "txt", "both"], dest="export_texts",
+                   help="also write the list of every text with its sheet "
+                        "and position: <name>_texts.csv and/or .txt next to "
+                        "the drawing (default: both)")
     f = p.add_argument_group("features (all on by default)")
     for flag, dest, help_ in (
             ("--no-arcs", "fit_arcs", "keep curves as splines"),
@@ -199,7 +204,8 @@ def options_from_args(args) -> Options:
               "dxf_version": "dxf_version", "layer_mode": "layer_mode",
               "min_repeats": "block_min_repeats",
               "precision": "curve_precision", "ocr_quality": "ocr_quality",
-              "dpi": "raster_dpi", "output_format": "output_format"}
+              "dpi": "raster_dpi", "output_format": "output_format",
+              "export_texts": "export_texts"}
     for arg, field_ in simple.items():
         val = getattr(args, arg, None)
         if val is not None:
@@ -387,7 +393,8 @@ def main(argv: Optional[List[str]] = None) -> int:
                                  recursive=args.recursive, files=files)
         for r in reports:
             mark = "OK " if r.success else "ERR"
-            print(f"{mark} {r.pdf_path} -> {', '.join(r.outputs)}"
+            print(f"{mark} {r.pdf_path} -> "
+                  f"{', '.join(r.outputs + r.text_files)}"
                   f"  ({r.stats.total_entities()} entities, "
                   f"{r.duration_s:.1f} s)")
             for e in r.errors:
@@ -415,7 +422,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     if not args.quiet:
         print(rep.render())
     else:
-        print(f"{rep.status_word()}: {', '.join(rep.outputs)}")
+        print(f"{rep.status_word()}: "
+              f"{', '.join(rep.outputs + rep.text_files)}")
     if args.json:
         with open(args.json, "w", encoding="utf-8") as fh:
             fh.write(rep.to_json())

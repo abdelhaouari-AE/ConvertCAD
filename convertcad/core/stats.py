@@ -12,7 +12,8 @@ from typing import Dict, List
 # counters added together when several pages / files are merged
 COUNTERS = ("lines", "polylines", "arcs", "circles", "splines", "texts",
             "mtexts", "shx_texts", "ocr_texts", "hatches", "pattern_hatches",
-            "images", "dimensions", "leaders", "blocks_defined",
+            "images", "dimensions", "leaders", "dims_to_check", "dim_groups",
+            "blocks_defined",
             "blocks_inserted", "duplicates_removed", "fills_skipped",
             "dashed_lines", "dash_pieces_merged")
 
@@ -33,6 +34,8 @@ class WriteStats:
     images: int = 0
     dimensions: int = 0
     leaders: int = 0
+    dims_to_check: int = 0           # dimensions on layer DIM_CHECK
+    dim_groups: int = 0              # dimensions not rebuilt, grouped
     blocks_defined: int = 0
     blocks_inserted: int = 0
     duplicates_removed: int = 0

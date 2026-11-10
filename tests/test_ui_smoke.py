@@ -83,6 +83,8 @@ def test_open_convert_edit_save(qapp, tmp_path, monkeypatch):
         # the language button shows the language code, no "?" button left
         assert w.lang_btn.text() == "EN"
         assert not hasattr(w, "help_btn")
+        w.options_panel.export_texts.setChecked(True)     # list of texts
+        assert w.options_panel.options().export_texts == "both"
 
         w.convert_or_cancel()
         t0 = time.time()
@@ -91,6 +93,10 @@ def test_open_convert_edit_save(qapp, tmp_path, monkeypatch):
         assert not w._busy, "conversion did not finish"
         rep = w.result["report"]
         assert rep.success and rep.stats.dimensions >= 5
+        # the list of texts is made when saving: no new conversion needed
+        w.options_panel.export_texts.setChecked(False)
+        w.options_panel.export_texts.setChecked(True)
+        assert not w.result["stale"]
 
         model = w.layers_panel.model
         names = [r.name for r in model.rows]
@@ -111,6 +117,14 @@ def test_open_convert_edit_save(qapp, tmp_path, monkeypatch):
         assert "COTES" in layers and "DIM" not in layers
         assert not doc.modelspace().query('*[layer=="HATCH"]')
         assert (tmp_path / "saved_log.txt").exists()
+        # the list of texts is read from the saved drawing (edits applied)
+        import csv
+        with open(tmp_path / "saved_texts.csv", encoding="utf-8-sig") as fh:
+            rows = list(csv.DictReader(fh))
+        assert rows and {r["drawing"] for r in rows} == {"saved.dxf"}
+        assert {r["layer"] for r in rows if r["kind"] == "dimension"} == \
+            {"COTES"}
+        assert (tmp_path / "saved_texts.txt").exists()
 
         w.toggle_theme()                  # theme switch must not raise
         _pump(100)
@@ -333,38 +347,79 @@ def test_side_panels_collapse_and_questions_are_translated(qapp):
     assert texts == ["Non", "Oui"]
 
 
-def test_update_bar_offers_and_skips_a_new_version(qapp):
-    """A newer version shows the bar; this source checkout cannot be updated
-    file by file, so the bar offers the download; Skip remembers it."""
+def test_update_window_offered_during_a_quiet_moment(qapp, monkeypatch):
+    """No check at start-up. A newer version found by the automatic check
+    waits for a quiet moment; this source checkout cannot be updated file
+    by file, so the window offers the download."""
     from convertcad.config import Settings
     from convertcad.core.updates import UpdateInfo
     from convertcad.ui import main_window as mw
 
     s = Settings()
     s.terms_accepted = True
+    s.auto_update_check = True
+    s.last_update_check = 0
     w = mw.MainWindow(s)
     w.show()
     _pump(50)
+    shown = []
+
+    def fake_exec(dlg):
+        shown.append((dlg.mode, [b.text() for b in dlg.buttons.buttons()],
+                      dlg.notes.text()))
+        dlg.action = "later"
+        return 0
+    monkeypatch.setattr(mw.UpdateDialog, "exec", fake_exec)
+    checks = []
+    monkeypatch.setattr(w, "check_updates", lambda quiet=False:
+                        checks.append(quiet))
+    monkeypatch.delenv("CONVERTCAD_NO_UPDATE_CHECK", raising=False)
     try:
-        assert not w.update_bar.isVisible()
+        assert w._update_thread is None              # nothing at start-up
+        w._on_idle_tick()
+        assert not checks                            # ConvertCAD just opened
+        w._started -= 60                             # open for a minute...
+        w._idle.last -= 60                           # ...nobody touched it
+        assert w._quiet_moment()
+        w._busy = True                               # a conversion runs
+        assert not w._quiet_moment()
+        w._busy = False
+        w._on_idle_tick()
+        assert checks == [True]                      # the automatic check
+        w._on_idle_tick()
+        assert checks == [True]                      # not again before 1 h
+
         info = UpdateInfo(current="1.0.0", latest="9.0.0",
                           url="https://example.org/r")
         w._update_quiet = True
         w._on_update_checked(info, "")
-        assert w.update_bar.isVisible() and w.update_bar.state == "available"
-        assert s.last_update_check > 0
-        labels = [w.update_bar.buttons.itemAt(i).widget().text()
-                  for i in range(w.update_bar.buttons.count())]
-        assert "Download" in labels and "Update now" not in labels
-        w._on_update_action("skip")
-        assert s.skipped_version == "9.0.0" and not w.update_bar.isVisible()
-        w._on_update_checked(info, "")          # skipped: the daily check stays quiet
-        assert not w.update_bar.isVisible()
-        w.update_bar.show_ready("9.0.0", 2.4, 172)
-        assert "2.4 MB" in w.update_bar.text.text()
-        w.update_bar.show_progress(1.0, 2.0)    # ignored outside "working"
-        w.update_bar.show_checking()
-        w.update_bar.show_progress(1.0, 2.0)
-        assert w.update_bar.bar.value() == 500
+        assert s.last_update_check > 0 and w._offer and not shown
+        w._show_offer()                              # at the quiet moment
+        mode, labels, link = shown[0]
+        assert mode == "download" and sorted(labels) == ["Download", "Later"]
+        assert "https://example.org/r" in link and w._offer is None
+        w._update_quiet = False                      # asked by the user:
+        w._on_update_checked(info, "")               # shown at once
+        assert len(shown) == 2
     finally:
         w.close()
+
+
+def test_update_window_downloads_then_restarts(qapp):
+    """The window: buttons, progress, the download result."""
+    from convertcad.ui.update_dialog import UpdateDialog
+
+    dlg = UpdateDialog("9.0.0", "1.0.0", "https://example.org/r", "patch")
+    assert sorted(b.text() for b in dlg.buttons.buttons()) == \
+        ["Later", "Update and restart"]
+    dlg.show_progress(1.0, 2.0)
+    assert dlg.bar.value() == 500 and "1.0 / 2.0 MB" in dlg.status.text()
+    dlg._on_ready("9.0.0", 2.4, 172)
+    assert dlg.action == "restart" and dlg.downloaded == (2.4, 172)
+    dlg = UpdateDialog("9.0.0", "1.0.0", "https://example.org/r", "patch")
+    dlg._on_failed("no network")
+    assert dlg.action == "failed" and dlg.error == "no network"
+    dlg = UpdateDialog("9.0.0", "1.0.0", "https://example.org/r", "ready")
+    assert "ready to install" in dlg.title.text()
+    dlg._on_go()
+    assert dlg.action == "restart"

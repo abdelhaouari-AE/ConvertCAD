@@ -1,6 +1,6 @@
 # ConvertCAD privacy policy
 
-*Applies to ConvertCAD 1.3.0 and later. Last update: 4 November 2026.*
+*Applies to ConvertCAD 1.4.0 and later. Last update: 10 November 2026.*
 
 ConvertCAD converts drawings **on your computer**. Your PDF files, the converted
 DXF / DWG files and your settings are never sent anywhere. There is no account,
@@ -11,8 +11,8 @@ ConvertCAD connects to the internet only in these cases:
 | When | What is contacted | What is sent |
 |---|---|---|
 | You download an OCR language (Tools > OCR languages and models) | GitHub (`github.com`) and, if GitHub fails, the ModelScope mirror (`modelscope.cn`) | A normal download request (your IP address, as for any download) |
-| Update check: at most **once a day** when ConvertCAD starts (**on** by default; switch it off with Help > *Check for updates automatically*), and when you click *Updates* or Help > *Check for updates* | The GitHub API (`api.github.com`) | A normal web request; nothing about you or your drawings |
-| You click *Update now*: ConvertCAD downloads only the files that changed in the new version | GitHub (`github.com` and its file storage) | Normal download requests; nothing about you or your drawings |
+| Update check: at most **once a day**, during a quiet moment (never while ConvertCAD starts; **on** by default; switch it off with Help > *Check for updates automatically*), and when you click *Updates* or Help > *Check for updates* | The GitHub API (`api.github.com`) | A normal web request; nothing about you or your drawings |
+| You click *Update and restart*: ConvertCAD downloads only the files that changed in the new version | GitHub (`github.com` and its file storage) | Normal download requests; nothing about you or your drawings |
 | You click *Feedback* | Your web browser opens the ConvertCAD form on Tally (`tally.so`) | Only what you type in the form, plus the ConvertCAD version, the operating system and the interface language written in the form address. Tally's own privacy policy applies to the form |
 
 The usage data that ONNX Runtime (the OCR engine) can send to Microsoft is

@@ -2,9 +2,40 @@
 
 All notable changes to ConvertCAD. Versions follow *major.minor.patch*.
 
-## [Unreleased]
+## [1.4.0] — 2026-11-10
+
+### Added
+- **List of all texts** (*Settings > Output > List of all texts*, command line
+  `--texts`): every text of the drawing — notes, paragraphs, dimension values, leader
+  notes, SHX and OCR texts — in `<name>_texts.csv` and `<name>_texts.txt` next to the
+  drawing, with its sheet, its position in the drawing and its position on the paper
+  sheet (mm from the top-left corner). To search the drawings or feed a search engine.
+  Saved with the drawing, layer edits applied.
+- **New update window** instead of the bar: *Later* or *Update and restart* (downloads
+  only the changed files, then ConvertCAD restarts), with a *What's new* link. The
+  automatic check (once a day) never runs while ConvertCAD starts: it waits for a quiet
+  moment, when nobody uses ConvertCAD and nothing is running. The *Updates* button (top
+  right) checks at any time.
+- **Dimensions checked with the drawing scale**: ConvertCAD measures each dimension and
+  compares its value with the scale the sheet shows (or the calibrated one). A value
+  that does not match is still rebuilt, but on the new layer **DIM_CHECK** (magenta), to
+  review; doubtful texts that do not match (a label, a count) stay texts.
+- **Any dimension end**: open arrows, outlined arrows, dots, crosses (X), and any shape
+  the sheet repeats at the ends of its dimension lines (squares…), learned from the
+  sheet. They are written with the matching AutoCAD arrow, or drawn inside the
+  dimension.
+- **Values written in several pieces**: metres with raised centimetres (3⁵⁰), stacked
+  fractions and tolerances (25 +0.1/−0.2), a value split in two texts. Dimension values
+  written with AutoCAD SHX fonts are recognised too.
+- **Dimensions that cannot be rebuilt stay together**: their value, line and arrows form
+  one group on layer DIM_RAW, so they move as one.
 
 ### Changed
+- Arrow and text sizes are judged locally: a large detail next to small dimensions no
+  longer hides them.
+- Rebar notes and counts (`5 HA12`, `4T16`, `2 P1`) are no longer taken as dimension
+  values.
+- The report counts the dimensions to check (DIM_CHECK) and the grouped ones.
 - **Dimension values read like in the PDF**: never upside down whatever the order in
   which the PDF draws the arrows, and horizontal when the PDF writes them horizontally on
   a vertical dimension. The dimension line is no longer cut under its value.
@@ -20,6 +51,8 @@ All notable changes to ConvertCAD. Versions follow *major.minor.patch*.
   ("fit to paper"); values with a label, count, brackets, tolerance or remark (`L=3500`,
   `2x1500`, `(3500)`, `3500 ±5`, `3500 (TYP.)`, `3500*`, `EQ`); feet-inches (`12'-6"`).
   A dimension line whose value is not recognised no longer becomes a leader.
+- Terms of use and privacy policy: the update check and the update download are
+  described as they work now.
 
 ## [1.3.0] — 2026-11-04
 

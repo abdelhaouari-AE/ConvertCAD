@@ -27,7 +27,9 @@ RESULT_ROWS = [
     ("Hatch patterns rebuilt", "pattern_hatches"),
     ("Dashed lines rebuilt", "dashed_lines"),
     ("Dash pieces merged", "dash_pieces_merged"),
-    ("Dimensions (true DIMENSION)", "dimensions"), ("Leaders", "leaders"),
+    ("Dimensions (true DIMENSION)", "dimensions"),
+    ("Dimensions to check (DIM_CHECK)", "dims_to_check"),
+    ("Dimensions grouped (DIM_RAW)", "dim_groups"), ("Leaders", "leaders"),
     ("Blocks defined", "blocks_defined"),
     ("Block references (INSERT)", "blocks_inserted"),
     ("Raster images", "images"),
@@ -50,6 +52,7 @@ class ConversionReport:
     pdf_path: str = ""
     dxf_path: str = ""                       # main output (first file)
     outputs: List[str] = field(default_factory=list)   # all DXF files
+    text_files: List[str] = field(default_factory=list)  # lists of texts
     pages_converted: List[int] = field(default_factory=list)
     pages_total: int = 0
     producer: str = ""
@@ -95,6 +98,7 @@ class ConversionReport:
         out += [f"  {k:<32}: {v}" for k, v in self.options.items()]
         out += [LINE, "OUTPUT"]
         out += [f"  {p}" for p in (self.outputs or [self.dxf_path])]
+        out += [f"  {p}" for p in self.text_files]
         out += [LINE, "RESULTS"]
         out += [f"  {label:<32}: {getattr(s, attr)}"
                 for label, attr in RESULT_ROWS]
@@ -120,8 +124,8 @@ class ConversionReport:
                 f"Duration : {self.duration_s:.1f} s", "",
                 "Engineering check: verify the scale on a known distance, "
                 "spot-check layer DIM",
-                "against the PDF and review layer DIM_RAW (measurement texts "
-                "not matched)."]
+                "against the PDF and review layers DIM_CHECK (dimensions to "
+                "check) and DIM_RAW (not matched)."]
         return "\n".join(out)
 
     def save(self, path: str) -> None:
@@ -170,7 +174,8 @@ class ConversionReport:
         warns = "".join(f"<li>{e(note(w))}</li>" for w in self.all_warnings())
         errs = "".join(f"<li>{e(note(x))}</li>" for x in self.errors)
         notes = "".join(f"<li>{e(note(n))}</li>" for n in self.page_notes)
-        outs = "<br>".join(e(p) for p in (self.outputs or [self.dxf_path]))
+        outs = "<br>".join(e(p) for p in (self.outputs or [self.dxf_path])
+                           + self.text_files)
         blocks = "".join(f"<li>{e(note(b))}</li>" for b in s.block_report)
         none = f"<div class='muted'>{e(t('none'))}</div>"
         css = (f"body{{color:{fg};font-size:10pt}} h2{{margin:2px 0 6px}}"
@@ -206,7 +211,7 @@ class ConversionReport:
                      + (f"<ul>{errs}</ul>" if errs else none))
         parts.append(h3("Options") + f"<table>{opts}</table>")
         footer = t("Verify the scale on a known distance, spot-check layer "
-                   "DIM and review layer DIM_RAW.")
+                   "DIM and review layers DIM_CHECK and DIM_RAW.")
         parts.append(f"<p class='muted' style='border-top:1px solid {bd};"
                      f"padding-top:6px'>{e(footer)}</p>")
         parts.append("</body></html>")

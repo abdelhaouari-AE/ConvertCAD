@@ -3,7 +3,7 @@
 **ConvertCAD {APP_VERSION}** — lea esto antes de usar la aplicación.
 
 ### 1. Procesamiento local
-Todas las conversiones se ejecutan en este ordenador. Ningún dibujo, archivo o dato se sube ni se envía a ningún sitio. La aplicación solo se conecta a internet cuando usted le pide descargar un idioma o un modelo del OCR (*Ajustes > Páginas escaneadas > Idiomas y modelos del OCR…*) — recibe entonces ese archivo — o buscar actualizaciones (*Ayuda > Buscar actualizaciones…*, o al iniciar si lo activó; desactivado por defecto) — lee entonces el número de la última versión. No envía nada más.
+Todas las conversiones se ejecutan en este ordenador. Ningún dibujo, archivo o dato se sube ni se envía a ningún sitio. La aplicación solo se conecta a internet cuando usted le pide descargar un idioma o un modelo del OCR (*Ajustes > Páginas escaneadas > Idiomas y modelos del OCR…*) — recibe entonces ese archivo — o buscar actualizaciones (*Ayuda > Buscar actualizaciones…*, el botón *Actualizaciones*, o una vez al día durante un momento tranquilo — activado por defecto, *Ayuda > Buscar actualizaciones automáticamente*) — lee entonces el número de la última versión — y, cuando usted hace clic en *Actualizar y reiniciar*, para descargar los archivos de la nueva versión. No envía nada más.
 
 ### 2. Su derecho a convertir
 Usted es responsable de tener derecho a convertir y editar los dibujos PDF que abre (contratos con clientes, cláusulas de confidencialidad, propiedad intelectual del autor original).

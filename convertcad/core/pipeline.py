@@ -20,7 +20,7 @@ import shutil
 import tempfile
 import time
 from dataclasses import asdict, replace
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Tuple
 
 from .annotations import reconstruct
 from .blocks import detect_blocks
@@ -80,8 +80,10 @@ def convert(pdf_path: str, out_path: str, opt: Optional[Options] = None,
 
 def _convert_dxf(pdf_path: str, dxf_path: str, opt: Options,
                  progress: Optional[ProgressFn],
-                 should_cancel: Optional[Callable[[], bool]]
-                 ) -> ConversionReport:
+                 should_cancel: Optional[Callable[[], bool]],
+                 defer_texts: bool = False) -> ConversionReport:
+    """DXF conversion. With `defer_texts` the list of texts is only
+    collected (rep.text_rows): the DWG conversion writes it."""
     t0 = time.time()
     rep = ConversionReport(pdf_path=pdf_path, dxf_path=dxf_path,
                            options=opt.describe())
@@ -188,7 +190,7 @@ def _convert_dxf(pdf_path: str, dxf_path: str, opt: Options,
                 if opt.ignore_white_fills:
                     masks = _drop_white(pd, rep)
 
-                page_scale = _page_scale(pd, opt, scale, rep)
+                page_scale, scale_known = _page_scale(pd, opt, scale, rep)
                 if k == 0 and page_scale != scale:     # linetype scale
                     writer.set_ltscale(effective_denominator(page_scale,
                                                              opt.units))
@@ -224,7 +226,18 @@ def _convert_dxf(pdf_path: str, dxf_path: str, opt: Options,
                 ann = reconstruct(rp, enable_dims=opt.dimensions,
                                   enable_leaders=opt.leaders,
                                   enable_ticks=opt.tick_dimensions,
-                                  units_per_pt=page_scale)
+                                  units_per_pt=page_scale, units=opt.units,
+                                  scale_known=scale_known)
+                if ann.to_review:
+                    rep.page_notes.append(
+                        f"Page {pno}: {ann.to_review} dimension(s) to check "
+                        f"on layer DIM_CHECK (value not confirmed by the "
+                        f"scale).")
+                if ann.groups:
+                    rep.page_notes.append(
+                        f"Page {pno}: {len(ann.groups)} dimension(s) not "
+                        f"rebuilt: grouped with their value on layer "
+                        f"DIM_RAW.")
 
                 step("detecting repeated symbols…", 0.7)
                 br = (detect_blocks(rp, opt.block_min_repeats,
@@ -246,10 +259,13 @@ def _convert_dxf(pdf_path: str, dxf_path: str, opt: Options,
                     writer.write_texts(pd.texts, ann.consumed_texts,
                                        {id(t) for t in ann.dim_raw_texts},
                                        tr, group_mtext=opt.group_mtext)
-                    if pd.shx_texts:
+                    shx = [t for t in pd.shx_texts
+                           if id(t) not in ann.consumed_texts]
+                    if shx:
                         sizes = [t.height for t in pd.texts] or [9.9]
-                        writer.write_shx_texts(pd.shx_texts, tr,
-                                               sorted(sizes)[len(sizes) // 2])
+                        writer.write_shx_texts(
+                            shx, tr, sorted(sizes)[len(sizes) // 2],
+                            {id(t) for t in ann.dim_raw_texts})
                         rep.page_notes.append(
                             f"Page {pno}: {len(pd.shx_texts)} AutoCAD SHX "
                             f"text(s) recovered on layer TEXT_SHX.")
@@ -288,6 +304,11 @@ def _convert_dxf(pdf_path: str, dxf_path: str, opt: Options,
     ok_pages = [p for p in rep.pages if p.kind != "error"]
     rep.success = (not rep.cancelled and bool(ok_pages)
                    and len(saved) == len(outputs))
+    if opt.export_texts and saved and not rep.cancelled:
+        rep.text_rows = _collect_texts(rep, writers, outputs, pdf_path)
+        if not defer_texts:
+            _write_text_lists(rep, rep.text_rows,
+                              os.path.splitext(dxf_path)[0], opt)
     rep.duration_s = time.time() - t0
     if opt.write_log and not rep.cancelled:
         try:
@@ -319,7 +340,7 @@ def _convert_to_dwg(pdf_path: str, dwg_path: str, opt: Options,
         rep = _convert_dxf(pdf_path, os.path.join(tmp, stem + ".dxf"), inner,
                            None if progress is None else
                            (lambda m, f: progress(m, f * 0.9)),
-                           should_cancel)
+                           should_cancel, defer_texts=True)
         rep.options = opt.describe()
         rep.source_options = opt
         rep.dxf_path = dwg_path
@@ -369,6 +390,14 @@ def _convert_to_dwg(pdf_path: str, dwg_path: str, opt: Options,
         rep.outputs = dwgs
         rep.success = len(dwgs) == len(output_paths(
             dwg_path, rep.pages_converted, opt.page_mode))
+        rows = getattr(rep, "text_rows", None)
+        if opt.export_texts and rows:
+            done = {os.path.basename(p) for p in dwgs}
+            for r in rows:                  # the DWG, or the DXF kept instead
+                name = os.path.splitext(r.drawing)[0] + ".dwg"
+                if name in done:
+                    r.drawing = name
+            _write_text_lists(rep, rows, os.path.join(final_dir, stem), opt)
         rep.duration_s = time.time() - t0
         if opt.write_log:
             try:
@@ -380,6 +409,32 @@ def _convert_to_dwg(pdf_path: str, dwg_path: str, opt: Options,
         return rep
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+def _collect_texts(rep: ConversionReport, writers: list, outputs: List[str],
+                   pdf_path: str) -> list:
+    """Every text of the drawings written (text_export.TextRow)."""
+    from .text_export import texts_of
+    rows: list = []
+    for i, w in enumerate(writers):
+        if i >= len(outputs) or not os.path.isfile(outputs[i]):
+            continue
+        pages = [p for p in rep.placements if p["file"] == i]
+        rows += texts_of(w.doc, pages, os.path.basename(outputs[i]),
+                         os.path.basename(pdf_path))
+    return rows
+
+
+def _write_text_lists(rep: ConversionReport, rows: list, base: str,
+                      opt: Options) -> None:
+    """<base>_texts.csv / .txt (Options.export_texts)."""
+    from .text_export import write_lists
+    try:
+        rep.text_files = write_lists(rows, base, opt.export_texts,
+                                     os.path.basename(rep.pdf_path),
+                                     opt.units)
+    except OSError as exc:
+        rep.warnings.append(f"Could not write the list of texts: {exc}")
 
 
 def _save(writer: DxfWriter, path: str, rep: ConversionReport) -> bool:
@@ -452,24 +507,28 @@ def _rebuild_notes(rp, pno: int, rep: ConversionReport) -> None:
 
 
 def _page_scale(pd: PageData, opt: Options, default: float,
-                rep: ConversionReport) -> float:
-    """Units per point for one sheet.
+                rep: ConversionReport) -> Tuple[float, bool]:
+    """Units per point for one sheet, and whether that scale is KNOWN
+    (calibrated, or read on the sheet) rather than the default one (the
+    dimension values are checked against a known scale only).
 
     With ``auto_scale`` (and no calibration) the scale written on the sheet
     ('Echelle : 1/100', 'SCALE 1:50', '2.5:1000'...) is used; when none or
     several different ones are written, the default scale is kept. The
     report says which scale each sheet received, so the user can check it.
     """
-    if not opt.auto_scale or opt.calibrated_units_per_pt > 0:
-        return default
+    if opt.calibrated_units_per_pt > 0:
+        return default, True
+    if not opt.auto_scale:
+        return default, False
     den = detect_scale("\n".join(t.text for t in pd.texts + pd.shx_texts))
     if den:
         rep.page_notes.append(f"Page {pd.number}: scale 1:{den:g} read on "
                               f"the sheet.")
-        return compute_scale(opt.units, den, 0.0)
+        return compute_scale(opt.units, den, 0.0), True
     rep.page_notes.append(f"Page {pd.number}: no single scale written on the "
                           f"sheet; 1:{opt.scale_denominator:g} used.")
-    return default
+    return default, False
 
 
 def _scanned_page(doc, pd: PageData, opt: Options, rep: ConversionReport,

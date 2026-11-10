@@ -1,10 +1,11 @@
 """
 updates.py — check whether a newer ConvertCAD exists.
 
-The check runs at most once a day at start-up (on by default; Help > Check
-for updates automatically) and whenever the user asks (Help > Check for
-updates…, or the Updates button). It makes ONE request to GitHub's public
-API for the list of ConvertCAD releases:
+The check runs at most once a day, never at start-up but during a quiet
+moment of the interface (on by default; Help > Check for updates
+automatically), and whenever the user asks (Help > Check for updates…, or
+the Updates button). It makes ONE request to GitHub's public API for the
+list of ConvertCAD releases:
   * nothing is sent — no drawing, no file name, no identifier; the request
     only says "ConvertCAD/<version>" (its User-Agent);
   * nothing is installed without the user's click: when a newer version

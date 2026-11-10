@@ -46,7 +46,7 @@ F3 switches snapping on or off.
 | Sand, concrete, gravel, earth, brick, insulation or dots drawn as many dashes and dots | One **HATCH** with the standard pattern (AR-SAND, AR-CONC, GRAVEL, EARTH, BRICK, INSUL, DOTS…) at the scale and angle measured on the PDF |
 | Text | **TEXT** in the PDF's font (Arial, Times New Roman, Courier New, Calibri…, bold and italic), size and length; stacked lines become one **MTEXT** paragraph, left-aligned, centred or right-aligned like the PDF |
 | AutoCAD SHX text drawn as strokes | Real **TEXT** on layer TEXT_SHX (the strokes are kept on the hidden layer TEXT_SHX_STROKES) |
-| Arrow + line + arrow + value | Real **DIMENSION** (layer DIM) — the value keeps the PDF text |
+| Arrow + line + arrow + value | Real **DIMENSION** (layer DIM) — the value keeps the PDF text. Any end: filled, open or outlined arrows, dots, crosses, or a shape the sheet repeats at its dimension ends (learned from the sheet) |
 | Oblique ticks + line + value | Real **DIMENSION** with architectural ticks |
 | Arrow on a circle or an arc + "R…" / "Ø…" value | Real **RADIUS** / **DIAMETER** dimension |
 | Two arrows on an arc + an angle ("45°") or an arc length | Real **ANGULAR** / **ARC LENGTH** dimension — only when the value agrees with the drawn arc |
@@ -55,7 +55,7 @@ F3 switches snapping on or off.
 | Scanned sheets | **LINE**, **CIRCLE** and **ARC** on layer TRACE_LINES, text read by OCR |
 | Embedded images, scans | Image on the locked layer IMG_RASTER |
 
-Measurement texts that matched no dimension are put on layer **DIM_RAW** (red) so you can review them. Nothing is invented: a pattern or a dimension is rebuilt only when it reproduces the PDF; otherwise its pieces are kept as they are. The arc length dimension is written as a true ARC_DIMENSION from DXF 2007; for older versions and DWG it is kept as its drawing on layer DIM.
+Each dimension is measured and its value compared with the drawing scale: a value that does not match is rebuilt on layer **DIM_CHECK** (magenta), to review. Measurement texts that matched no dimension are put on layer **DIM_RAW** (red); a dimension that could not be rebuilt keeps its value, line and arrows together, as one group on DIM_RAW. Nothing is invented: a pattern or a dimension is rebuilt only when it reproduces the PDF; otherwise its pieces are kept as they are. The arc length dimension is written as a true ARC_DIMENSION from DXF 2007; for older versions and DWG it is kept as its drawing on layer DIM.
 
 ## Settings explained
 
@@ -71,7 +71,7 @@ Measurement texts that matched no dimension are put on layer **DIM_RAW** (red) s
 
 **Scanned pages** — trace lines, circles and arcs; read text with OCR (PP-OCR models, on this computer); *OCR languages*: English, French… (Latin script, built in), another script (Arabic, Cyrillic, Greek…) or both for mixed drawings — only the installed ones are listed; *OCR accuracy*: Standard (built-in model) or Maximum (larger models, slower); **OCR languages and models…** downloads the other languages and the maximum accuracy models, or installs them from files on a computer without internet (see *Help > OCR guide*); scan resolution (200–600 dpi); use the PDF's own text layer when the scan is already searchable; keep raster images on a locked layer.
 
-**Output** — *file format*: DXF, or DWG (AutoCAD 2000 format: opens in every AutoCAD since 2000 and every current CAD program; written by the included GNU LibreDWG converter and checked after writing); DXF version (R2018 for current software, R12 for old CNC machines); with several sheets, one DXF with sheets side by side or one DXF per sheet; write a conversion log next to the DXF; open the folder after saving.
+**Output** — *file format*: DXF, or DWG (AutoCAD 2000 format: opens in every AutoCAD since 2000 and every current CAD program; written by the included GNU LibreDWG converter and checked after writing); DXF version (R2018 for current software, R12 for old CNC machines); with several sheets, one DXF with sheets side by side or one DXF per sheet; write a conversion log next to the DXF; *list of all texts* (.csv + .txt, see below); open the folder after saving.
 
 **Presets** — ready-made settings: Recommended, Architectural plans, Structural / formwork plans, Scanned archive drawings, Geometry only, CNC / laser. *Save as preset…* keeps your own combinations.
 
@@ -81,7 +81,7 @@ Measurement texts that matched no dimension are put on layer **DIM_RAW** (red) s
 
 ## Updates
 
-ConvertCAD asks GitHub, at most once a day when it starts, whether a newer version exists (switch this off with *Help > Check for updates automatically*); *Help > Check for updates…* or the *Updates* button ask at any time. Nothing about you or your drawings is sent. When a newer version exists, a bar under the toolbar offers it: *Update now* downloads only the files that changed (usually a few MB) and puts them in place when you restart or close ConvertCAD; if anything goes wrong, the previous files are kept. *Skip this version* hides it until the next one. On Linux, and for an installation for all users in Program Files, the bar offers the full download instead.
+Once a day, during a quiet moment — never while ConvertCAD starts, and never while you work or a conversion runs — ConvertCAD asks GitHub whether a newer version exists (switch this off with *Help > Check for updates automatically*); the *Updates* button (top right) or *Help > Check for updates…* ask at any time. Nothing about you or your drawings is sent. When a newer version exists, a window offers it, with a *What's new* link: *Update and restart* downloads only the files that changed (usually a few MB), then ConvertCAD restarts with the new version; if anything goes wrong, the previous files are kept. *Later* closes the window: the next daily check offers the version again. On Linux, and for an installation for all users in Program Files, the window offers the full download instead.
 
 ## Converting a whole folder
 
@@ -89,11 +89,15 @@ ConvertCAD asks GitHub, at most once a day when it starts, whether a newer versi
 
 The same conversions can be scripted with the console program *ConvertCAD-cli.exe* (next to ConvertCAD.exe) — type `ConvertCAD-cli --help` in a command prompt.
 
+## List of all texts
+
+With *Settings > Output > List of all texts* on, saving a drawing also writes `<name>_texts.csv` and `<name>_texts.txt` next to it: every text of the drawing (notes, paragraphs, dimension values, leader notes, SHX and OCR texts), sheet by sheet in reading order, with its position in the drawing (x, y in drawing units, as in CAD) and on the paper sheet (mm from the sheet's top-left corner). The .txt is for reading or for a search engine; the .csv (UTF-8, comma-separated: in Excel use *Data > From Text/CSV*) has the columns pdf, drawing, page, kind, layer, text, x, y, rotation, height, sheet_x_mm, sheet_y_mm. Layer edits made before saving are applied. Command line: `--texts` (or `--texts csv`, `--texts txt`).
+
 ## Engineering checklist after every conversion
 
 1. Measure a known distance in CAD to confirm the scale.
 2. Show only layer DIM and spot-check values against the PDF.
-3. Review layer DIM_RAW.
+3. Review layers DIM_CHECK (dimensions to check) and DIM_RAW.
 4. Read the warnings of the report.
 
 ## Troubleshooting

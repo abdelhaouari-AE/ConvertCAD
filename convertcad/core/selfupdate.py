@@ -32,7 +32,7 @@ running from the source code) the program offers the full download.
 Privacy: nothing about the user or the drawings is sent. The requests only
 download public files of the GitHub release ("User-Agent: ConvertCAD/<v>").
 
-This module never imports Qt: the interface (ui/update_bar.py), the
+This module never imports Qt: the interface (ui/update_dialog.py), the
 command line (cli.py: --check-update, --update) and the applier use it.
 """
 

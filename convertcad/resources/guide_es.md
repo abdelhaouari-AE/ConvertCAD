@@ -46,7 +46,7 @@ F3 activa o desactiva la referencia.
 | Arena, hormigón, grava, tierra, ladrillo, aislante o puntos dibujados como muchos trazos y puntos | Un **HATCH** con el patrón estándar (AR-SAND, AR-CONC, GRAVEL, EARTH, BRICK, INSUL, DOTS…) a la escala y con el ángulo medidos en el PDF |
 | Texto | **TEXT** con la fuente del PDF (Arial, Times New Roman, Courier New, Calibri…, negrita y cursiva), su tamaño y su longitud; las líneas apiladas forman un párrafo **MTEXT**, alineado a la izquierda, centrado o a la derecha como en el PDF |
 | Texto SHX de AutoCAD dibujado como trazos | **TEXT** real en la capa TEXT_SHX (los trazos se conservan en la capa oculta TEXT_SHX_STROKES) |
-| Flecha + línea + flecha + valor | **DIMENSION** verdadera (capa DIM) — el valor conserva el texto del PDF |
+| Flecha + línea + flecha + valor | **DIMENSION** verdadera (capa DIM) — el valor conserva el texto del PDF. Cualquier extremo: flechas rellenas, abiertas o vacías, puntos, cruces, o una forma que la hoja repite en los extremos de sus cotas (aprendida de la hoja) |
 | Trazos oblicuos + línea + valor | **DIMENSION** verdadera con trazos arquitectónicos |
 | Flecha sobre un círculo o un arco + valor «R…» / «Ø…» | Cota verdadera de **RADIO** / **DIÁMETRO** |
 | Dos flechas sobre un arco + un ángulo («45°») o una longitud de arco | Cota verdadera **ANGULAR** / de **LONGITUD DE ARCO** — solo cuando el valor coincide con el arco dibujado |
@@ -55,7 +55,7 @@ F3 activa o desactiva la referencia.
 | Hojas escaneadas | **LINE**, **CIRCLE** y **ARC** en la capa TRACE_LINES, texto leído con OCR |
 | Imágenes incrustadas, escaneos | Imagen en la capa bloqueada IMG_RASTER |
 
-Los textos de medida que no corresponden a ninguna cota se colocan en la capa **DIM_RAW** (roja) para que pueda revisarlos. No se inventa nada: un patrón o una cota solo se reconstruye cuando reproduce el PDF; si no, sus piezas se conservan tal cual. La cota de longitud de arco se escribe como ARC_DIMENSION verdadera a partir del DXF 2007; en las versiones anteriores y en DWG se conserva como su dibujo en la capa DIM.
+Cada cota se mide y su valor se compara con la escala del dibujo: un valor que no coincide se reconstruye en la capa **DIM_CHECK** (magenta), para revisarlo. Los textos de medida que no corresponden a ninguna cota se colocan en la capa **DIM_RAW** (roja); una cota que no se pudo reconstruir mantiene juntos su valor, su línea y sus flechas, en un grupo en DIM_RAW. No se inventa nada: un patrón o una cota solo se reconstruye cuando reproduce el PDF; si no, sus piezas se conservan tal cual. La cota de longitud de arco se escribe como ARC_DIMENSION verdadera a partir del DXF 2007; en las versiones anteriores y en DWG se conserva como su dibujo en la capa DIM.
 
 ## Los ajustes
 
@@ -71,7 +71,7 @@ Los textos de medida que no corresponden a ninguna cota se colocan en la capa **
 
 **Páginas escaneadas** — vectorizar líneas, círculos y arcos; leer el texto con OCR (modelos PP-OCR, en este ordenador); *idiomas del OCR*: inglés, francés… (alfabeto latino, integrado), otro alfabeto (árabe, cirílico, griego…) o ambos para los dibujos mixtos — solo se muestran los instalados; *precisión del OCR*: Estándar (modelo integrado) o Máxima (modelos más grandes, más lentos); **Idiomas y modelos del OCR…** descarga los demás idiomas y los modelos de precisión máxima, o los instala desde archivos en un ordenador sin internet (véase *Ayuda > Guía del OCR*); resolución de escaneo (200–600 ppp); usar la capa de texto del PDF cuando el escaneo ya permite buscar texto; conservar las imágenes ráster en una capa bloqueada.
 
-**Salida** — *formato de archivo*: DXF, o DWG (formato AutoCAD 2000: se abre en todos los AutoCAD desde 2000 y en todos los programas CAD actuales; lo escribe el conversor GNU LibreDWG incluido y se comprueba tras escribirlo); versión DXF (R2018 para los programas actuales, R12 para máquinas CNC antiguas); con varias hojas, un DXF con las hojas una al lado de otra o un DXF por hoja; escribir un registro de conversión junto al DXF; abrir la carpeta después de guardar.
+**Salida** — *formato de archivo*: DXF, o DWG (formato AutoCAD 2000: se abre en todos los AutoCAD desde 2000 y en todos los programas CAD actuales; lo escribe el conversor GNU LibreDWG incluido y se comprueba tras escribirlo); versión DXF (R2018 para los programas actuales, R12 para máquinas CNC antiguas); con varias hojas, un DXF con las hojas una al lado de otra o un DXF por hoja; escribir un registro de conversión junto al DXF; *lista de todos los textos* (.csv + .txt, ver más abajo); abrir la carpeta después de guardar.
 
 **Perfiles** — ajustes listos para usar: Recomendado, Planos de arquitectura, Planos de estructura / encofrado, Planos escaneados de archivo, Solo geometría, CNC / láser. *Guardar como perfil…* conserva sus propias combinaciones.
 
@@ -81,7 +81,7 @@ Los textos de medida que no corresponden a ninguna cota se colocan en la capa **
 
 ## Actualizaciones
 
-ConvertCAD pregunta a GitHub, como mucho una vez al día al iniciarse, si existe una versión más reciente (se desactiva con *Ayuda > Buscar actualizaciones automáticamente*); *Ayuda > Buscar actualizaciones…* o el botón *Actualizaciones* lo preguntan en cualquier momento. No se envía nada sobre usted ni sobre sus planos. Cuando existe una versión más reciente, una barra bajo la barra de herramientas la ofrece: *Actualizar ahora* descarga solo los archivos modificados (normalmente unos pocos MB) y los coloca al reiniciar o cerrar ConvertCAD; si algo falla, se conservan los archivos anteriores. *Omitir esta versión* la oculta hasta la siguiente. En Linux, y en una instalación para todos los usuarios en Program Files, la barra ofrece la descarga completa.
+Una vez al día, durante un momento tranquilo — nunca al iniciarse ConvertCAD, ni mientras usted trabaja o una conversión está en curso — ConvertCAD pregunta a GitHub si existe una versión más reciente (se desactiva con *Ayuda > Buscar actualizaciones automáticamente*); el botón *Actualizaciones* (arriba a la derecha) o *Ayuda > Buscar actualizaciones…* lo preguntan en cualquier momento. No se envía nada sobre usted ni sobre sus planos. Cuando existe una versión más reciente, una ventana la ofrece, con un enlace *Novedades*: *Actualizar y reiniciar* descarga solo los archivos modificados (normalmente unos pocos MB) y ConvertCAD se reinicia con la nueva versión; si algo falla, se conservan los archivos anteriores. *Más tarde* cierra la ventana: la comprobación del día siguiente volverá a ofrecer la versión. En Linux, y en una instalación para todos los usuarios en Program Files, la ventana ofrece la descarga completa.
 
 ## Convertir una carpeta entera
 
@@ -89,11 +89,15 @@ ConvertCAD pregunta a GitHub, como mucho una vez al día al iniciarse, si existe
 
 Las mismas conversiones pueden automatizarse con el programa de consola *ConvertCAD-cli.exe* (junto a ConvertCAD.exe) — escriba `ConvertCAD-cli --help` en un símbolo del sistema.
 
+## Lista de todos los textos
+
+Con *Ajustes > Salida > Lista de todos los textos* activado, al guardar un dibujo se escriben también `<nombre>_texts.csv` y `<nombre>_texts.txt` a su lado: cada texto del dibujo (notas, párrafos, valores de cotas, notas de las directrices, textos SHX y OCR), hoja por hoja en orden de lectura, con su posición en el dibujo (x, y en unidades del dibujo, como en CAD) y en la hoja de papel (mm desde la esquina superior izquierda de la hoja). El .txt sirve para leer o para un motor de búsqueda; el .csv (UTF-8, separado por comas: en Excel use *Datos > Desde el texto/CSV*) tiene las columnas pdf, drawing, page, kind, layer, text, x, y, rotation, height, sheet_x_mm, sheet_y_mm. Se aplican los cambios de capas hechos antes de guardar. En la línea de comandos: `--texts` (o `--texts csv`, `--texts txt`).
+
 ## Comprobaciones tras cada conversión
 
 1. Mida una distancia conocida en CAD para confirmar la escala.
 2. Muestre solo la capa DIM y compare algunos valores con el PDF.
-3. Revise la capa DIM_RAW.
+3. Revise las capas DIM_CHECK (cotas por revisar) y DIM_RAW.
 4. Lea las advertencias del informe.
 
 ## Solución de problemas

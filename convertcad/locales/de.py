@@ -219,8 +219,6 @@ STRINGS = {
         "Bemaßungen mit Schrägstrichen",
     "Leaders (arrow + note)":
         "Führungslinien (Pfeil + Notiz)",
-    "Values always keep the original PDF text. Unmatched values go to layer DIM_RAW for review.":
-        "Werte behalten immer den ursprünglichen PDF-Text. Nicht zugeordnete Werte kommen zur Prüfung auf den Layer DIM_RAW.",
     "Layers and blocks":
         "Layer und Blöcke",
     "Keep the PDF's own layers":
@@ -621,8 +619,6 @@ STRINGS = {
         "von",
     "unknown producer":
         "unbekannter Hersteller",
-    "Verify the scale on a known distance, spot-check layer DIM and review layer DIM_RAW.":
-        "Prüfen Sie den Maßstab an einem bekannten Abstand, kontrollieren Sie stichprobenartig den Layer DIM und prüfen Sie den Layer DIM_RAW.",
     "Lines":
         "Linien",
     "Polylines":
@@ -969,8 +965,6 @@ STRINGS = {
         "ConvertCAD ist aktuell ({v}).",
     "ConvertCAD {v} is available.":
         "ConvertCAD {v} ist verfügbar.",
-    "ConvertCAD {v} is available (this one is {c}).":
-        "ConvertCAD {v} ist verfügbar (diese ist {c}).",
     "Nothing is installed automatically: download it from its release page.":
         "Nichts wird automatisch installiert: laden Sie sie von ihrer Veröffentlichungsseite herunter.",
     "Open the release page":
@@ -1105,10 +1099,6 @@ STRINGS = {
         'Einmal täglich bei GitHub nachfragen, ob es eine neuere Version gibt (nichts über Sie oder Ihre Zeichnungen wird gesendet)',
     "What's new":
         'Neuigkeiten',
-    'Update now':
-        'Jetzt aktualisieren',
-    'Skip this version':
-        'Diese Version überspringen',
     'Checking which files changed…':
         'Geänderte Dateien werden ermittelt…',
     'Downloading the update: {done} / {total} MB':
@@ -1117,10 +1107,6 @@ STRINGS = {
         'ConvertCAD {v} ist bereit zur Installation: {size} MB statt {full} MB heruntergeladen.',
     'ConvertCAD {v} is ready to install.':
         'ConvertCAD {v} ist bereit zur Installation.',
-    'Restart now':
-        'Jetzt neu starten',
-    'When I close ConvertCAD':
-        'Beim Schließen von ConvertCAD',
     'ConvertCAD was updated to {v}.':
         'ConvertCAD wurde auf Version {v} aktualisiert.',
     'The update could not be installed: {e}':
@@ -1131,4 +1117,32 @@ STRINGS = {
         'Das Update wird beim Schließen von ConvertCAD installiert.',
     'Update cancelled.':
         'Update abgebrochen.',
+    "Values always keep the original PDF text. Dimensions to check go to layer DIM_CHECK, unmatched values to layer DIM_RAW.":
+        "Werte behalten immer den ursprünglichen PDF-Text. Zu prüfende Bemaßungen kommen auf den Layer DIM_CHECK, nicht zugeordnete Werte auf den Layer DIM_RAW.",
+    "Verify the scale on a known distance, spot-check layer DIM and review layers DIM_CHECK and DIM_RAW.":
+        "Prüfen Sie den Maßstab an einem bekannten Abstand, kontrollieren Sie stichprobenartig den Layer DIM und prüfen Sie die Layer DIM_CHECK und DIM_RAW.",
+    "Dimensions to check (DIM_CHECK)":
+        "Zu prüfende Bemaßungen (DIM_CHECK)",
+    "Dimensions grouped (DIM_RAW)":
+        "Gruppierte Bemaßungen (DIM_RAW)",
+    "{n} dimension(s) to check on layer DIM_CHECK (value not confirmed by the scale).":
+        "{n} Bemaßung(en) auf Layer DIM_CHECK zu prüfen (Wert nicht durch den Maßstab bestätigt).",
+    "{n} dimension(s) not rebuilt: grouped with their value on layer DIM_RAW.":
+        "{n} Bemaßung(en) nicht wiederhergestellt: mit ihrem Wert auf Layer DIM_RAW gruppiert.",
+    "List of all texts (.csv + .txt)":
+        "Liste aller Texte (.csv + .txt)",
+    "Every text with its sheet and its position, saved next to the drawing: to search the drawings or feed a search engine.":
+        "Jeder Text mit seinem Blatt und seiner Position, neben der Zeichnung gespeichert: um die Zeichnungen zu durchsuchen oder eine Suchmaschine zu speisen.",
+    "List of texts":
+        "Liste der Texte",
+    "Update available":
+        "Update verfügbar",
+    "ConvertCAD {v} is available":
+        "ConvertCAD {v} ist verfügbar",
+    "This one is {c}.":
+        "Aktuelle Version: {c}.",
+    "Update and restart":
+        "Aktualisieren und neu starten",
+    "Restarting ConvertCAD…":
+        "ConvertCAD wird neu gestartet…",
 }

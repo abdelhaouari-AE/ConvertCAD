@@ -1,10 +1,10 @@
 # ConvertCAD — Development guide
 
-Complete technical description of **ConvertCAD 1.3.0**: the programming language and
+Complete technical description of **ConvertCAD 1.4.0**: the programming language and
 tools, the architecture and data flow, the content of every file, the algorithms, the
 options, the tests, the build and release process, and how to extend the application.
 
-*Author: abdelhaouari · Last update: 4 November 2026 · Applies to version 1.3.0*
+*Author: abdelhaouari · Last update: 10 November 2026 · Applies to version 1.4.0*
 
 How to build the downloads (portable, installer, AppImage, .deb) and sign them:
 [PACKAGING.md](PACKAGING.md).
@@ -350,17 +350,20 @@ ConvertCAD/
 | `patterns.py` | What CAD plotters explode: `merge_dashed_lines()` (collinear pieces with a regular rhythm → one line with a measured linetype: DASHED, CENTER, DASHDOT, PHANTOM, DOT, DIVIDE), `detect_hatch_patterns()` (families of parallel, regularly spaced lines → `HatchPattern` with angle, spacing, boundary and holes; crossing grids), `add_mask_holes()` (white masks under texts become holes); tolerances in `PTol`. |
 | `textures.py` | Texture hatches exploded by plotters (dots, sand, concrete, gravel, earth, brick, insulation): groups of dashes and dots compared with the standard patterns `TEXTURES` (scale from dash lengths or dot spacing, angle from directions, origin by vote), the pattern drawn again with ezdxf and kept only when it reproduces the PDF (§5.17); `TextureHatch`, `snap_boundaries()`. |
 | `layers.py` | **Step 3.** Layer naming rules: native PDF layer names, role layers, style fingerprints (`GEO_BLACK_050_CENTER`), readable colour names (HSV), lineweight mapping, name sanitising. |
-| `annotations.py` | **Step 4.** Recognises dimensions — radius and diameter (arrow on a circle along its radius + R/Ø value), angle and arc length (two arrows along an arc + a value that agrees with it), linear (arrowheads or oblique ticks + line + value, extension lines) — and leaders (arrow + polyline + note); safe fallback to `DIM_RAW`; tolerances in `ATol`. |
+| `annotations.py` | **Step 4.** Recognises dimensions — radius and diameter (arrow on a circle along its radius + R/Ø value), angle and arc length (two arrows along an arc + a value that agrees with it), linear (two terminators or oblique ticks + line + value, extension lines; global assignment checked against the drawing scale), terminators learned from the sheet — and leaders (arrow + polyline + note); fallback groups and `DIM_RAW`; tolerances in `ATol` (§5.6). |
+| `terminators.py` | Ends of dimension lines and leaders: filled arrows, open (V) and outlined arrows, X crossings, dots (`Arrowhead`, `cad_arrow()` → AutoCAD arrow block), shapes compared on a 7 × 7 grid for the learned terminators (`end_shape`, `similar`); tolerances in `TTol`. |
+| `dimvalues.py` | Dimension values: patterns (`DIM_TEXT_RE`, `DIM_VALUE_RE`), `is_plain()` / `is_value()`, `value_number()` (number and family, metric or imperial), values written in several texts (`combine_split_values` → `CompositeText` with its MTEXT), `ScaleVotes` (the scale the dimensions of a sheet agree on). |
 | `blocks.py` | **Step 5.** Clusters touching entities per layer (long lines cut into chunks, long elements excluded), computes fingerprints in the 8 orientations of a square (rotations by 90° and mirror images, `D4`), turns symbols repeated ≥ N times into block definitions + insertions with rotation / mirror (`insert_orientation()`); copies turned by any other angle matched by their key points (`_turned_copies`); tolerances in `BTol`. |
 | `dxf_writer.py` | **Step 6.** `DxfWriter`: document setup (units, linetypes, text style, `$LTSCALE`), layers (hidden ones off), colours (ACI / true colour, ByLayer), polylines, arcs, circles, exact splines, solid and pattern hatches (`_USER` pattern with the measured angle and spacing), measured linetypes `CC_<FAMILY>_<n>`, images (exact placement and orientation), TEXT/MTEXT in the PDF's font (one text style per font, capital height of that font, width factor keeping the PDF length, paragraphs left / centre / right aligned), SHX texts, rotated linear, radius, diameter, 3-point angular and arc-length DIMENSIONs with text override (ARC_DIMENSION exploded to its drawing before AutoCAD 2007 and for DWG), standard pattern HATCHes (textures) with the measured scale, angle and origin, MULTILEADER with multi-line notes (LEADER + MTEXT on old versions), rotated / mirrored block inserts, R12 fallbacks; `Transform` (page → DXF). |
 | `fonts.py` | Which CAD text style shows a PDF text like the original: `resolve()` maps the PDF font name and flags to a `CadFont` (Windows TrueType file, bold / italic file, capital height ratio, base font for widths); `natural_width()`, `width_factor()` (keeps the PDF length). |
 | `pipeline.py` | Orchestration: `convert()` (never raises; progress and cancel callbacks; `.dwg` targets through `_convert_to_dwg`), area clipping, white strokes and masks, per-sheet scale, scanned-page handling, sheet placements for the overlay, output names (`_p2` suffixes in split mode), `convert_folder()` for batch mode. |
 | `dwg.py` | Native DWG output: finds the bundled LibreDWG programs, prepares the DXF for LibreDWG's reader (post-2000 objects removed, MTEXT rotation, AutoCAD's handle numbering, linetype count, complete INSERT scale factors, group 16 of 3-point angular dimensions removed; the file is read and written byte for byte in latin-1, because ezdxf writes a DXF 2000 in the drawing code page cp1252 — reading it as UTF-8 turned accents into "?"), runs `dxf2dwg`, reads the DWG back with `dwg2dxf` and checks entity count and block references (§5.15). |
 | `report.py` | `ConversionReport`: inputs, options, results per entity type, layers (with block-internal counts), blocks, page notes, warnings, errors, status, duration; rendered as text (`_log.txt`, English), HTML (interface: options, page notes and blocks translated through `t` and `note`) and JSON. |
-| `postprocess.py` | After conversion: `layer_summary()` (rows of the layer table), `apply_layer_edits()` (remove / rename-merge / recolour), `finalize()` (copy to the final path with edits, images and log), `finalize_dwg()` (same, saved as DWG), `needs_reconversion_for_dwg()`, `describe_edits()`. |
+| `postprocess.py` | After conversion: `layer_summary()` (rows of the layer table), `apply_layer_edits()` (remove / rename-merge / recolour), `finalize()` (copy to the final path with edits, images and log; the texts of the saved drawing for the list of texts), `finalize_dwg()` (same, saved as DWG), `needs_reconversion_for_dwg()`, `describe_edits()`. |
+| `text_export.py` | List of all texts (§5.20): `texts_of()` reads every text of a DXF document with its sheet and positions, `reading_order()`, `write_lists()` → `<name>_texts.csv` / `.txt`. Standard library at import. |
 | `presets.py` | Six built-in presets (recommended, architectural, structural, scanned, geometry, CNC) and the functions that apply or store presets without touching drawing-specific values. |
 | `jobs.py` | `JobRunner`: runs `convert` / `convert_folder` in a child process and relays progress, results, errors and cancellation through a queue (§3.2). |
-| `updates.py` | Update check (on by default, at most once a day, and on request): one request to GitHub's public API for the releases, nothing sent; `check()` returns `UpdateInfo` (newest version, release page, release files `assets`), `newest_release()` (the OCR models release is skipped), `is_newer()`, `UpdateError` (§5.18). |
+| `updates.py` | Update check (on by default, at most once a day during a quiet moment, and on request): one request to GitHub's public API for the releases, nothing sent; `check()` returns `UpdateInfo` (newest version, release page, release files `assets`), `newest_release()` (the OCR models release is skipped), `is_newer()`, `UpdateError` (§5.18). |
 | `selfupdate.py` | Per-file updates (§5.19): list of files of a build (`write_manifest`), partial reading of the release zip by HTTP range requests (`prepare`, `download`), swap with rollback (`apply_pending`), clean-up of replaced files (`cleanup_old`), the applier process (`run_applier`, `--apply-update`), kind of installation (`install_kind`, `can_update_files`). No Qt. |
 | `licensing.py` | Licence hook: `check_license()` (called before every conversion) and `license_summary()` (About box). Always permissive; replacing this file adds licence management without touching anything else. |
 
@@ -370,7 +373,7 @@ ConvertCAD/
 |---|---|
 | `__init__.py` | Package docstring. |
 | `app.py` | `run_gui()`: Qt application, high-DPI policy (fractional scaling passed through), Fusion style + theme, language (right-to-left layout for Arabic), app icon, logging to `convertcad.log`, global exception dialog, first-launch Terms gate, main window; `_warm_up()` loads the heavy libraries in a background thread once the window is shown; `CONVERTCAD_STARTUP_PROBE=1` prints the start-up time. |
-| `main_window.py` | `MainWindow`: actions and shortcuts, menus, command bar, layout (sheets / viewers + activity / settings-layers-report tabs), status bar, open / inspect / hints, tools (measure, calibrate, select area), calibration and measurement, conversion through `JobRunner`, result loading, overlay check (PDF under the result, opacity slider), stale-options notice, saving DXF or DWG in a background thread (`_SaveThread`), batch, theme and language switching (*View > Language*, five languages), entity selection in the result (status text, layer selected), optional update check (`_UpdateThread`, Help menu), tool labels dropped when they do not fit (`_fit_toolbar`), drag & drop, recent files, window state, close handling; collapsible side panels (`SidePanel`, View > Panels, Ctrl+0 collapses both, state saved), *Convert a folder* next to *Open PDF*. |
+| `main_window.py` | `MainWindow`: actions and shortcuts, menus, command bar, layout (sheets / viewers + activity / settings-layers-report tabs), status bar, open / inspect / hints, tools (measure, calibrate, select area), calibration and measurement, conversion through `JobRunner`, result loading, overlay check (PDF under the result, opacity slider), stale-options notice, saving DXF or DWG in a background thread (`_SaveThread`), batch, theme and language switching (*View > Language*, five languages), entity selection in the result (status text, layer selected), update check during quiet moments and on request (`_UpdateThread`, `_on_idle_tick`, update window, Help menu), tool labels dropped when they do not fit (`_fit_toolbar`), drag & drop, recent files, window state, close handling; collapsible side panels (`SidePanel`, View > Panels, Ctrl+0 collapses both, state saved), *Convert a folder* next to *Open PDF*. |
 | `cadview.py` | `CadView`, base class of both viewers (always left to right, even in Arabic): CAD navigation (wheel zoom at cursor, middle-button / Space / Pan-tool drag), fit, zoom limits, `view_changed` and `zoom_changed` signals. |
 | `pdf_view.py` | `PdfView`: source sheet on a "drafting table" with shadow; sharp at any zoom (base image + high-resolution tile of the visible area); Measure, Calibrate and Select-area tools (area: drag a rectangle, outside dimmed, size label, Esc cancels); snap glyphs and labels; crosshair; measurements drawn as dimension lines with ticks; calibration overlay; `format_length()`. |
 | `dxf_view.py` | `DxfView`: renders the converted DXF with ezdxf's drawing add-on in a background `QThread` (`Recorder`); `merge_recording()` merges the primitives into one `QGraphicsPathItem` per layer set, colour, width, kind and tile (8 × 8), with cosmetic pens — a few hundred items instead of tens of thousands; hiding a layer stays instant; overlay of the PDF sheets (`set_overlay`, `set_overlay_opacity`); AutoCAD-like model space in both themes (RGB 33 40 48) with an adaptive grid drawn in `drawBackground` — lines every 1, 2 or 5 × 10^k units at least 14 px apart, a major line every 5, X / Y axes in red / green; **selection**: a pick index built after the preview is shown (`build_pick_index`, `PickIndex.pick`: nearest stroke within 5 screen px, else the smallest filled area under the cursor), highlight, `selected` signal with `describe_entity()` (type, layer, length, radius, text, block…). |
@@ -384,6 +387,7 @@ ConvertCAD/
 | `empty_state.py` | Welcome screen: drop zone, *Open PDF…*, *Try the sample plan*, recent drawings, the four workflow steps. |
 | `dialogs.py` | `MarkdownDialog` (renders `resources/*.md`), `GuideDialog`, `TermsDialog` (first-launch gate), `AboutDialog` (component versions including RapidOCR, ONNX Runtime, the installed OCR models and LibreDWG, licence status), `ShortcutsDialog`, `CalibrateDialog` (real distance input with validation). |
 | `ocr_models_dialog.py` | `OcrModelsDialog` (*OCR languages and models…*): installed models (built in / downloaded / included) with *Remove*, drop-down list of the models to download with their size, *Download* with progress bar and *Cancel* (`DownloadWorker`, a `QThread`), *Install from file…* (offline computers), models folder, download page, help; `models_changed` signal; `stop_downloads()` at exit. |
+| `update_dialog.py` | `UpdateDialog` (new version: *Later*, *Update and restart* or *Download*, *What's new* link; download progress and *Cancel*; `action` tells the main window what to do), `PatchThread` (downloads the changed files, §5.19), `IdleWatcher` (seconds since the last input, for the quiet moments). |
 | `batch_dialog.py` | `BatchDialog`: input / output folders, sub-folders, *read the scale on each sheet*, per-file status and time, progress, cancel, open output folder. |
 | `widgets.py` | Reusable pieces: `PanelHeader` (title + small actions), `CollapsibleSection`, `Toast` (fading message), `small_button`, `label`, `hline`, `restyle`, `ask_yes_no()` / `yes_no_box()` (Yes / No in the interface language). |
 | `theme.py` | Colour tokens for the dark and light themes, fixed markup palette, fonts, Qt palette and the complete style sheet; `apply_theme()`, `tok()`, `current()`. |
@@ -412,6 +416,8 @@ folder is bundled into the exe by `ConvertCAD.spec`.
 | `test_geometry.py` | Arc and circle fitting, arc merging, exact splines, polylines, duplicates, curve precision. |
 | `test_annotations.py` | Arrow and tick dimensions, extension lines, leaders (text left or right), grid bubbles not taken as values, `DIM_RAW` fallback; radius, diameter, angle and arc length dimensions (values that disagree with the drawing are not rebuilt), written in R2018, R12 and DWG. |
 | `test_annotation_quality.py` | Dimensions and leaders drawn like CAD plots, compared with the same PDF converted without them: large arrows and sheets printed larger, values with labels / remarks and feet-inches, no leader along a dimension line, no duplicate line under a chain; value direction whatever the drawing order, horizontal values on vertical dimensions, arrow / tick / extension sizes measured, no extension line where the PDF has none; MULTILEADER drawn on the PDF lines with the note at its place (landing at mid-height, note on the left, underline, no landing, rotated note). |
+| `test_dimension_learning.py` | What counts as a value (rebar notes and counts do not), the number it gives, the scale check (modulo powers of ten); doubtful values checked against the scale, a value against it rebuilt on `DIM_CHECK`; open / outlined arrows and dots (with the matching AutoCAD arrow), squares learned from the sheet (drawn inside the dimension), an X between two open arrows; split values (3⁵⁰, stacked tolerance, two texts); local sizes; an SHX value as dimension text; a dimension that cannot be rebuilt grouped on `DIM_RAW`. |
+| `test_text_export.py` | The list of texts: kinds, layers, positions in the drawing and on the sheet, reading order, `.txt` lines; formats and option off; several sheets (side by side and one file per sheet); layer edits applied at save time; `--texts`; next to a DWG; stacked values read as written. |
 | `test_textures.py` | Texture hatches recognised exactly (dots, gravel, earth, brick, insulation — scale, angle, pieces replaced), sand on its statistics, text and tile grids left alone, HATCH written with the drawn boundary, R12 keeps the lines, option off. |
 | `test_blocks.py` | Repeated symbols become blocks; walls do not glue symbols; sample plan: doors ×3, columns ×20; rotated and mirrored copies (all 8 orientations) give exactly the drawn lines once the INSERTs are exploded; copies turned by any angle (and mirrored) become one block with the right rotations. |
 | `test_writer.py` | Every DXF version, scale and units, ACI mapping, ByLayer, dimension angles, R12 fallbacks. |
@@ -425,7 +431,7 @@ folder is bundled into the exe by `ConvertCAD.spec`.
 | `test_units_and_report.py` | Imperial scales read (1/4" = 1'-0", 1" = 20'…), inch / foot factors, imperial DXF header; the report's options, unit names and message shapes translated in every language; the log stays English. |
 | `test_updates.py` | Version comparison, the check is on by default, one request with nothing about the user, the newest program release chosen (OCR models release, drafts and pre-releases skipped), release files listed, failures reported. |
 | `test_selfupdate.py` | Per-file updates over a local range-only web server: list of files, only changed files downloaded, swap, removed files, clean-up, rollback when a file is locked, damaged download refused, cancel, other system refused, kinds of installation. |
-| `test_ui_smoke.py` | The real window offscreen: open the sample, convert in the child process, edit layers, save through the real save code, switch theme twice; side panels collapse and reopen (bar, menu, Ctrl+0), Yes / No in French, *Convert a folder* next to *Open PDF*; select an area, convert, overlay on / off, save as DWG (with the automatic re-conversion); OCR languages list and status, *OCR languages and models…* window; selecting an entity in the result (layer selected, hidden layer clears the selection). |
+| `test_ui_smoke.py` | The real window offscreen: open the sample, convert in the child process, edit layers, save through the real save code (with the list of texts, layer edits applied), switch theme twice; update window offered during a quiet moment only (no check at start-up, not while a conversion runs), its buttons, progress and results; side panels collapse and reopen (bar, menu, Ctrl+0), Yes / No in French, *Convert a folder* next to *Open PDF*; select an area, convert, overlay on / off, save as DWG (with the automatic re-conversion); OCR languages list and status, *OCR languages and models…* window; selecting an entity in the result (layer selected, hidden layer clears the selection). |
 
 ### 4.7 `scripts/`
 
@@ -592,38 +598,74 @@ fingerprint according to `layer_mode`:
 Colour names come from HSV (`BLACK`, `DKGRAY`, `RED`, `DKGREEN`, `CYAN`…). Lineweights snap
 to the nearest DXF lineweight enum. Names are sanitised for AutoCAD (`<>/\":;?*|=` removed).
 
-### 5.6 Step 4 — `annotations.py`
+### 5.6 Step 4 — `annotations.py` (+ `terminators.py`, `dimvalues.py`)
 
-**Sizes follow the drawing.** The usual font size of the values (`_Context.size`, median
-of the dimension values, or of all texts when there are fewer than 3) sets the scale of
-the size limits: on a drawing whose values are larger than `REF_SIZE` (10 pt, i.e. 2.5 mm
-letters) — larger arrows, or a sheet printed larger ("fit to paper") — the largest arrow
-(`ARROW_REL_AREA` × size², never less than `ARROW_MAX_AREA`), the longest tick
-(`TICK_MAX_LEN` × k) and the note distance of leaders (`LEADER_TEXT` × k) grow in
-proportion; they never shrink below the fixed values.
+Three modules: `terminators.py` finds the **ends** of dimension lines and leaders,
+`dimvalues.py` knows what a **value** is (patterns, the number it gives, values written in
+several texts, the scale check), `annotations.py` puts them together (`reconstruct()`):
+radius / diameter, angle / arc length, linear dimensions, chain lines, dimensions learned
+from the sheet, leaders, fallback groups, then `DIM_RAW`.
 
-**Values** (`DIM_VALUE_RE`): plain measurements (`DIM_TEXT_RE`: `3500`, `3 500`, `3,50`,
-`R25`, `Ø60`, `45°`, `1200 mm`, `3⁵⁰`, feet-inches `12'-6"`, `4'-3 1/2"`, `10'`, `6"`)
-and the same with a label or count (`L=3500`, `H = 2.50`, `2x1500`), brackets
-(`(3500)`), a tolerance (`3500 ±5`, `25 +0.1/-0.2`, `Ø20 H7`), a remark (`3500 (TYP.)`,
-`3500*`, `1500 c/c`) or `EQ`. Only plain measurements go to `DIM_RAW` when nothing
-matches (a labelled text is often a note).
+**Sizes are judged locally.** `_Context.size_at(p)` is the largest height of the 3
+values nearest to `p` (within 400 pt, memoised per 40-pt cell): a large detail next to
+small dimensions keeps its own limits. It scales the largest arrow (`TTol.ARROW_REL_AREA`
+× size², never less than `ARROW_MAX_AREA`), the longest stroke of an open arrow, the
+largest dot, the longest tick and the note distance of leaders; they never shrink below
+the fixed values.
 
-**Arrow dimensions.** Small filled triangles are arrowheads; the tip is the sharpest
-vertex. Arrow pairs pointing in opposite directions along a common axis (bucketed by
-`_axis_key` for speed) are candidates. A pair becomes a dimension only when a **value**
-sits along the segment between the tips (`_nearest_dim_text`). Extension lines are
-searched conservatively (`_find_extension`): roughly perpendicular, passing through the
-tip, overshooting by at most `EXT_OVERSHOOT`, the long side at least twice the short side —
-shared extension lines are reused by chained dimensions (`ext_ids`). The DXF dimension is
-a rotated linear dimension at the exact angle of the tips, its definition points on the
-extension lines, and the **PDF text kept as text override**. A dimension line drawn once
-for a whole chain (or joined to its neighbours by the geometry step), or running past
-arrows drawn outside, is consumed when the arrow dimensions on its line cover it
-(`_consume_chain_lines`), so no duplicate line stays under them. `DimensionEntity` also
-carries what the writer needs to draw it like the PDF: the value's direction and font,
-the arrow / tick length, which extension lines exist and how far they pass the
-dimension line, and how far a tick dimension line passes its end ticks.
+**Terminators** (`terminators.py`, `Arrowhead.kind`): *filled* triangles (the tip is the
+sharpest vertex, `find_arrowheads`); *open* arrows — two short strokes meeting at the tip
+(V, half angle 5°–40°) — and *blank* (outlined) triangles, found among the polylines
+(`find_stroke_arrows`); an *X* — two strokes crossing at their middles — gives two open
+arrows tip to tip (`twin`), the shared station of a chain; *dots* (small filled discs or
+squares, bbox centre, `find_dots`). The strokes of a stroked terminator joined to the
+dimension line by the geometry step are cut off (`_Context.detach`) or kept as separate
+pieces (`split_out`). `cad_arrow()` gives the AutoCAD arrow block written: "" (closed
+filled), `CLOSEDBLANK`, `OPEN` / `OPEN30` / `OPEN90` (nearest half angle), `DOT`, `NONE`.
+
+**Values** (`dimvalues.py`, `DIM_VALUE_RE`): plain measurements (`DIM_TEXT_RE`: `3500`,
+`3 500`, `3,50`, `R25`, `Ø60`, `45°`, `1200 mm`, `3⁵⁰`, feet-inches `12'-6"`, `4'-3 1/2"`,
+`10'`, `6"`) and *doubtful* values: with a label or count (`L=3500`, `H = 2.50`, `2x1500`),
+brackets (`(3500)`), a tolerance (`3500 ±5`, `25 +0.1/-0.2`, `Ø20 H7` — a fit only after
+Ø), a remark (`3500 (TYP.)`, `3500*`, `1500 c/c`) or `EQ`. Rebar notes and counts
+(`5 HA12`, `4T16`, `12 T10`, `2 P1`) are not values. `value_number()` gives the number and
+its family (metric, compared modulo powers of ten — mm, cm and m alike — or imperial, in
+inches). **Values written in several texts** (`combine_split_values` → `CompositeText`,
+used instead of its parts): metres + raised centimetres (`3,` + `50` → `3⁵⁰`, MTEXT
+`3\S50^ ;`), stacked fractions (`3\S1/2;`) and tolerances (`25\S+0.1^ -0.2;`), `±` parts.
+AutoCAD SHX texts recovered from their comments (`page.shx_texts`) are values too.
+
+**Linear dimensions** (`_linear_dimensions`), a global assignment:
+1. *Frames*: two terminators facing each other on one line (`_arrow_frames`, pairs of
+   dots `_dot_frames`, ticks `_tick_frames`); a frame that skips inner arrows of a chain
+   gets a `penalty`.
+2. *Candidate values* of each frame with a geometric cost (`_frame_texts`: distance to
+   the line in text heights + text outside the span + off-centre).
+3. *Scale votes* (`ScaleVotes`): the clear pairs — each other's best, a plain value, no
+   penalty — vote value ÷ span; clusters of at least 2 votes give the sheet's scale. A
+   scale read on the sheet or calibrated (`scale_known`) is used too.
+4. *Full cost* (`_value_cost`): a plain value that agrees with the scale costs less, one
+   that disagrees is kept for **review** (layer `DIM_CHECK`); a doubtful value that
+   disagrees is refused, one with no scale to check it is kept for review.
+5. *Greedy choice*, cheapest first: each text and each arrow used once, a tick or a dot
+   by two dimensions at most (chains).
+
+Extension lines are searched conservatively (`_find_extension`); the DXF dimension is a
+rotated linear dimension at the exact angle of the tips, its definition points on the
+extension lines, and the **PDF text kept as text override** (`mtext` for split values).
+A dimension line drawn once for a whole chain is consumed when the dimensions on it cover
+it (`_consume_chain_lines`). `DimensionEntity` also carries what the writer needs to draw
+it like the PDF: value direction and font, terminator kind and size, which extension
+lines exist and how far they pass the dimension line, `review`.
+
+**Learned terminators** (`_learned_dimensions`): for the values still free, the line
+they are written along and the small shapes on that line on each side of the value
+(`_Ends`: pieces within `END_RADIUS` × text height of a station). A shape is described
+on a 7 × 7 grid around the end (`end_shape`, fuzzy `similar`, `mirrored`); the same
+shape on both sides of a value, repeated on at least `LEARNED_MIN` dimension lines of
+the sheet (squares, crosses, house symbols…), is a terminator whatever its form. Its
+pieces are drawn inside the dimension (arrow block `NONE`). A value that disagrees with
+the scale is not learned.
 
 **Tick dimensions** (architecture): short oblique strokes (25°–75° to the dimension line)
 at both ends of a line, with a value — same rules, written with architectural ticks.
@@ -660,9 +702,16 @@ line that ends at another arrowhead is a dimension line whose value was not reco
 never a leader (`_ends_at_arrow`). Written as MULTILEADER (see 5.8) or LEADER + MTEXT for
 R12–R2004.
 
+**Fallback groups** (`_fallback_groups`): a plain value still free, written along a line
+with something at its ends (arrow, tick, extension line), is a dimension that could not
+be rebuilt: its value, line and ends become one `DimGroup`, written as a GROUP on
+`DIM_RAW` so they move as one object.
+
 **Safety.** Plain measurements (`DIM_TEXT_RE`) that matched nothing go to `DIM_RAW`. Grid
 bubble numbers and item marks (`_is_label`: a single character, or a text inside a small
-circle) are not treated as values. Consumed lines, fills and texts are marked so they are not written twice.
+circle) are not treated as values. Consumed lines, fills and texts are marked so they are
+not written twice; the half of an X used by one dimension only is drawn again
+(`_restore_twins`).
 
 ### 5.7 Step 5 — `blocks.py`
 
@@ -731,7 +780,14 @@ circle) are not treated as values. Consumed lines, fills and texts are marked so
   (`DIMEXO` 0) and passing the dimension line like in the PDF (`DIMEXE`), no extension
   line where the PDF has none (`DIMSE1` / `DIMSE2`), dimension line passing the end ticks
   (`DIMDLE`). `DIMGAP` stays within the PDF clearance between value and line, so a line
-  drawn whole under its value is not cut by the CAD.
+  drawn whole under its value is not cut by the CAD. The terminator is the PDF's
+  (`DIMBLK` override: `CLOSEDBLANK`, `OPEN30`, `DOT`…; `DIMASZ` = arrow length or dot
+  diameter); a learned terminator is drawn inside the dimension block (`BYBLOCK`) with
+  `DIMBLK` `NONE`. A split value is written as MTEXT stacking (`3\S50^ ;`). A dimension to
+  review goes on layer `DIM_CHECK` (magenta, `stats.dims_to_check`).
+- Fallback groups (`_write_group`): the value, line and ends of a dimension that could
+  not be rebuilt, on layer `DIM_RAW`, joined in a GROUP object (not in R12;
+  `stats.dim_groups`).
 - Leaders (`_write_multileader`): everything is worked out in the frame of the note (x
   along its lines, y up, origin at the top-left of its first line), so rotated notes
   work too. The leader side (left / right of the note) is where the landing starts; the
@@ -740,8 +796,9 @@ circle) are not treated as values. Consumed lines, fills and texts are marked so
   landing: middle of the first line (AutoCAD's default), top, middle of the note, middle
   of the last line, bottom — or an underline when the landing runs on under the note.
   The dogleg goes from the shaft's end to the landing's end, the landing gap is the PDF
-  gap before the note, and a leader without landing gets no dogleg. If ezdxf fails, a
-  classic LEADER + text is written instead (`_write_classic_leader`).
+  gap before the note, and a leader without landing gets no dogleg. The arrow is the
+  PDF's (open, dot…: `set_arrow_properties`; classic LEADER: `DIMLDRBLK`). If ezdxf
+  fails, a classic LEADER + text is written instead (`_write_classic_leader`).
 - Radius / diameter: `add_radius_dim` / `add_diameter_dim` with `location` on the PDF line
   (text aligned with it, or horizontal with a landing); angle: `add_angular_dim_3p` (the
   y flip reverses the angles: DXF p1 = PDF end point); arc length: `add_arc_dim_3p`, kept
@@ -975,17 +1032,25 @@ pieces stay lines.
 ### 5.18 `updates.py` — update check
 
 On by default since 1.3.0 (setting `auto_update_check`; the old `check_updates`, off by
-default, is ignored on purpose): at most once a day, 4 s after start-up
-(`last_update_check`), and whenever the user asks (*Help > Check for updates…*, the
-*Updates* button, `ConvertCAD-cli --check-update`). `check()` runs in a `QThread`: one
+default, is ignored on purpose). Since 1.4.0 the automatic check never runs at start-up:
+`ui/update_dialog.IdleWatcher` (an event filter on the application) counts the seconds
+since the last mouse move or click, key or wheel; every 5 s the main window
+(`_on_idle_tick`) checks — at most once a day (`last_update_check`, `CHECK_EVERY_S`), an
+hour later after a failure (`RETRY_S`) — during a **quiet moment** (`_quiet_moment`: no
+input for `IDLE_S` = 20 s, ConvertCAD open for 30 s, no conversion, no save, no other
+window open). Whenever the user asks (*Help > Check for updates…*, the *Updates* button
+top right, `ConvertCAD-cli --check-update`) the check runs at once. `check()` runs in a `QThread`: one
 GET of `https://api.github.com/repos/abdelhaouari-AE/ConvertCAD/releases` with only
 `ConvertCAD/<version>` as User-Agent. `newest_release()` keeps the highest version tag
 (`v1.2.0`) and skips drafts, pre-releases and the OCR models release (`ocr-models-v1`,
 which GitHub may call "latest" — the reason the list is read instead of
 `releases/latest`); that version is compared with `APP_VERSION` (`is_newer`) and its
-release files are kept (`UpdateInfo.assets`, `asset_url()`). A newer version is offered in
-the update bar (§5.19); the daily check stays quiet for a version the user skipped
-(`skipped_version`). Any failure is reported (`UpdateError`), never fatal.
+release files are kept (`UpdateInfo.assets`, `asset_url()`). A newer version is offered
+in the **update window** (`UpdateDialog`, §5.19): at once when the user asked, otherwise
+at the next quiet moment with ConvertCAD in front. *Later* closes it (the next daily check
+offers it again), *Update and restart* downloads and restarts, *What's new* opens the
+release page; an installation that cannot be updated file by file gets *Download*. Any
+failure is reported (`UpdateError`), never fatal.
 
 ### 5.19 `selfupdate.py` — updates that download only the changed files
 
@@ -1016,15 +1081,17 @@ exactly its compressed bytes), inflated, checked (size, CRC-32, SHA-256 of the l
 written to `_update/<version>/files/`. `_update/pending.json` is written last: it means
 "ready". Cancel and free-space checks are built in.
 
-**Applying (`apply_pending`, `run_applier`).** When the user chooses *Restart now* or
-*When I close ConvertCAD*, the window first prepares and checks the helper
-(`prepare_applier`): on Windows a running PyInstaller program cannot rename its own files
+**Applying (`apply_pending`, `run_applier`).** When the download is complete (the update
+window shows its progress and a *Cancel* button, `PatchThread`), the main window first
+prepares and checks the helper (`prepare_applier`, `_restart_for_update`): on Windows a running PyInstaller program cannot rename its own files
 (the build test showed it: `WinError 32`), so `make_runner` copies `ConvertCAD-cli.exe`, its
 `.pkg`, the files at the top of `_internal` (the Python runtime, about 30 MB) and our
 `.pyc` files to `_update\runner\` — Qt and the big libraries are in sub-folders and are
 not copied — and the copy must answer `--apply-update --check`; on Linux the command-line
 program itself is used (POSIX renames files in use). If the helper cannot start, nothing
-is closed and the bar says why. Just before the window closes it starts the helper
+is closed and a message says why (with *Download the full version*). Then the window
+closes (an unsaved result is asked about first; if the user keeps the window, the update
+is installed when ConvertCAD closes). Just before the window closes it starts the helper
 (`launch_applier`: `--apply-update --app-dir <folder> --wait-pid <pid>`). `main.py` /
 `convertcad_cli.py` hand `--apply-update` to `run_applier` before importing anything
 else. The applier waits for the window process to end, then for each file renames the
@@ -1034,15 +1101,16 @@ every rename is undone in reverse order, `failed.json` keeps the plan, `last-res
 records the failure. Success → `last-result.json`, the Windows *Apps* entry
 (`HKCU\…\Uninstall\{AppId}_is1`: `DisplayVersion`, `DisplayName`) is updated, and the
 window program is started again with `--update-done` (unless `--no-relaunch`). At the
-next start the interface shows the result (`take_result`) and deletes the `*.cc-old` files
-and the helper's copy (`cleanup_old`, in a thread).
+next start the interface shows the result in a short message (`take_result`), offers an
+update downloaded but not installed at the first quiet moment (`read_pending`), and
+deletes the `*.cc-old` files and the helper's copy (`cleanup_old`, in a thread).
 
 **Where it applies.** `install_kind()`: `win-installed` (an `unins000.exe` is in the
 folder), `win-portable`, `linux-portable`, `appimage`, `deb`, `source`.
 `can_update_files()` needs one of the first three, the list of files and write access to
 the folder; the release has a Windows source zip only, so on Linux and for an
-installation for all users (Program Files, no write access) the bar offers the full
-download (`FULL_DOWNLOAD`). The installer deletes `_update\` and `*.cc-old` and, at
+installation for all users (Program Files, no write access) the update window offers
+the full download (`FULL_DOWNLOAD`). The installer deletes `_update\` and `*.cc-old` and, at
 uninstall, all of `_internal\` (files added by updates are not in its list).
 
 **Command line.** `ConvertCAD-cli --check-update`, `--update` (downloads, then the applier
@@ -1053,6 +1121,29 @@ range-only server, forces the files in use by the update itself (the CLI, its `.
 Python library, `base_library.zip`, `selfupdate.pyc`) to be replaced, then checks every
 SHA-256, the removed file, a conversion with the updated copy and the clean-up.
 
+### 5.20 `text_export.py` — list of all texts
+
+Option `export_texts` ("" | `csv` | `txt` | `both`; interface: *Settings > Output > List
+of all texts* = both; command line `--texts [csv|txt|both]`). The texts are **read back
+from the finished DXF document** (`texts_of(doc, placements, drawing, pdf)`), so the list
+holds exactly what the drawing shows: TEXT, MTEXT (`plain_mtext`, stacking codes read as
+written: `3⁵⁰`, `25 +0.1/-0.2`), DIMENSION values (text override, at `text_midpoint`),
+MULTILEADER notes, attributes and texts inside blocks (`_Blocks.has_text`, virtual
+entities). `kind` comes from the entity and the role layer: text, paragraph, dimension,
+leader, value (DIM_RAW), shx, ocr, block. The sheet of a point is found from the report
+placements of its file (`_Sheets`: sheets side by side, the strips meet half way across
+the gap) and the point is turned back into mm on that sheet, from its top-left corner.
+`reading_order()`: sheet by sheet, top to bottom (texts less than 1.5 mm apart are on one
+line), left to right. `write_lists()`: `<base>_texts.csv` (UTF-8 with BOM, comma,
+columns `CSV_COLUMNS`) and `<base>_texts.txt` (one line per text: `text  [x, y | sheet x,
+y mm | kind, layer]`, paragraph lines joined with ` // `).
+
+Where it runs: `pipeline._convert_dxf` (after saving, from the writers' documents; the
+DWG conversion writes it in the final folder with the DWG names, `defer_texts`) — and,
+in the interface, again when the user saves: `postprocess.finalize(..., text_pages=…)`
+reads the saved drawing (layer edits applied) and `_SaveThread` writes one list for all
+the sheet files next to the saved drawing.
+
 ---
 
 ## 6. The desktop interface (`convertcad/ui`)
@@ -1060,7 +1151,7 @@ SHA-256, the removed file, a conversion with the updated copy and the clean-up.
 ### 6.1 Window layout
 
 ```
- menu bar        File · View · Tools · Help
+ menu bar        File · View · Tools · Help                    Feedback · Updates
  command bar     Open PDF ▾ | Pan · Calibrate scale · Measure distance · Select area |
                  Fit · − · + | Convert · Save DXF/DWG · Convert a folder | Theme · Help
  ┌ Sheets ─────┐┌ Source PDF | DXF result ───────────────┐┌ Settings | Layers | Report ┐
@@ -1138,7 +1229,9 @@ See §4.4 for each file. Design rules used throughout:
 - the layer table shows the full layer name (elided in the middle when too long) with the
   linetype as a caption, and bordered swatches so white layers stay visible (shown black on
   the light theme, as CAD software does with colour 7);
-- messages appear as a short toast over the viewer and in the activity log.
+- messages appear as a short toast over the viewer and in the activity log;
+- nothing pops up while the user works: a new version is offered in a window only
+  during a quiet moment (§5.18), or at once when the user clicks *Updates*.
 
 ### 6.5 Keyboard shortcuts
 
@@ -1250,6 +1343,7 @@ All options are fields of `convertcad.core.options.Options` (also importable fro
 | `page_mode` | `single` | Output › Multi-page output | `--split-pages` | side by side / one file per sheet |
 | `page_gap_factor` | 1.10 | — | — | spacing between sheets |
 | `write_log` | on | Output › Write a conversion log | `--no-log` | `<name>_log.txt` |
+| `export_texts` | `""` (off) | Output › List of all texts (= `both`) | `--texts [csv\|txt\|both]` | `<name>_texts.csv` / `.txt`: every text with its sheet and positions (§5.20) |
 
 `Options.from_dict()` ignores unknown keys and fills missing ones with defaults, so old
 settings files and presets never break after an update.
@@ -1267,7 +1361,8 @@ settings files and presets never break after an update.
 | `TEXT_SHX` | texts recovered from AutoCAD SHX comments |
 | `TEXT_SHX_STROKES` (off) | the strokes AutoCAD drew for those texts, kept but hidden |
 | `DIM` | true DIMENSION entities (and the drawing of arc-length dimensions before DXF 2007 / in DWG) |
-| `DIM_RAW` (red) | measurement texts that matched no dimension — **review them** |
+| `DIM_CHECK` (magenta) | true DIMENSIONs whose value does not match the drawing scale — **review them** |
+| `DIM_RAW` (red) | measurement texts that matched no dimension, and the groups (value + line + ends) of dimensions that could not be rebuilt — **review them** |
 | `ANNOT_LEADER` | leaders / multileaders |
 | `HATCH` | solid fills; rebuilt hatch patterns and textures stay on the layer of their lines |
 | `BLOCKS` | block references (INSERT); block content keeps its style layers |
@@ -1354,7 +1449,7 @@ tests then check it automatically. For a right-to-left language add its code to
 ## 13. Testing
 
 ```bat
-python -m pytest -q                       :: whole suite, 115 tests (≈ 70 s)
+python -m pytest -q                       :: whole suite, about 300 tests (≈ 1 min)
 python -m pytest tests/test_geometry.py -q
 python -m pytest -k dimension -q          :: tests whose name contains "dimension"
 python -m ruff check .                    :: lint
@@ -1692,10 +1787,13 @@ Where the speed comes from:
 - Dimensions: linear (aligned/rotated), radius, diameter, angle (3 points) and arc length;
   ordinate, jogged-radius and 2-line angular dimensions remain geometry + text. Arc length
   dimensions are written as ARC_DIMENSION from DXF 2007 only (their drawing otherwise).
-  Terminators recognised: filled arrows and oblique ticks — open or outline arrows and
-  dots are not (dimensions and leaders stay geometry + text). A value drawn as lines
-  without hidden text (no SHX comment) cannot be read. On scanned drawings no arrowhead
-  is traced, so no dimension or leader is rebuilt (values go to `DIM_RAW`).
+  Terminators recognised: filled, open and outlined arrows, dots, X crossings, oblique
+  ticks, and other shapes when the sheet repeats them at its dimension ends (at least
+  three dimension lines). The scale check needs at least two clear dimensions on the
+  sheet (or a scale read on the sheet / calibrated); without it, doubtful values go to
+  `DIM_CHECK`. A value drawn as lines without hidden text (no SHX comment) cannot be
+  read. On scanned drawings no arrowhead is traced, so no dimension or leader is rebuilt
+  (values go to `DIM_RAW`).
 - Leaders: straight pieces only (a curved leader stays geometry); a note of several lines
   with the leader at its middle keeps only the line at the landing.
 - Scanned drawings: tracing is approximate by nature (lines, circles and arcs; no
@@ -1742,6 +1840,7 @@ All third-party licences: [`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md).
 
 | Version | Date | Highlights |
 |---|---|---|
+| 1.4.0 | 2026-11-10 | Dimensions checked with the drawing scale (`DIM_CHECK`), any terminator (open, outlined, dots, X, learned from the sheet, `terminators.py`), values in several pieces and SHX values (`dimvalues.py`), local sizes, fallback groups; list of all texts (`text_export.py`, `--texts`); update window and checks during quiet moments (`update_dialog.py`) |
 | 1.3.0 | 2026-11-04 | Updates that download only the changed files (`selfupdate.py`), update bar, daily update check on by default, reproducible builds, exact library versions (`requirements-lock.txt`, `check_lock.py`, pip-audit, Dependabot security updates, CLAUDE.md rule) |
 | 1.2.3 | 2026-11-03 | Interface polish: language button, tab lines, regular-weight slim panel titles, paper size instead of the Vector tag, centred welcome step numbers |
 | 1.2.2 | 2026-11-02 | Sheet tick-box error fixed; Feedback (Tally form, `core/feedback.py`, `FORM_URL`) and Updates buttons in the menu bar corner; language button (EN, FR…) replacing the "?" button; new icon; plotter-blue accent, blue snap buttons |

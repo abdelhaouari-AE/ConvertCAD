@@ -27,7 +27,8 @@ from ezdxf.math import BSpline, Vec2, Vec3
 from .annotations import (AngularDimension, AnnotationResult, DimensionEntity,
                           LeaderEntity, RadialDimension)
 from .blocks import BlockResult
-from .constants import (LAYER_BLOCKS, LAYER_DIM, LAYER_DIM_RAW, LAYER_HATCH,
+from .constants import (LAYER_BLOCKS, LAYER_DIM, LAYER_DIM_CHECK,
+                        LAYER_DIM_RAW, LAYER_HATCH,
                         LAYER_IMAGE, LAYER_LEADER, LAYER_SHX_TEXT, LAYER_TEXT,
                         LAYER_TRACE_TEXT, UNITS)
 from .extractor import PageData, RawText, Style
@@ -459,14 +460,23 @@ class DxfWriter:
                     self._write_mtext(grp, layer, tr, align)
 
     def write_shx_texts(self, texts: List[RawText], tr,
-                        default_size: float) -> None:
+                        default_size: float,
+                        dim_raw_ids: Optional[set] = None) -> None:
+        """SHX texts recovered from the AutoCAD comments, on TEXT_SHX
+        (a value that matched no dimension: on DIM_RAW, for review)."""
         if not texts:
             return
         layer = self._role_layer(LAYER_SHX_TEXT, (0, 255, 255))
+        raw = dim_raw_ids or set()
         for t in texts:
             if t.height <= 0:
                 t.height = default_size
-            self._write_text(t, layer, tr, stat="shx_texts")
+            if id(t) in raw:
+                self._write_text(t, self._role_layer(LAYER_DIM_RAW,
+                                                     (255, 0, 0)), tr,
+                                 stat="shx_texts")
+            else:
+                self._write_text(t, layer, tr, stat="shx_texts")
 
     def _write_text(self, t: RawText, layer: str, tr, stat: str = "") -> None:
         h = self._text_height(t, tr)
@@ -689,8 +699,14 @@ class DxfWriter:
     def write_annotations(self, ann: AnnotationResult, tr) -> None:
         if ann.dimensions or ann.radial or ann.angular:
             self._role_layer(LAYER_DIM, (255, 0, 0))
+        if any(d.review for d in ann.dimensions):
+            self._role_layer(LAYER_DIM_CHECK, (255, 0, 255))
         for d in ann.dimensions:
             self._write_dimension(d, tr)
+        if ann.groups:
+            self._role_layer(LAYER_DIM_RAW, (255, 0, 0))
+        for g in ann.groups:
+            self._write_group(g, tr)
         for r in ann.radial:
             self._write_radial(r, tr)
         for a in ann.angular:
@@ -734,10 +750,16 @@ class DxfWriter:
                 if clear > 0:
                     override["dimgap"] = min(override["dimgap"],
                                              0.9 * clear / 0.75)
+            if d.arrow and d.kind != "tick":
+                override["dimblk"] = d.arrow
+            layer = LAYER_DIM_CHECK if d.review else LAYER_DIM
+            # a value split by the PDF (3⁵⁰, stacked fraction, tolerance):
+            # MTEXT stacking codes, plain text in R12
+            text = d.mtext if d.mtext and not self.r12 else d.text
             dim = self.msp.add_linear_dim(
                 base=tr.pt(d.line_point), p1=p1, p2=p2, angle=angle,
-                text=d.text, dimstyle="Standard", override=override,
-                dxfattribs={"layer": LAYER_DIM})
+                text=text, dimstyle="Standard", override=override,
+                dxfattribs={"layer": layer})
             if d.text_center is not None:
                 try:
                     dim.set_location(tr.pt(d.text_center), leader=False,
@@ -745,10 +767,82 @@ class DxfWriter:
                 except Exception:                          # pragma: no cover
                     pass
             dim.render()
+            if d.extra_lines or d.extra_fills:
+                self._dimension_ends(dim, d, tr)
             self.stats.dimensions += 1
-            self._count(LAYER_DIM)
+            if d.review:
+                self.stats.dims_to_check += 1
+            self._count(layer)
         except Exception as exc:
             self._warn_once("dim", f"Some dimensions fell back: {exc}")
+
+    def _dimension_ends(self, dim, d: DimensionEntity, tr) -> None:
+        """Terminators of a shape the CAD does not know (learned on the
+        sheet): drawn as in the PDF inside the dimension's own block, so
+        they move with it."""
+        try:
+            blk = self.doc.blocks.get(dim.dimension.dxf.geometry)
+        except Exception:                                  # pragma: no cover
+            return
+        if blk is None:
+            return
+        att = {"layer": "0", "color": 0}                   # BYBLOCK
+        for pts in d.extra_lines:
+            if len(pts) >= 2:
+                blk.add_line(tr.pt(pts[0]), tr.pt(pts[-1]), dxfattribs=att)
+        for pts in d.extra_fills:
+            if len(pts) < 3:
+                continue
+            if self.r12:
+                blk.add_polyline2d([tr.pt(p) for p in pts], close=True,
+                                   dxfattribs=att)
+                continue
+            hatch = blk.add_hatch(color=0, dxfattribs={"layer": "0"})
+            hatch.paths.add_polyline_path([tr.pt(p) for p in pts],
+                                          is_closed=True)
+
+    def _write_group(self, g, tr) -> None:
+        """A dimension that could not be rebuilt: its value, line and ends
+        as they are, on layer DIM_RAW, made one GROUP (selected and moved
+        as one object; still editable piece by piece)."""
+        try:
+            ents = []
+            for pts in g.lines:
+                if len(pts) == 2:
+                    ents.append(self.msp.add_line(
+                        tr.pt(pts[0]), tr.pt(pts[1]),
+                        dxfattribs={"layer": LAYER_DIM_RAW}))
+                elif not self.r12:
+                    ents.append(self.msp.add_lwpolyline(
+                        [tr.pt(p) for p in pts],
+                        dxfattribs={"layer": LAYER_DIM_RAW}))
+                else:
+                    ents.append(self.msp.add_polyline2d(
+                        [tr.pt(p) for p in pts],
+                        dxfattribs={"layer": LAYER_DIM_RAW}))
+            for f in g.fills:
+                if self.r12:
+                    ents.append(self.msp.add_polyline2d(
+                        [tr.pt(p) for p in f.points], close=True,
+                        dxfattribs={"layer": LAYER_DIM_RAW}))
+                    continue
+                hatch = self.msp.add_hatch(dxfattribs={"layer": LAYER_DIM_RAW})
+                hatch.paths.add_polyline_path([tr.pt(p) for p in f.points],
+                                              is_closed=True)
+                ents.append(hatch)
+            for _ in ents:
+                self._count(LAYER_DIM_RAW)
+            for t in g.texts:                     # (counted by _write_text)
+                before = len(self.msp)
+                self._write_text(t, LAYER_DIM_RAW, tr)
+                ents.extend(list(self.msp)[before:])
+            if not self.r12 and len(ents) > 1:
+                group = self.doc.groups.new()
+                group.extend(ents)
+            self.stats.dim_groups += 1
+        except Exception as exc:
+            self._warn_once("dimgroup", f"Some dimension groups fell back: "
+                            f"{exc}")
 
     @staticmethod
     def _measured_sizes(d: DimensionEntity, tr, override: dict,
@@ -760,7 +854,7 @@ class DxfWriter:
             size = tr.length(d.terminator)
             if d.kind == "tick":                 # CAD tick: 2*sqrt(2)*DIMTSZ
                 override["dimtsz"] = size / (2.0 * math.sqrt(2.0))
-            else:
+            else:                                # arrow length, dot diameter
                 override["dimasz"] = size
         elif d.kind == "tick":
             override["dimtsz"] = override["dimtxt"] * 0.6
@@ -934,10 +1028,10 @@ class DxfWriter:
                     self._warn_once("mleader", "Some leaders were written as "
                                     f"classic leaders ({exc})")
                     self._write_classic_leader(verts, lines, h, corner,
-                                               content, tr)
+                                               content, tr, ld)
             elif not self.r12:
                 self._write_classic_leader(verts, lines, h, corner, content,
-                                           tr)
+                                           tr, ld)
             else:
                 self.msp.add_polyline2d(verts, dxfattribs={
                     "layer": LAYER_LEADER})
@@ -952,10 +1046,17 @@ class DxfWriter:
             self._warn_once("leader", f"Some leaders fell back: {exc}")
 
     def _write_classic_leader(self, verts, lines, h, corner, content,
-                              tr) -> None:
+                              tr, ld: Optional[LeaderEntity] = None) -> None:
         """LEADER entity through the PDF vertices + the note as text."""
         top = lines[0]
-        self.msp.add_leader(vertices=verts, dxfattribs={"layer": LAYER_LEADER})
+        override = None
+        if ld is not None and (ld.arrow_kind or ld.arrow > 0):
+            override = {"dimasz": tr.length(ld.arrow) if ld.arrow > 0
+                        else h * 0.9}
+            if ld.arrow_kind:
+                override["dimldrblk"] = ld.arrow_kind
+        self.msp.add_leader(vertices=verts, override=override,
+                            dxfattribs={"layer": LAYER_LEADER})
         if len(lines) > 1:
             mt = self.msp.add_mtext(content, dxfattribs={
                 "layer": LAYER_LEADER, "char_height": h,
@@ -1052,7 +1153,8 @@ class DxfWriter:
                       style=self._style(font))
         if n > 1:
             b.context.mtext.line_spacing_factor = factor
-        b.set_arrow_properties(size=tr.length(ld.arrow) if ld.arrow > 0
+        b.set_arrow_properties(name=ld.arrow_kind,
+                               size=tr.length(ld.arrow) if ld.arrow > 0
                                else h * 0.9)
         b.set_connection_properties(landing_gap=gap,
                                     dogleg_length=dogleg if dogleg > 1e-6

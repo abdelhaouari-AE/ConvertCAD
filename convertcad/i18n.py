@@ -97,6 +97,10 @@ def tr_progress(msg: str) -> str:
 NOTE_TEMPLATES = [
     "{n} letter outline(s) replaced by the real text written over them.",
     "{n} AutoCAD SHX text(s) recovered on layer TEXT_SHX.",
+    "{n} dimension(s) to check on layer DIM_CHECK (value not confirmed by "
+    "the scale).",
+    "{n} dimension(s) not rebuilt: grouped with their value on layer "
+    "DIM_RAW.",
     "selected area only — {kept} of {total} PDF elements kept.",
     "{n} white (invisible) line(s) or text(s) left out.",
     "scale 1:{den} read on the sheet.",
@@ -271,9 +275,6 @@ _fr({
     "Dimensions with arrows": "Cotes avec flèches",
     "Dimensions with tick marks": "Cotes avec traits obliques",
     "Leaders (arrow + note)": "Lignes de repère (flèche + note)",
-    "Values always keep the original PDF text. Unmatched values go to layer DIM_RAW for review.":
-        "Les valeurs gardent toujours le texte d'origine du PDF. Les valeurs "
-        "non reconnues vont sur le calque DIM_RAW pour vérification.",
     "Layers and blocks": "Calques et blocs",
     "Keep the PDF's own layers": "Conserver les calques du PDF",
     "Layer naming": "Nom des calques",
@@ -520,9 +521,6 @@ _fr({
     "Errors": "Erreurs", "Options": "Options", "none": "aucun",
     "in blocks": "dans les blocs", "Pages": "Feuilles", "of": "sur",
     "unknown producer": "producteur inconnu",
-    "Verify the scale on a known distance, spot-check layer DIM and review layer DIM_RAW.":
-        "Vérifiez l'échelle sur une distance connue, contrôlez le calque DIM "
-        "et passez en revue le calque DIM_RAW.",
     "Lines": "Lignes", "Polylines": "Polylignes", "Arcs": "Arcs",
     "Circles": "Cercles", "Splines": "Splines", "Texts": "Textes",
     "Paragraphs (MTEXT)": "Paragraphes (MTEXT)",
@@ -803,8 +801,6 @@ _fr({
         "La dernière version n'a pas pu être vérifiée : {e}.",
     "ConvertCAD is up to date ({v}).": "ConvertCAD est à jour ({v}).",
     "ConvertCAD {v} is available.": "ConvertCAD {v} est disponible.",
-    "ConvertCAD {v} is available (this one is {c}).":
-        "ConvertCAD {v} est disponible (celle-ci est la {c}).",
     "Nothing is installed automatically: download it from its release page.":
         "Rien n'est installé automatiquement : téléchargez-la depuis sa page "
         "de publication.",
@@ -948,10 +944,6 @@ _fr({
         "Une fois par jour, demander à GitHub si une version plus récente existe (rien sur vous ni sur vos plans n'est envoyé)",
     "What's new":
         'Nouveautés',
-    'Update now':
-        'Mettre à jour',
-    'Skip this version':
-        'Ignorer cette version',
     'Checking which files changed…':
         'Recherche des fichiers modifiés…',
     'Downloading the update: {done} / {total} MB':
@@ -960,10 +952,6 @@ _fr({
         'ConvertCAD {v} est prêt à être installé : {size} Mo téléchargés au lieu de {full} Mo.',
     'ConvertCAD {v} is ready to install.':
         'ConvertCAD {v} est prêt à être installé.',
-    'Restart now':
-        'Redémarrer maintenant',
-    'When I close ConvertCAD':
-        'À la fermeture de ConvertCAD',
     'ConvertCAD was updated to {v}.':
         'ConvertCAD a été mis à jour en version {v}.',
     'The update could not be installed: {e}':
@@ -974,4 +962,41 @@ _fr({
         'La mise à jour sera installée à la fermeture de ConvertCAD.',
     'Update cancelled.':
         'Mise à jour annulée.',
+})
+
+_fr({
+    "Values always keep the original PDF text. Dimensions to check go to layer DIM_CHECK, unmatched values to layer DIM_RAW.":
+        "Les valeurs gardent toujours le texte d'origine du PDF. Les cotes à vérifier vont sur le calque DIM_CHECK, les valeurs non reconnues sur le calque DIM_RAW.",
+    "Verify the scale on a known distance, spot-check layer DIM and review layers DIM_CHECK and DIM_RAW.":
+        "Vérifiez l'échelle sur une distance connue, contrôlez le calque DIM et passez en revue les calques DIM_CHECK et DIM_RAW.",
+    "Dimensions to check (DIM_CHECK)":
+        "Cotes à vérifier (DIM_CHECK)",
+    "Dimensions grouped (DIM_RAW)":
+        "Cotes groupées (DIM_RAW)",
+    "{n} dimension(s) to check on layer DIM_CHECK (value not confirmed by the scale).":
+        "{n} cote(s) à vérifier sur le calque DIM_CHECK (valeur non confirmée par l'échelle).",
+    "{n} dimension(s) not rebuilt: grouped with their value on layer DIM_RAW.":
+        "{n} cote(s) non reconstruite(s) : groupée(s) avec leur valeur sur le calque DIM_RAW.",
+})
+
+_fr({
+    "List of all texts (.csv + .txt)":
+        "Liste de tous les textes (.csv + .txt)",
+    "Every text with its sheet and its position, saved next to the drawing: to search the drawings or feed a search engine.":
+        "Chaque texte avec sa feuille et sa position, enregistré à côté du dessin : pour chercher dans les plans ou alimenter un moteur de recherche.",
+    "List of texts":
+        "Liste des textes",
+})
+
+_fr({
+    "Update available":
+        "Mise à jour disponible",
+    "ConvertCAD {v} is available":
+        "ConvertCAD {v} est disponible",
+    "This one is {c}.":
+        "Version actuelle : {c}.",
+    "Update and restart":
+        "Mettre à jour et redémarrer",
+    "Restarting ConvertCAD…":
+        "Redémarrage de ConvertCAD…",
 })

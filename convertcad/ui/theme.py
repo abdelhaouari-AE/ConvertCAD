@@ -347,13 +347,6 @@ QToolButton#SnapToggle:checked {{
     color: {t['on_accent']}; border-color: {t['accent']}; background: {t['accent']};
 }}
 
-/* ---- update bar (ui/update_bar.py) ---------------------------------- */
-QFrame#UpdateBar {{
-    background: {t['panel_alt']}; border-bottom: 1px solid {t['border']};
-    border-left: 3px solid {t['accent']};
-}}
-QFrame#UpdateBar QPushButton {{ padding: 3px 10px; }}
-
 /* ---- empty state ---------------------------------------------------- */
 QWidget#EmptyState {{ background: {t['canvas']}; }}
 QFrame#DropCard {{

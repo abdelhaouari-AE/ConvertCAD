@@ -3,7 +3,7 @@
 **ConvertCAD {APP_VERSION}** — bitte vor der Nutzung der Anwendung lesen.
 
 ### 1. Lokale Verarbeitung
-Alle Konvertierungen laufen auf diesem Computer. Keine Zeichnung, Datei oder Information wird hochgeladen oder irgendwohin gesendet. Die Anwendung verbindet sich nur dann mit dem Internet, wenn Sie sie auffordern, eine OCR-Sprache oder ein OCR-Modell herunterzuladen (*Einstellungen > Gescannte Seiten > OCR-Sprachen und -Modelle…*) — sie empfängt dann diese Datei — oder nach Updates zu suchen (*Hilfe > Nach Updates suchen…*, oder beim Start, wenn Sie das eingeschaltet haben; standardmäßig aus) — sie liest dann die Nummer der neuesten Version. Sonst sendet sie nichts.
+Alle Konvertierungen laufen auf diesem Computer. Keine Zeichnung, Datei oder Information wird hochgeladen oder irgendwohin gesendet. Die Anwendung verbindet sich nur dann mit dem Internet, wenn Sie sie auffordern, eine OCR-Sprache oder ein OCR-Modell herunterzuladen (*Einstellungen > Gescannte Seiten > OCR-Sprachen und -Modelle…*) — sie empfängt dann diese Datei — oder nach Updates zu suchen (*Hilfe > Nach Updates suchen…*, die Schaltfläche *Updates*, oder einmal täglich in einem ruhigen Moment — standardmäßig ein, *Hilfe > Automatisch nach Updates suchen*) — sie liest dann die Nummer der neuesten Version — und, wenn Sie auf *Aktualisieren und neu starten* klicken, um die Dateien der neuen Version herunterzuladen. Sonst sendet sie nichts.
 
 ### 2. Ihr Recht zu konvertieren
 Sie sind dafür verantwortlich, das Recht zu haben, die geöffneten PDF-Zeichnungen zu konvertieren und zu bearbeiten (Kundenverträge, Vertraulichkeitsklauseln, geistiges Eigentum des ursprünglichen Urhebers).

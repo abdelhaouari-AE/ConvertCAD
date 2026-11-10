@@ -173,5 +173,6 @@ with a certificate of your own is still possible with `scripts\sign_windows.bat`
 4. *Actions → build → Run workflow*, tick **Publish the release** (or push the tag
    `v<version>`). The release `v<version>` is created with the five downloads and the
    CHANGELOG section as notes; the website offers it at once. Users of 1.3.0 and later
-   get it from the update bar (only the changed files on Windows).
+   are offered it in ConvertCAD (only the changed files on Windows): 1.3.x by its
+   update bar, 1.4.0 and later by the update window, during a quiet moment.
 5. Only when `ocr_catalog.py` changed: run the **OCR models release** workflow.

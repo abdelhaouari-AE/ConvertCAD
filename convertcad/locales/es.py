@@ -219,8 +219,6 @@ STRINGS = {
         "Cotas con trazos oblicuos",
     "Leaders (arrow + note)":
         "Directrices (flecha + nota)",
-    "Values always keep the original PDF text. Unmatched values go to layer DIM_RAW for review.":
-        "Los valores conservan siempre el texto original del PDF. Los valores sin correspondencia van a la capa DIM_RAW para revisarlos.",
     "Layers and blocks":
         "Capas y bloques",
     "Keep the PDF's own layers":
@@ -621,8 +619,6 @@ STRINGS = {
         "de",
     "unknown producer":
         "productor desconocido",
-    "Verify the scale on a known distance, spot-check layer DIM and review layer DIM_RAW.":
-        "Compruebe la escala en una distancia conocida, revise por muestreo la capa DIM y examine la capa DIM_RAW.",
     "Lines":
         "Líneas",
     "Polylines":
@@ -969,8 +965,6 @@ STRINGS = {
         "ConvertCAD está actualizado ({v}).",
     "ConvertCAD {v} is available.":
         "ConvertCAD {v} está disponible.",
-    "ConvertCAD {v} is available (this one is {c}).":
-        "ConvertCAD {v} está disponible (esta es la {c}).",
     "Nothing is installed automatically: download it from its release page.":
         "No se instala nada automáticamente: descárguela desde su página de publicación.",
     "Open the release page":
@@ -1105,10 +1099,6 @@ STRINGS = {
         'Una vez al día, preguntar a GitHub si existe una versión más reciente (no se envía nada sobre usted ni sobre sus planos)',
     "What's new":
         'Novedades',
-    'Update now':
-        'Actualizar ahora',
-    'Skip this version':
-        'Omitir esta versión',
     'Checking which files changed…':
         'Buscando los archivos modificados…',
     'Downloading the update: {done} / {total} MB':
@@ -1117,10 +1107,6 @@ STRINGS = {
         'ConvertCAD {v} está listo para instalarse: {size} MB descargados en lugar de {full} MB.',
     'ConvertCAD {v} is ready to install.':
         'ConvertCAD {v} está listo para instalarse.',
-    'Restart now':
-        'Reiniciar ahora',
-    'When I close ConvertCAD':
-        'Al cerrar ConvertCAD',
     'ConvertCAD was updated to {v}.':
         'ConvertCAD se ha actualizado a la versión {v}.',
     'The update could not be installed: {e}':
@@ -1131,4 +1117,32 @@ STRINGS = {
         'La actualización se instalará al cerrar ConvertCAD.',
     'Update cancelled.':
         'Actualización cancelada.',
+    "Values always keep the original PDF text. Dimensions to check go to layer DIM_CHECK, unmatched values to layer DIM_RAW.":
+        "Los valores conservan siempre el texto original del PDF. Las cotas por revisar van a la capa DIM_CHECK; los valores no asociados, a la capa DIM_RAW.",
+    "Verify the scale on a known distance, spot-check layer DIM and review layers DIM_CHECK and DIM_RAW.":
+        "Verifique la escala en una distancia conocida, compruebe por muestreo la capa DIM y revise las capas DIM_CHECK y DIM_RAW.",
+    "Dimensions to check (DIM_CHECK)":
+        "Cotas por revisar (DIM_CHECK)",
+    "Dimensions grouped (DIM_RAW)":
+        "Cotas agrupadas (DIM_RAW)",
+    "{n} dimension(s) to check on layer DIM_CHECK (value not confirmed by the scale).":
+        "{n} cota(s) por revisar en la capa DIM_CHECK (valor no confirmado por la escala).",
+    "{n} dimension(s) not rebuilt: grouped with their value on layer DIM_RAW.":
+        "{n} cota(s) no reconstruida(s): agrupada(s) con su valor en la capa DIM_RAW.",
+    "List of all texts (.csv + .txt)":
+        "Lista de todos los textos (.csv + .txt)",
+    "Every text with its sheet and its position, saved next to the drawing: to search the drawings or feed a search engine.":
+        "Cada texto con su hoja y su posición, guardado junto al dibujo: para buscar en los planos o alimentar un motor de búsqueda.",
+    "List of texts":
+        "Lista de textos",
+    "Update available":
+        "Actualización disponible",
+    "ConvertCAD {v} is available":
+        "ConvertCAD {v} está disponible",
+    "This one is {c}.":
+        "Versión actual: {c}.",
+    "Update and restart":
+        "Actualizar y reiniciar",
+    "Restarting ConvertCAD…":
+        "Reiniciando ConvertCAD…",
 }

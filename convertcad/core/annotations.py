@@ -2,14 +2,31 @@
 annotations.py — STEP 4: rebuild TRUE dimensions and leaders (heuristics).
 
 In a PDF a dimension is only drawing primitives:
-    2 terminators (filled arrows OR oblique ticks) + a dimension line
-    + 2 extension lines + a measurement text.
+    2 terminators (arrows, ticks, dots...) + a dimension line
+    + 2 extension lines + a value text.
 This module recognises those patterns and rebuilds real DXF DIMENSION
 entities (and LEADERs for "arrow + polyline + note" patterns).
+
+How linear dimensions are found (whole sheet at once):
+  1. terminators: filled, outline and open arrows, dots, oblique ticks
+     (terminators.py) — sizes judged from the values NEAR them;
+  2. frames: two terminators facing each other on one line;
+  3. every frame x every nearby value gets a cost (distance to the line,
+     centring, agreement with the scale of the sheet — dimvalues.py);
+     the scale is voted by the clear pairs first;
+  4. the pairs are taken from the cheapest, each value and terminator once;
+  5. values still free: starting from the value, its line and the shapes
+     at both line ends — a shape repeated at line ends on the sheet is a
+     terminator whatever its form ("learned");
+  6. values with a line under them that still match nothing: line, ends
+     and value are GROUPED (they move as one object) on layer DIM_RAW.
 
 SAFE-FALLBACK RULE (never invent, never corrupt):
   * A dimension is rebuilt ONLY when terminators, line and text all agree.
   * The value shown is ALWAYS the original PDF text (kept as text override).
+  * A value with a label / remark ("L=3500", "3500 (TYP.)") must agree with
+    the scale; when nothing tells the scale, or a plain value disagrees
+    with it, the dimension goes to layer DIM_CHECK (to review).
   * Measurement-looking texts that matched nothing go to layer DIM_RAW
     (red) so the user can review them. Unmatched geometry stays untouched.
 
@@ -23,66 +40,30 @@ import statistics
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
+from .constants import LAYER_SHX_STROKES
+from .dimvalues import (ANGLE_RE, ARC_SIGN, DIAMETER_RE,  # noqa: F401
+                        DIAMETER_SIGNS, DIM_TEXT_RE, DIM_VALUE_RE, RADIUS_RE,
+                        CompositeText, ScaleVotes, combine_split_values,
+                        is_plain, text_ids, value_number)
 from .extractor import PageData, Point, RawFill, RawText
 from .geometry import EArc, EPolyline, RebuiltPage
 from .spatial import (GridIndex, angle_deg, angle_diff_mod180,
                       point_line_distance, point_segment_distance,
                       segment_intersection)
-
-# Text that *looks like* a measurement: "3500", "3 500", "3.50", "12,5",
-# "R25", "Ø60", "45°", "1200 mm", "⌒785", "3⁵⁰" (metres with the
-# centimetres written small), feet-inches "12'-6\"", "4'-3 1/2\"", "10'"...
-DIAMETER_SIGNS = "Øø⌀∅Φφ"    # Ø ø ⌀ ∅ Φ φ
-ARC_SIGN = "⌒"                                     # ⌒ (arc length)
-_NUMBER = (r"(?:\d{1,3}(?:[   ]\d{3})+|\d{1,7})"
-           r"(?:[.,]\d{1,3})?")
-_METRIC = _NUMBER + r"(?:[⁰¹²³⁴⁵⁶⁷⁸⁹]{1,2})?\s*(?:mm|cm|m|MM|CM|M|°)?"
-_FRACTION = r"(?:\d{1,3}/\d{1,3}|[½¼¾⅛⅜⅝⅞])"
-_INCHES = (r"(?:\d{1,3}(?:[.,]\d{1,4})?(?:[\s-]?" + _FRACTION + r")?|"
-           + _FRACTION + r")\s?[\"″”]")
-_FEET = r"\d{1,5}(?:[.,]\d{1,4})?\s?['′’]"
-_IMPERIAL = r"(?:" + _FEET + r"(?:\s?-?\s?" + _INCHES + r")?|" + _INCHES + ")"
-_MEASURE = (r"[~±≈R" + DIAMETER_SIGNS + ARC_SIGN + r"]?\s?(?:" + _IMPERIAL
-            + "|" + _METRIC + ")")
-DIM_TEXT_RE = re.compile("^" + _MEASURE + "$")
-# The VALUE of a dimension may also carry a label, a count, brackets, a
-# tolerance or a remark: "L=3500", "2x1500", "(3500)", "3500 ±5",
-# "25 +0.1/-0.2", "Ø20 H7", "3500 (TYP.)", "3500*", or be "EQ". Such a text
-# is accepted when terminators and line agree; when nothing matches it stays
-# an ordinary text (often a note), it does not go to DIM_RAW.
-_LABEL = r"(?:[A-Za-z]{1,3}\.?\s?[=:]\s?|[1-9]\s?[xX×]\s?)"   # L= / 2x
-_TOLERANCE = (r"(?:\s?(?:±|\+/-)\s?\d{1,4}(?:[.,]\d{1,3})?"
-              r"|\s?[+-]\d{1,4}(?:[.,]\d{1,3})?\s?/\s?[+-]?\d{1,4}"
-              r"(?:[.,]\d{1,3})?"
-              r"|\s?[A-Za-z]{1,2}\d{1,2}(?:/[a-z]{1,2}\d{1,2})?)")
-_REMARK = (r"(?:\s?\*|\s*\(?\s*(?:TYP|Typ|typ|MAX|Max|max|MIN|Min|min|"
-           r"ENV|Env|env|CA|ca|EQ|Eq|eq|c/c|C/C)\.?\s*\)?)")
-DIM_VALUE_RE = re.compile(
-    "^(?:" + _LABEL + r")?(?:\(\s?" + _MEASURE + r"\s?\)|" + _MEASURE
-    + ")(?:" + _TOLERANCE + ")?(?:" + _REMARK + "){0,2}$"
-    r"|^(?:EQ|Eq|eq)\.?$")
-# Radius "R25", "R 12.5"; diameter "Ø60", "2xØ12", "%%c60" (AutoCAD code)
-RADIUS_RE = re.compile(r"^(?:\d{1,3}\s?[xX×]\s?)?R\s?\d")
-DIAMETER_RE = re.compile(r"^(?:\d{1,3}\s?[xX×]\s?)?(?:[" + DIAMETER_SIGNS
-                         + r"]|%%[cC])\s?\d")
-# Angle "45°", "22.5°", "30°15'", "12°30'15\""
-ANGLE_RE = re.compile(
-    r"^(\d{1,3}(?:[.,]\d{1,4})?)\s*°"
-    r"(?:\s*(\d{1,2}(?:[.,]\d+)?)\s*['′])?"
-    r"(?:\s*(\d{1,2}(?:[.,]\d+)?)\s*[\"″])?$")
+from .terminators import (Arrowhead, TTol, best_similarity,  # noqa: F401
+                          end_shape, find_arrowheads, find_dots,
+                          find_stroke_arrows, merge_outlined_fills,
+                          size_lookup)
 
 
 class ATol:
     """Annotation tolerances, in page points.
 
     Sizes are given for values written about REF_SIZE points high (2.5 mm
-    letters); on drawings with larger values (printed larger, "fit to
-    paper") the size limits of arrows, ticks and notes grow in proportion,
-    never shrink."""
+    letters); where the values are larger (a detail drawn larger, a sheet
+    printed larger), the size limits of arrows, ticks and notes grow in
+    proportion there, never shrink."""
     REF_SIZE = 10.0            # usual font size of dimension values
-    ARROW_MAX_AREA = 14.0      # filled triangle area above this -> not an
-    ARROW_REL_AREA = 0.35      # arrow, unless below this x (value size)²
-    ARROW_MIN_AREA = 0.15      # (arrows up to ~2x the letter height)
     OPPOSITE_DEG = 25.0        # paired arrows must point in opposite directions
     COLLINEAR_OFF = 1.5        # arrow tips must lie on a common line
     TEXT_NEAR = 6.0            # text-to-dimension-line distance (x text height)
@@ -105,6 +86,8 @@ class ATol:
     TICK_OBLIQUE_HI = 75.0
     TICK_PAIR_MIN = 6.0        # two ticks must be at least this far apart
     TICK_ON_LINE = 1.5         # tick midpoint distance to the dimension line
+    # --- values ---
+    CLEAR_COST = 1.5           # a pair this good (and mutual) votes the scale
     # --- radius / diameter / angle / arc length ---
     ON_CIRCLE = 1.2            # arrow tip this close to a circle (or 3 % of r)
     RADIAL_DEG = 15.0          # radius arrow: along the radius
@@ -116,21 +99,18 @@ class ATol:
     ANGLE_AGREE = 2.0          # written vs drawn angle: 2 degrees or 4 %
     ARC_AGREE = 0.03           # written vs drawn arc length: 3 %
     TRACK_TOL = 0.8            # arcs of one dimension arc: same centre/radius
+    # --- shapes learned at line ends, unrecognised dimensions ---
+    LINE_UNDER = 2.5           # value within this many heights of its line
+    END_RADIUS = 1.2           # end shape: within this many text heights
+    SAME_SHAPE = 0.7           # signature similarity of two ends
+    LEARNED_MIN = 3            # a shape seen at fewer ends is not learned
+    LEARNED_SURE = 4           # ends with one shape on the sheet: sure
 
 
 # Arrows labelled with these words show a direction (stairs, ramps, slopes),
 # they are not leaders.
 DIRECTION_WORDS = {"UP", "DN", "DOWN", "MONTEE", "MONTÉE", "DESCENTE",
                    "MONTE", "DESC", "HAUT", "BAS", "SLOPE", "PENTE"}
-
-
-@dataclass
-class Arrowhead:
-    tip: Point
-    direction: Tuple[float, float]   # unit vector, base -> tip
-    fill: RawFill
-    used: bool = False
-    length: float = 0.0              # base -> tip
 
 
 @dataclass
@@ -146,18 +126,24 @@ class DimensionEntity:
     text: str                  # original PDF text, kept as override -> exact
     height: float              # PDF font size
     text_center: Optional[Point] = None   # where the PDF shows the value
-    kind: str = "arrow"        # "arrow" | "tick"
+    kind: str = "arrow"        # "arrow" | "tick" | "dot" | "learned"
     tip1: Optional[Point] = None          # terminator positions on the line
     tip2: Optional[Point] = None
     # --- measured in the PDF, so the CAD dimension looks the same ---
     text_rotation: Optional[float] = None  # degrees, direction of the value
     value: Optional[RawText] = None        # the PDF text (font, letter size)
-    terminator: float = 0.0    # arrow length / tick length (points)
+    terminator: float = 0.0    # arrow length / tick length / dot diameter
     ext1: bool = False         # extension line found at def_point1 / 2
     ext2: bool = False         # (otherwise the CAD one is not drawn)
     ext_beyond: Optional[float] = None    # extension lines pass the
                                           # dimension line by (points)
     line_beyond: float = 0.0   # dimension line passes the ticks by (points)
+    arrow: str = ""            # CAD arrow block ("" closed filled, "DOT"...)
+    mtext: str = ""            # value with MTEXT stacking codes (3\S50^ ;)
+    review: bool = False       # doubtful: written on layer DIM_CHECK
+    # terminators of an unknown shape, drawn as in the PDF (page coords)
+    extra_lines: List[List[Point]] = field(default_factory=list)
+    extra_fills: List[List[Point]] = field(default_factory=list)
 
 
 @dataclass
@@ -204,6 +190,17 @@ class LeaderEntity:
     lines: List[RawText] = field(default_factory=list)   # all lines, top
                                                          # to bottom
     arrow: float = 0.0         # arrowhead length (points)
+    arrow_kind: str = ""       # CAD arrow block ("" closed filled, "DOT"...)
+
+
+@dataclass
+class DimGroup:
+    """A dimension that could not be rebuilt: its value, line and ends,
+    written as they are on layer DIM_RAW and grouped (one object)."""
+    texts: List[RawText] = field(default_factory=list)
+    lines: List[List[Point]] = field(default_factory=list)
+    fills: List[RawFill] = field(default_factory=list)
+    styles: list = field(default_factory=list)       # Style of each line
 
 
 @dataclass
@@ -212,69 +209,14 @@ class AnnotationResult:
     radial: List[RadialDimension] = field(default_factory=list)
     angular: List[AngularDimension] = field(default_factory=list)
     leaders: List[LeaderEntity] = field(default_factory=list)
+    groups: List[DimGroup] = field(default_factory=list)
     dim_raw_texts: List[RawText] = field(default_factory=list)
     consumed_fills: set = field(default_factory=set)     # id() of RawFill
     consumed_texts: set = field(default_factory=set)     # id() of RawText
 
-
-# ---------------------------------------------------------------------------
-# Arrowhead detection
-# ---------------------------------------------------------------------------
-def _polygon_area(pts: List[Point]) -> float:
-    a = 0.0
-    for i in range(len(pts)):
-        x1, y1 = pts[i]
-        x2, y2 = pts[(i + 1) % len(pts)]
-        a += x1 * y2 - x2 * y1
-    return abs(a) / 2.0
-
-
-def _dedupe(pts: List[Point], tol: float = 0.05) -> List[Point]:
-    out: List[Point] = []
-    for p in pts:
-        if all(math.dist(p, q) > tol for q in out):
-            out.append(p)
-    return out
-
-
-def find_arrowheads(fills: List[RawFill],
-                    value_size: float = 0.0) -> List[Arrowhead]:
-    """Small filled triangles are arrowheads; tip = the sharpest vertex.
-
-    value_size: usual font size of the dimension values (points). The
-    largest arrow accepted grows with it, so arrows drawn larger than usual
-    (3.5 mm and more, or a sheet printed larger) are still found."""
-    max_area = max(ATol.ARROW_MAX_AREA, ATol.ARROW_REL_AREA * value_size ** 2)
-    arrows: List[Arrowhead] = []
-    for f in fills:
-        if len(f.points) > 12:
-            continue
-        pts = _dedupe(f.points)
-        if not 3 <= len(pts) <= 4:
-            continue
-        area = _polygon_area(pts)
-        if not ATol.ARROW_MIN_AREA <= area <= max_area:
-            continue
-        best_tip, best_d, best_base = None, -1.0, (0.0, 0.0)
-        for i, p in enumerate(pts):
-            others = [q for j, q in enumerate(pts) if j != i]
-            bx = sum(q[0] for q in others) / len(others)
-            by = sum(q[1] for q in others) / len(others)
-            d = math.dist(p, (bx, by))
-            if d > best_d:
-                best_tip, best_d, best_base = p, d, (bx, by)
-        if best_d < 1e-6:
-            continue
-        # A real arrowhead is clearly longer than wide.
-        base_w = 2.0 * area / best_d
-        if best_d < 1.2 * base_w:
-            continue
-        arrows.append(Arrowhead(
-            tip=best_tip,
-            direction=((best_tip[0] - best_base[0]) / best_d,
-                       (best_tip[1] - best_base[1]) / best_d),
-            fill=f, length=best_d))
-    return arrows
+    @property
+    def to_review(self) -> int:
+        return sum(1 for d in self.dimensions if d.review)
 
 
 # ---------------------------------------------------------------------------
@@ -293,16 +235,25 @@ class _Context:
         self.line_index: GridIndex[EPolyline] = GridIndex(12.0)
         for pl in self.lines:
             self.line_index.insert_segment(pl, pl.points[0], pl.points[1])
-        texts = rp.page.texts
-        # possible dimension values (strict measurements AND values with a
+        # current pieces of the polylines stroked terminators were cut from
+        self._pieces: Dict[int, List[EPolyline]] = {}
+        # PDF texts AND the AutoCAD SHX texts read from the PDF comments
+        texts = list(rp.page.texts) + list(rp.page.shx_texts)
+        self.texts = texts
+        # values split by the PDF ("3" + small raised "50"...): the
+        # composite stands for its parts
+        self.composites = combine_split_values(texts)
+        parts = {id(p) for c in self.composites for p in c.parts}
+        pool = [t for t in texts if id(t) not in parts] + self.composites
+        # possible dimension values (plain measurements AND values with a
         # label / count / remark: "L=3500", "2x1500", "3500 (TYP.)"...)
-        self.dim_texts = [t for t in texts
+        self.dim_texts = [t for t in pool
                           if DIM_VALUE_RE.match(t.text.strip())]
         heights = [t.height for t in self.dim_texts] or [2.5]
         self.text_margin = ATol.TEXT_NEAR * max(statistics.median(heights),
                                                 1.0) * 2
-        # usual size of the values (PDF font size): arrows, ticks and gaps
-        # grow with it when a drawing is printed larger ("fit to paper")
+        # usual size of the values (PDF font size), for the whole sheet and
+        # near each point: arrows, ticks and gaps grow with it
         sized = self.dim_texts if len(self.dim_texts) >= 3 else texts
         self.size = statistics.median([t.height for t in sized]) \
             if sized else 0.0
@@ -311,6 +262,7 @@ class _Context:
         for t in self.dim_texts:
             c = t.center()
             self.dim_text_index.insert(t, (c[0], c[1], c[0], c[1]))
+        self.size_at = size_lookup({}, 40.0, self._local_size)
         self.text_index: GridIndex[RawText] = GridIndex(24.0)
         for t in texts:
             self.text_index.insert(t, (t.origin[0], t.origin[1],
@@ -349,11 +301,113 @@ class _Context:
             elif ANGLE_RE.match(s) or DIM_TEXT_RE.match(s):
                 self.curve_texts.insert(t, box)
 
+    # ---- sizes ----------------------------------------------------------
+    def _local_size(self, p: Point) -> float:
+        """Font size of the values near p: the largest of the three nearest
+        (the whole sheet's when none is near)."""
+        near = sorted((math.dist(t.center(), p), t.height)
+                      for t in self.dim_text_index.near(p[0], p[1], 400.0))
+        near = [h for d, h in near if d <= 400.0][:3]
+        # the largest of them: a large detail next to small dimensions
+        # keeps its large arrows (the limits are upper bounds only)
+        return max(near) if near else self.size
+
+    def k_at(self, p: Point) -> float:
+        return max(1.0, self.size_at(p) / ATol.REF_SIZE)
+
     def open_ends(self) -> GridIndex:
         """Ends of the short open polylines (leader pieces), built once."""
         if self._open_ends is None:
             self._open_ends = _end_index(self.rp)
         return self._open_ends
+
+    # ---- cutting stroked terminators out of their polylines --------------
+    def detach(self, strokes: List[Tuple[EPolyline, Point, Point]]) -> None:
+        """Remove the segments a-b of a used terminator from the polylines
+        they belong to; what is left becomes new polylines (and lines)."""
+        for orig, a, b in strokes:
+            pieces = self._pieces.get(id(orig), [orig])
+            for piece in pieces:
+                if piece.consumed:
+                    continue
+                i = _segment_at(piece, a, b)
+                if i is None:
+                    continue
+                piece.consumed = True
+                runs = _runs_without(piece, i)
+                new = [EPolyline(points=r, closed=False, style=piece.style)
+                       for r in runs]
+                self._pieces[id(orig)] = [p for p in pieces
+                                          if p is not piece] + new
+                for p in new:
+                    self.add_polyline(p)
+                break
+
+    def split_out(self, strokes: List[Tuple[EPolyline, Point, Point]]
+                  ) -> None:
+        """Like detach, but the strokes stay drawn as pieces of their own
+        (a terminator not used yet: a leader may start from it)."""
+        for orig, a, b in strokes:
+            pieces = self._pieces.get(id(orig), [orig])
+            for piece in pieces:
+                if piece.consumed or len(piece.points) == 2 and \
+                        not piece.closed:
+                    continue
+                i = _segment_at(piece, a, b)
+                if i is None:
+                    continue
+                piece.consumed = True
+                new = [EPolyline(points=r, closed=False, style=piece.style)
+                       for r in _runs_without(piece, i)]
+                new.append(EPolyline(points=[a, b], closed=False,
+                                     style=piece.style))
+                self._pieces[id(orig)] = [p for p in pieces
+                                          if p is not piece] + new
+                for p in new:
+                    self.add_polyline(p)
+                break
+
+    def add_polyline(self, pl: EPolyline) -> None:
+        self.rp.polylines.append(pl)
+        if pl.is_single_line:
+            self.lines.append(pl)
+            self.line_index.insert_segment(pl, pl.points[0], pl.points[1])
+        self._open_ends = None
+
+
+def _segment_at(pl: EPolyline, a: Point, b: Point) -> Optional[int]:
+    """Index of the segment a-b (either way) of a polyline."""
+    pts = pl.points
+    n = len(pts)
+    pairs = [(i, pts[i], pts[i + 1]) for i in range(n - 1)]
+    if pl.closed and n > 2:
+        pairs.append((n - 1, pts[-1], pts[0]))
+    for i, p, q in pairs:
+        if (p == a and q == b) or (p == b and q == a):
+            return i
+    return None
+
+
+def _runs_without(pl: EPolyline, i: int) -> List[List[Point]]:
+    """The parts of a polyline left when its segment i is removed."""
+    pts = list(pl.points)
+    if pl.closed and len(pts) > 2:
+        ring = pts[i + 1:] + pts[:i + 1]
+        return [ring] if len(ring) >= 2 else []
+    runs = [pts[:i + 1], pts[i + 1:]]
+    return [r for r in runs if len(r) >= 2]
+
+
+def _use_terminator(ctx: _Context, res: AnnotationResult,
+                    ar: Arrowhead) -> None:
+    """Mark a terminator as used: its fill and strokes are not written."""
+    ar.used = True
+    if ar.fill is not None:
+        res.consumed_fills.add(id(ar.fill))
+    for f in ar.extra_fills:
+        res.consumed_fills.add(id(f))
+    if ar.strokes:
+        ctx.detach(ar.strokes)
 
 
 def _end_index(rp: RebuiltPage) -> GridIndex:
@@ -385,36 +439,6 @@ def _span(c) -> Tuple[float, float]:
     if isinstance(c, EArc):
         return c.start_angle % 360.0, (c.sweep or 360.0)
     return 0.0, 360.0
-
-
-def _nearest_dim_text(ctx: _Context, res: AnnotationResult,
-                      tip1: Point, tip2: Point) -> Optional[RawText]:
-    """Measurement text sitting along the segment tip1-tip2."""
-    m = ctx.text_margin
-    x0, x1 = min(tip1[0], tip2[0]) - m, max(tip1[0], tip2[0]) + m
-    y0, y1 = min(tip1[1], tip2[1]) - m, max(tip1[1], tip2[1]) + m
-    mid = ((tip1[0] + tip2[0]) / 2, (tip1[1] + tip2[1]) / 2)
-    span = math.dist(tip1, tip2)
-    best, bd = None, 1e18
-    for t in ctx.dim_text_index.query(x0, y0, x1, y1):
-        if id(t) in res.consumed_texts:
-            continue
-        c = t.center()
-        h = max(t.height, 1.0)
-        d = point_line_distance(c, tip1, tip2)
-        if d > ATol.TEXT_NEAR * h:
-            continue
-        if math.dist(c, mid) > span / 2 + 4 * h + ATol.TEXT_NEAR * h:
-            continue
-        # The value is written along the dimension line (aligned style) or
-        # horizontally (unidirectional style); any other angle is a mismatch.
-        line_ang = angle_deg((tip2[0] - tip1[0], -(tip2[1] - tip1[1])))
-        if (angle_diff_mod180(line_ang, t.rotation) > 30.0
-                and angle_diff_mod180(t.rotation, 0.0) > 5.0):
-            continue
-        if d < bd:
-            best, bd = t, d
-    return best
 
 
 def _find_extension(ctx: _Context, tip: Point, axis: Tuple[float, float]
@@ -472,14 +496,15 @@ def _consume_chain_lines(ctx: _Context, res: AnnotationResult) -> None:
     dimensions on its line cover it (otherwise it would stay as a duplicate
     line under the dimensions)."""
     dims = [d for d in res.dimensions
-            if d.kind == "arrow" and d.tip1 is not None and d.tip2 is not None]
+            if d.kind in ("arrow", "learned") and d.tip1 is not None
+            and d.tip2 is not None]
     if not dims:
         return
     index: GridIndex[DimensionEntity] = GridIndex(24.0)
     for d in dims:
         index.insert(d, (min(d.tip1[0], d.tip2[0]), min(d.tip1[1], d.tip2[1]),
                          max(d.tip1[0], d.tip2[0]), max(d.tip1[1], d.tip2[1])))
-    for pl in ctx.lines:
+    for pl in list(ctx.lines):
         if pl.consumed:
             continue
         a, b = pl.points
@@ -526,7 +551,7 @@ def _make_dimension(ctx: _Context, res: AnnotationResult, t1: Point,
                 e[1].consumed = True
                 ctx.ext_ids.add(id(e[1]))
     beyond = [e[2] for e in (e1, e2) if e]
-    res.consumed_texts.add(id(text))
+    res.consumed_texts.update(text_ids(text))
     _consume_dim_line(ctx, t1, t2)
     return DimensionEntity(def_point1=p1, def_point2=p2,
                            line_point=((t1[0] + t2[0]) / 2,
@@ -539,12 +564,32 @@ def _make_dimension(ctx: _Context, res: AnnotationResult, t1: Point,
                            ext2=bool(e2) and consume_ext,
                            ext_beyond=(sum(beyond) / len(beyond)
                                        if beyond else None),
-                           line_beyond=line_beyond)
+                           line_beyond=line_beyond,
+                           mtext=getattr(text, "mtext", "") or "")
 
 
 # ---------------------------------------------------------------------------
-# Arrow dimensions (pairs found along common axes -> handles chains)
+# Linear dimensions: frames x values, matched over the whole sheet
 # ---------------------------------------------------------------------------
+@dataclass
+class _Frame:
+    """Two terminators facing each other on one line."""
+    t1: Point
+    t2: Point
+    kind: str                  # "arrow" | "tick" | "dot"
+    terms: tuple = ()          # Arrowheads; ticks: indexes in ticks list
+    size: float = 0.0          # terminator size (points)
+    line: Optional[EPolyline] = None     # tick / dot frames: the line
+    cad: str = ""              # CAD arrow block
+    mixed: bool = False        # two different kinds of arrows
+    penalty: float = 0.0       # arrows pointing at each other, other
+                               # terminators between the two ends
+
+    @property
+    def span(self) -> float:
+        return math.dist(self.t1, self.t2)
+
+
 def _axis_key(tip: Point, d: Tuple[float, float]) -> Tuple[int, int]:
     """Bucket key of the infinite line through `tip` along `d`.
     Sign-agnostic (abs offset, angle mod 180) so that two opposite arrows on
@@ -555,21 +600,24 @@ def _axis_key(tip: Point, d: Tuple[float, float]) -> Tuple[int, int]:
     return (int(round(theta / 4.0)) % 45, int(round(offset / 3.0)))
 
 
-def _arrow_dimensions(ctx: _Context, arrows: List[Arrowhead],
-                      res: AnnotationResult) -> None:
+def _arrow_frames(arrows: List[Arrowhead]) -> List[_Frame]:
+    """Pairs of arrows pointing in opposite directions on one line
+    (outwards; inwards for small dimensions with the arrows outside). Each
+    arrow keeps its three nearest partners."""
+    arrows = [a for a in arrows if a.has_direction and not a.used]
     buckets: Dict[Tuple[int, int], List[int]] = {}
     for i, a in enumerate(arrows):
         buckets.setdefault(_axis_key(a.tip, a.direction), []).append(i)
     cos_opp = math.cos(math.radians(180.0 - ATol.OPPOSITE_DEG))
+    frames: List[_Frame] = []
+    seen: set = set()
     for i, a1 in enumerate(arrows):
-        if a1.used:
-            continue
         kt, ko = _axis_key(a1.tip, a1.direction)
         cands = []
         for dt in (-1, 0, 1):
             for do in (-1, 0, 1):
                 for j in buckets.get(((kt + dt) % 45, ko + do), ()):
-                    if j == i or arrows[j].used:
+                    if j == i:
                         continue
                     a2 = arrows[j]
                     dot = (a1.direction[0] * a2.direction[0]
@@ -591,91 +639,681 @@ def _arrow_dimensions(ctx: _Context, arrows: List[Arrowhead],
                     inward = s2 < 0 < s1       # small dims: arrows outside
                     if outward or inward:
                         cands.append((span, 0 if outward else 1, j))
-        for _, _, j in sorted(cands):
-            a2 = arrows[j]
-            text = _nearest_dim_text(ctx, res, a1.tip, a2.tip)
-            if text is None:
+        for _, inward, j in sorted(cands)[:3]:
+            key = (min(i, j), max(i, j))
+            if key in seen:
                 continue
-            a1.used = a2.used = True
-            res.consumed_fills.update({id(a1.fill), id(a2.fill)})
-            res.dimensions.append(
-                _make_dimension(ctx, res, a1.tip, a2.tip, text, "arrow",
-                                terminator=(a1.length + a2.length) / 2.0))
-            break
+            seen.add(key)
+            a2 = arrows[j]
+            cad = a1.cad_arrow() if a1.kind != "filled" else a2.cad_arrow()
+            # arrows pointing at each other are rarer than pointing away
+            # (and two neighbours of a chain look like that); a frame with
+            # other arrows between its ends is two dimensions, not one
+            inner = _arrows_between(arrows, buckets, a1, a2)
+            frames.append(_Frame(a1.tip, a2.tip, "arrow", (a1, a2),
+                                 size=(a1.length + a2.length) / 2.0,
+                                 cad=cad, mixed=a1.kind != a2.kind,
+                                 penalty=0.5 * inward + 0.6 * inner))
+    return frames
 
 
-# ---------------------------------------------------------------------------
-# Tick-mark dimensions (architectural style)
-# ---------------------------------------------------------------------------
-def _tick_dimensions(ctx: _Context, res: AnnotationResult) -> None:
+def _arrows_between(arrows: List[Arrowhead], buckets, a1: Arrowhead,
+                    a2: Arrowhead) -> int:
+    """Arrows lying on the line a1-a2, strictly between the two tips."""
+    kt, ko = _axis_key(a1.tip, a1.direction)
+    span = math.dist(a1.tip, a2.tip)
+    u = ((a2.tip[0] - a1.tip[0]) / span, (a2.tip[1] - a1.tip[1]) / span)
+    n = 0
+    seen: set = set()
+    for dt in (-1, 0, 1):
+        for do in (-1, 0, 1):
+            for j in buckets.get(((kt + dt) % 45, ko + do), ()):
+                a = arrows[j]
+                if a is a1 or a is a2 or id(a) in seen:
+                    continue
+                seen.add(id(a))
+                if point_line_distance(a.tip, a1.tip, a2.tip) \
+                        > ATol.COLLINEAR_OFF:
+                    continue
+                t = (a.tip[0] - a1.tip[0]) * u[0] + (a.tip[1] - a1.tip[1]) * u[1]
+                if 1.0 < t < span - 1.0:
+                    n += 1
+    return min(n, 4)
+
+
+def _tick_list(ctx: _Context) -> list:
+    """Short lines that may be oblique ticks: (mid, angle, line, length)."""
     ticks = []
-    tick_index: GridIndex[int] = GridIndex(12.0)
-    tick_max = ATol.TICK_MAX_LEN * ctx.k        # longer ticks on larger prints
     for pl in ctx.lines:
-        if pl.consumed:
+        if pl.consumed or pl.style.pdf_layer == LAYER_SHX_STROKES:
             continue
         a, b = pl.points
         L = math.dist(a, b)
-        if ATol.TICK_MIN_LEN <= L <= tick_max:
-            mid = ((a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0)
+        mid = ((a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0)
+        if ATol.TICK_MIN_LEN <= L <= ATol.TICK_MAX_LEN * ctx.k_at(mid):
             ang = angle_deg((b[0] - a[0], b[1] - a[1])) % 180.0
-            k = len(ticks)
             ticks.append((mid, ang, pl, L))
-            tick_index.insert(k, (mid[0], mid[1], mid[0], mid[1]))
+    return ticks
+
+
+def _stations(ctx: _Context, line: EPolyline, items, max_reach: float,
+              accept) -> list:
+    """Things lying on a line, sorted along it: [(t, item)]; `accept(item,
+    line angle)` filters them."""
+    a, b = line.points
+    L = math.dist(a, b)
+    u = ((b[0] - a[0]) / L, (b[1] - a[1]) / L)
+    line_ang = angle_deg(u)
+    out = []
+    for item, p in items:
+        if point_line_distance(p, a, b) > ATol.TICK_ON_LINE:
+            continue
+        t = (p[0] - a[0]) * u[0] + (p[1] - a[1]) * u[1]
+        if not -max_reach <= t <= L + max_reach:
+            continue
+        if accept(item, line_ang):
+            out.append((t, item))
+    out.sort(key=lambda x: x[0])
+    return out
+
+
+def _tick_frames(ctx: _Context, ticks: list) -> List[_Frame]:
+    """Consecutive oblique ticks along a line."""
     if len(ticks) < 2:
-        return
-    used = [False] * len(ticks)
+        return []
+    index: GridIndex[int] = GridIndex(12.0)
+    for k, (mid, _, _, _) in enumerate(ticks):
+        index.insert(k, (mid[0], mid[1], mid[0], mid[1]))
+    frames: List[_Frame] = []
     for line in sorted(ctx.lines, key=lambda p: -math.dist(*p.points)):
         if line.consumed:
             continue
         a, b = line.points
-        L = math.dist(a, b)
-        if L < ATol.TICK_PAIR_MIN:
+        if math.dist(a, b) < ATol.TICK_PAIR_MIN:
             continue
-        u = ((b[0] - a[0]) / L, (b[1] - a[1]) / L)
-        line_ang = angle_deg(u)
-        m = ATol.TICK_ON_LINE + tick_max
-        on_line = []
-        for k in tick_index.query(min(a[0], b[0]) - m, min(a[1], b[1]) - m,
-                                  max(a[0], b[0]) + m, max(a[1], b[1]) + m):
-            mid, ang, tpl, _ = ticks[k]
-            if used[k] or tpl is line or tpl.consumed:
-                continue
-            if point_line_distance(mid, a, b) > ATol.TICK_ON_LINE:
-                continue
-            t = (mid[0] - a[0]) * u[0] + (mid[1] - a[1]) * u[1]
-            if not -tick_max <= t <= L + tick_max:
-                continue
-            rel = angle_diff_mod180(ang, line_ang)
-            if ATol.TICK_OBLIQUE_LO <= rel <= ATol.TICK_OBLIQUE_HI:
-                on_line.append((t, k))
-        if len(on_line) < 2:
-            continue
-        on_line.sort()
-        made, intervals = [], 0
+        m = ATol.TICK_ON_LINE + ATol.TICK_MAX_LEN * ctx.k
+        cand = [(k, ticks[k][0]) for k in index.query(
+            min(a[0], b[0]) - m, min(a[1], b[1]) - m,
+            max(a[0], b[0]) + m, max(a[1], b[1]) + m)
+            if ticks[k][2] is not line and not ticks[k][2].consumed]
+
+        def oblique(k, line_ang):
+            rel = angle_diff_mod180(ticks[k][1], line_ang)
+            return ATol.TICK_OBLIQUE_LO <= rel <= ATol.TICK_OBLIQUE_HI
+        on_line = _stations(ctx, line, cand, m, oblique)
         for (t_a, ka), (t_b, kb) in zip(on_line, on_line[1:]):
             if t_b - t_a < ATol.TICK_PAIR_MIN:
                 continue
-            intervals += 1
-            p1, p2 = ticks[ka][0], ticks[kb][0]
-            text = _nearest_dim_text(ctx, res, p1, p2)
-            if text is None:
+            frames.append(_Frame(ticks[ka][0], ticks[kb][0], "tick",
+                                 (ka, kb), size=(ticks[ka][3]
+                                                 + ticks[kb][3]) / 2.0,
+                                 line=line))
+    return frames
+
+
+def _dot_frames(ctx: _Context, dots: List[Arrowhead]) -> List[_Frame]:
+    """Consecutive dots along a line (two dots at one place, the ends of
+    two dimensions of a chain, count once)."""
+    if len(dots) < 2:
+        return []
+    index: GridIndex[Arrowhead] = GridIndex(12.0)
+    for d in dots:
+        index.insert(d, (d.tip[0], d.tip[1], d.tip[0], d.tip[1]))
+    frames: List[_Frame] = []
+    for line in ctx.lines:
+        if line.consumed:
+            continue
+        a, b = line.points
+        if math.dist(a, b) < ATol.MIN_SPAN:
+            continue
+        m = 4.0
+        cand = [(d, d.tip) for d in index.query(
+            min(a[0], b[0]) - m, min(a[1], b[1]) - m,
+            max(a[0], b[0]) + m, max(a[1], b[1]) + m) if not d.used]
+        on_line = _stations(ctx, line, cand, m, lambda d, ang: True)
+        groups: List[Tuple[float, List[Arrowhead]]] = []
+        for t, d in on_line:
+            if groups and t - groups[-1][0] <= 0.6:
+                groups[-1][1].append(d)
+            else:
+                groups.append((t, [d]))
+        for (t_a, ga), (t_b, gb) in zip(groups, groups[1:]):
+            if t_b - t_a < ATol.MIN_SPAN:
                 continue
-            for k in (ka, kb):            # consume ticks BEFORE looking for
-                used[k] = True            # extension lines (a steep tick must
-                ticks[k][2].consumed = True   # not pass for one)
-            dim = _make_dimension(ctx, res, p1, p2, text, "tick",
-                                  terminator=(ticks[ka][3] + ticks[kb][3]) / 2)
-            res.dimensions.append(dim)
-            made.append(dim)
-        if made and len(made) == intervals:
+            frames.append(_Frame(ga[0].tip, gb[0].tip, "dot",
+                                 (tuple(ga), tuple(gb)),
+                                 size=(ga[0].length + gb[0].length) / 2.0,
+                                 line=line, cad="DOT"))
+    return frames
+
+
+def _frame_texts(ctx: _Context, res: AnnotationResult,
+                 f: _Frame) -> List[Tuple[float, RawText]]:
+    """Values that may belong to a frame, with their cost on geometry
+    alone: distance to the line (text heights), outside the span, and
+    off-centre."""
+    tip1, tip2 = f.t1, f.t2
+    m = ctx.text_margin
+    x0, x1 = min(tip1[0], tip2[0]) - m, max(tip1[0], tip2[0]) + m
+    y0, y1 = min(tip1[1], tip2[1]) - m, max(tip1[1], tip2[1]) + m
+    mid = ((tip1[0] + tip2[0]) / 2, (tip1[1] + tip2[1]) / 2)
+    span = f.span
+    u = ((tip2[0] - tip1[0]) / span, (tip2[1] - tip1[1]) / span)
+    line_ang = angle_deg((tip2[0] - tip1[0], -(tip2[1] - tip1[1])))
+    out = []
+    for t in ctx.dim_text_index.query(x0, y0, x1, y1):
+        if text_ids(t) & res.consumed_texts:
+            continue
+        c = t.center()
+        h = max(t.height, 1.0)
+        d = point_line_distance(c, tip1, tip2)
+        if d > ATol.TEXT_NEAR * h:
+            continue
+        s = (c[0] - mid[0]) * u[0] + (c[1] - mid[1]) * u[1]
+        outside = max(0.0, abs(s) - span / 2.0)
+        if outside > 4 * h + ATol.TEXT_NEAR * h:
+            continue
+        # The value is written along the dimension line (aligned style) or
+        # horizontally (unidirectional style); any other angle is a mismatch.
+        if (angle_diff_mod180(line_ang, t.rotation) > 30.0
+                and angle_diff_mod180(t.rotation, 0.0) > 5.0):
+            continue
+        geo = d / h + 0.5 * outside / h \
+            + 0.15 * min(abs(s) / max(span / 2.0, 1e-9), 1.0)
+        out.append((geo, t))
+    return out
+
+
+def _value_cost(geo: float, t: RawText, span: float, votes: ScaleVotes,
+                mixed: bool = False, penalty: float = 0.0
+                ) -> Tuple[Optional[float], bool]:
+    """Cost of a value for a frame, and whether the dimension should be
+    reviewed. A doubtful value (label, remark...) that disagrees with a
+    known scale is refused (None)."""
+    nv = value_number(t.text)
+    agree = votes.check(nv[0], nv[1], span) if nv else None
+    cost, review = geo, False
+    if is_plain(t.text):
+        if agree is True:
+            cost -= 0.8
+        elif agree is False:          # not to scale, or not its value
+            cost += 1.2
+            review = True
+    elif nv is None:                  # "EQ"
+        cost += 0.6
+    elif agree is True:
+        cost -= 0.4
+    elif agree is False:
+        return None, False
+    else:                             # nothing tells the scale
+        cost += 0.8
+        review = True
+    if isinstance(t, CompositeText):
+        cost -= 0.2
+    if mixed:
+        cost += 0.3
+    return cost + penalty, review
+
+
+def _linear_dimensions(ctx: _Context, arrows: List[Arrowhead],
+                       dots: List[Arrowhead], res: AnnotationResult,
+                       ticks_on: bool, votes: ScaleVotes) -> None:
+    ticks = _tick_list(ctx) if ticks_on else []
+    frames = _arrow_frames(arrows) + _dot_frames(ctx, dots) \
+        + _tick_frames(ctx, ticks)
+    pairs = []
+    for fi, f in enumerate(frames):
+        for geo, t in _frame_texts(ctx, res, f):
+            pairs.append((geo, fi, t))
+    if not pairs:
+        return
+    # 1. the clear pairs (each other's best, plain value) vote the scale
+    best_f: Dict[int, Tuple[float, RawText]] = {}
+    best_t: Dict[int, Tuple[float, int]] = {}
+    for geo, fi, t in pairs:
+        geo += frames[fi].penalty
+        if fi not in best_f or geo < best_f[fi][0]:
+            best_f[fi] = (geo, t)
+        if id(t) not in best_t or geo < best_t[id(t)][0]:
+            best_t[id(t)] = (geo, fi)
+    for fi, (geo, t) in best_f.items():
+        if best_t[id(t)][1] == fi and geo <= ATol.CLEAR_COST \
+                and frames[fi].penalty == 0.0 and is_plain(t.text):
+            nv = value_number(t.text)
+            if nv:
+                votes.add(nv[0], nv[1], frames[fi].span)
+    votes.finish()
+    # 2. every pair with its full cost, the cheapest first
+    scored = []
+    for geo, fi, t in pairs:
+        cost, review = _value_cost(geo, t, frames[fi].span, votes,
+                                   frames[fi].mixed, frames[fi].penalty)
+        if cost is not None:
+            scored.append((cost, fi, t, review))
+    scored.sort(key=lambda x: x[0])
+    taken_texts: set = set()
+    taken_arrows: set = set()
+    tick_use: Dict[int, int] = {}
+    done: set = set()
+    chosen = []
+    for _cost, fi, t, review in scored:
+        f = frames[fi]
+        ids = text_ids(t)
+        if fi in done or ids & taken_texts or ids & res.consumed_texts:
+            continue
+        if f.kind == "arrow":
+            if any(id(a) in taken_arrows for a in f.terms):
+                continue
+            taken_arrows.update(id(a) for a in f.terms)
+        elif f.kind == "dot":
+            ends = [id(g[0]) for g in f.terms]
+            if any(tick_use.get(e, 0) >= 2 for e in ends):
+                continue
+            for e in ends:
+                tick_use[e] = tick_use.get(e, 0) + 1
+        else:
+            if any(tick_use.get(-1 - k, 0) >= 2 for k in f.terms):
+                continue
+            for k in f.terms:
+                tick_use[-1 - k] = tick_use.get(-1 - k, 0) + 1
+        taken_texts |= ids
+        done.add(fi)
+        chosen.append((f, t, review))
+    # 3. terminators first (a steep tick must not pass for an extension
+    #    line), then the dimensions
+    for f, _t, _review in chosen:
+        if f.kind == "arrow":
+            for a in f.terms:
+                _use_terminator(ctx, res, a)
+        elif f.kind == "dot":
+            for g in f.terms:
+                for d in g:
+                    _use_terminator(ctx, res, d)
+        else:
+            for k in f.terms:
+                ticks[k][2].consumed = True
+    by_line: Dict[int, list] = {}
+    for f, t, review in chosen:
+        dim = _make_dimension(ctx, res, f.t1, f.t2, t, f.kind,
+                              terminator=f.size)
+        dim.arrow = f.cad
+        dim.review = review
+        _consume_value_marks(ctx, t)
+        res.dimensions.append(dim)
+        if f.line is not None:
+            by_line.setdefault(id(f.line), []).append((f, dim))
+    # 4. a tick / dot line whose every interval is a dimension is theirs
+    intervals: Dict[int, int] = {}
+    lines: Dict[int, EPolyline] = {}
+    for f in frames:
+        if f.line is not None:
+            intervals[id(f.line)] = intervals.get(id(f.line), 0) + 1
+            lines[id(f.line)] = f.line
+    for lid, made in by_line.items():
+        if len(made) != intervals.get(lid, 0):
+            continue
+        line = lines[lid]
+        line.consumed = True
+        if made[0][0].kind != "tick":
+            continue
+        # the line passes the end ticks (CAD "dimension line extension"):
+        # the CAD dimensions draw it, never longer than in the PDF
+        a, b = line.points
+        L = math.dist(a, b)
+        u = ((b[0] - a[0]) / L, (b[1] - a[1]) / L)
+        ts = [(p[0] - a[0]) * u[0] + (p[1] - a[1]) * u[1]
+              for f, _ in made for p in (f.t1, f.t2)]
+        ends = (min(ts), L - max(ts))
+        if min(ends) > 0.5:
+            for _, dim in made:
+                dim.line_beyond = min(ends)
+
+
+def _consume_value_marks(ctx: _Context, t: RawText) -> None:
+    """The bar of a stacked fraction drawn as a line: part of the value."""
+    if not isinstance(t, CompositeText) or "/" not in t.text:
+        return
+    d = t.direction()
+    w = t.width or 0.55 * t.height * len(t.text)
+    c = t.center()
+    for pl in ctx.line_index.near(c[0], c[1], w):
+        if pl.consumed:
+            continue
+        a, b = pl.points
+        L = math.dist(a, b)
+        if L > 0.8 * w or L < 0.5:
+            continue
+        if abs((b[0] - a[0]) * d[0] + (b[1] - a[1]) * d[1]) < 0.9 * L:
+            continue
+        mid = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
+        if point_line_distance(mid, t.origin,
+                               (t.origin[0] + d[0], t.origin[1] + d[1])) \
+                < t.height and math.dist(mid, c) < w:
+            pl.consumed = True
+
+
+# ---------------------------------------------------------------------------
+# From the value: its line, and the shapes at both ends of the line
+# ---------------------------------------------------------------------------
+def _line_under(ctx: _Context, t: RawText) -> Optional[EPolyline]:
+    """The line a value is written along (above, under or on it), the value
+    lying between its ends."""
+    c = t.center()
+    h = max(t.height, 1.0)
+    best, bd = None, 1e18
+    for pl in ctx.line_index.near(c[0], c[1], ATol.LINE_UNDER * h):
+        if pl.consumed:
+            continue
+        a, b = pl.points
+        L = math.dist(a, b)
+        if L < 2.0 * h:
+            continue
+        ang = angle_deg((b[0] - a[0], -(b[1] - a[1])))
+        if angle_diff_mod180(ang, t.rotation) > 5.0:
+            continue
+        d = point_line_distance(c, a, b)
+        if d > ATol.LINE_UNDER * h:
+            continue
+        s = ((c[0] - a[0]) * (b[0] - a[0]) + (c[1] - a[1]) * (b[1] - a[1])) / L
+        if not 0.0 < s < L:
+            continue
+        if d < bd:
+            best, bd = pl, d
+    return best
+
+
+class _Ends:
+    """Small pieces of geometry, for the shapes at line ends."""
+
+    def __init__(self, ctx: _Context, res: AnnotationResult):
+        self.ctx = ctx
+        self.res = res
+        self.segs: GridIndex = GridIndex(8.0)
+        for pl in ctx.rp.polylines:
+            if pl.consumed or pl.style.pdf_layer == LAYER_SHX_STROKES:
+                continue
+            pts = pl.points
+            pairs = list(zip(pts, pts[1:]))
+            if pl.closed and len(pts) > 2:
+                pairs.append((pts[-1], pts[0]))
+            for a, b in pairs:
+                if math.dist(a, b) <= 30.0:
+                    self.segs.insert((pl, a, b), (min(a[0], b[0]),
+                                                  min(a[1], b[1]),
+                                                  max(a[0], b[0]),
+                                                  max(a[1], b[1])))
+        self.fills: GridIndex[RawFill] = GridIndex(8.0)
+        for f in ctx.rp.page.fills:
+            if f.background or id(f) in res.consumed_fills:
+                continue
+            xs = [p[0] for p in f.points]
+            ys = [p[1] for p in f.points]
+            self.fills.insert(f, (min(xs), min(ys), max(xs), max(ys)))
+
+    def stations(self, line: EPolyline, r: float) -> list:
+        """Small shapes touching a line (crossing it, ending on it, centred
+        on it), grouped by their place along it:
+        [(s, items, strokes, fills)], s from the first end."""
+        a, b = line.points
+        L = math.dist(a, b)
+        u = ((b[0] - a[0]) / L, (b[1] - a[1]) / L)
+        x0, x1 = min(a[0], b[0]) - r, max(a[0], b[0]) + r
+        y0, y1 = min(a[1], b[1]) - r, max(a[1], b[1]) + r
+        found = []
+        for pl, p, q in self.segs.query(x0, y0, x1, y1):
+            if pl is line or pl.consumed or math.dist(p, q) > 2.0 * r:
+                continue
+            hit = segment_intersection(p, q, a, b, eps=0.0)
+            if hit is None:
+                dp = point_segment_distance(p, a, b)
+                dq = point_segment_distance(q, a, b)
+                if min(dp, dq) > 0.6:
+                    continue
+                hit = p if dp <= dq else q
+            if math.dist(p, hit) > r or math.dist(q, hit) > r:
+                continue                  # not small around the line
+            sp = (hit[0] - a[0]) * u[0] + (hit[1] - a[1]) * u[1]
+            found.append((sp, ("seg", (p, q)), (pl, p, q), None))
+        for f in self.fills.query(x0, y0, x1, y1):
+            if id(f) in self.res.consumed_fills:
+                continue
+            xs, ys = [p[0] for p in f.points], [p[1] for p in f.points]
+            cx, cy = (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
+            if any(math.dist(p, (cx, cy)) > r for p in f.points):
+                continue
+            if point_segment_distance((cx, cy), a, b) > 0.6 and \
+                    min(point_segment_distance(p, a, b) for p in f.points) > 0.6:
+                continue
+            sp = (cx - a[0]) * u[0] + (cy - a[1]) * u[1]
+            found.append((sp, ("fill", f), None, f))
+        found.sort(key=lambda x: x[0])
+        out = []
+        for sp, item, stroke, fill in found:
+            if out and sp - out[-1][4] <= 0.4 * r:
+                st = out[-1]
+            else:
+                st = [sp, [], [], [], sp]
+                out.append(st)
+            st[1].append(item)
+            if stroke is not None:
+                st[2].append(stroke)
+            if fill is not None:
+                st[3].append(fill)
+            st[4] = sp
+        res = []
+        for sp0, items, strokes, fills, sp1 in out:
+            res.append(((sp0 + sp1) / 2.0, items, strokes, fills))
+        return res
+
+    def at(self, end: Point, r: float, line: EPolyline):
+        """Pieces lying within r of a line end and touching it:
+        ([("seg", (a, b)) | ("fill", fill)], strokes, fills)."""
+        items, strokes, fills = [], [], []
+        touch = max(0.25 * r, 1.0)
+        near = 1e18
+        for pl, a, b in self.segs.near(end[0], end[1], r):
+            if pl is line or pl.consumed:
+                continue
+            if math.dist(a, end) > r + 0.3 or math.dist(b, end) > r + 0.3:
+                continue
+            items.append(("seg", (a, b)))
+            strokes.append((pl, a, b))
+            near = min(near, point_segment_distance(end, a, b))
+        for f in self.fills.near(end[0], end[1], r):
+            if id(f) in self.res.consumed_fills:
+                continue
+            if any(math.dist(p, end) > r + 0.3 for p in f.points):
+                continue
+            items.append(("fill", f))
+            fills.append(f)
+            near = min(near, min(math.dist(p, end) for p in f.points))
+        if near > touch:
+            return [], [], []
+        return items, strokes, fills
+
+
+def _learned_dimensions(ctx: _Context, res: AnnotationResult,
+                        votes: ScaleVotes, ticks_on: bool = True) -> None:
+    """Values still free: the line they are written along, and the small
+    shapes on that line on both sides of the value (at its ends, or in the
+    middle of a chain). The same shape on both sides — and repeated on
+    other dimension lines of the sheet — is a terminator, whatever its
+    form."""
+    free = [t for t in ctx.dim_texts
+            if not (text_ids(t) & res.consumed_texts) and not _is_label(ctx, t)]
+    if not free:
+        return
+    ends = _Ends(ctx, res)
+    cands = []
+    for t in free:
+        line = _line_under(ctx, t)
+        if line is None:
+            continue
+        a, b = line.points
+        L = math.dist(a, b)
+        u = ((b[0] - a[0]) / L, (b[1] - a[1]) / L)
+        r = max(ATol.END_RADIUS * t.height, 4.0)
+        c = t.center()
+        st = (c[0] - a[0]) * u[0] + (c[1] - a[1]) * u[1]
+        stations = ends.stations(line, r)
+        left = [x for x in stations if x[0] < st]
+        right = [x for x in stations if x[0] > st]
+        if not left or not right:
+            continue
+        sa, sb = left[-1], right[0]
+        if sb[0] - sa[0] < 2.0 * r:
+            continue
+        pa = (a[0] + u[0] * sa[0], a[1] + u[1] * sa[0])
+        pb = (a[0] + u[0] * sb[0], a[1] + u[1] * sb[0])
+        if not ticks_on and (_tick_like(sa[1], u) or _tick_like(sb[1], u)):
+            continue                      # tick dimensions are switched off
+        sig_a = end_shape(sa[1], pa, u, r)
+        sig_b = end_shape(sb[1], pb, (-u[0], -u[1]), r)
+        if len(sig_a) < 2 or len(sig_b) < 2 or \
+                best_similarity(sig_a, sig_b) < ATol.SAME_SHAPE:
+            continue
+        cands.append((t, line, pa, pb, sa, sb, sig_a, sig_b))
+    if not cands:
+        return
+    shapes = [x for c in cands for x in (c[6], c[7])]
+    support = [sum(1 for o in shapes if best_similarity(x, o)
+                   >= ATol.SAME_SHAPE) for x in shapes]
+    order = sorted(range(len(cands)), key=lambda i: -min(support[2 * i],
+                                                         support[2 * i + 1]))
+    shared: set = set()                   # ends of the dimensions made here
+    made: Dict[int, list] = {}
+    for i in order:
+        t, line, pa, pb, sa, sb, sig_a, sig_b = cands[i]
+        if text_ids(t) & res.consumed_texts:
+            continue
+        items = sa[2] + sb[2]
+        fills = sa[3] + sb[3]
+        if any(pl.consumed and (id(pl), p, q) not in shared
+               for pl, p, q in items) or \
+                any(id(f) in res.consumed_fills and id(f) not in shared
+                    for f in fills):
+            continue
+        seen = min(support[2 * i], support[2 * i + 1])
+        if seen < ATol.LEARNED_MIN:
+            continue                      # one shape at two ends: not enough
+        nv = value_number(t.text)
+        agree = votes.check(nv[0], nv[1], math.dist(pa, pb)) if nv else None
+        if agree is False:
+            continue                      # unknown ends AND not to scale
+        sure = seen >= ATol.LEARNED_SURE
+        dim = _make_dimension(ctx, res, pa, pb, t, "learned")
+        dim.arrow = "NONE"
+        dim.extra_lines = [[p, q] for pl, p, q in items
+                           if (id(pl), p, q) not in shared]
+        dim.extra_fills = [list(f.points) for f in fills
+                           if id(f) not in shared]
+        dim.terminator = max((math.dist(p, e) for e, st in ((pa, sa),
+                                                           (pb, sb))
+                              for pl, p0, q0 in st[2] for p in (p0, q0)),
+                             default=0.0)
+        dim.review = not (sure and agree is True)
+        ctx.detach(items)
+        for f in fills:
+            res.consumed_fills.add(id(f))
+            shared.add(id(f))
+        shared.update((id(pl), p, q) for pl, p, q in items)
+        _consume_value_marks(ctx, t)
+        res.dimensions.append(dim)
+        made.setdefault(id(line), []).append((line, dim))
+    # the line under a chain of such dimensions is theirs when they cover it
+    for dims in made.values():
+        line = dims[0][0]
+        a, b = line.points
+        L = math.dist(a, b)
+        u = ((b[0] - a[0]) / L, (b[1] - a[1]) / L)
+        ts = sorted(((d.tip1[0] - a[0]) * u[0] + (d.tip1[1] - a[1]) * u[1],
+                     (d.tip2[0] - a[0]) * u[0] + (d.tip2[1] - a[1]) * u[1])
+                    for _, d in dims)
+        ts = [tuple(sorted(x)) for x in ts]
+        ts.sort()
+        lo, hi = ts[0]
+        whole = True
+        for s0, s1 in ts[1:]:
+            if s0 > hi + 1.0:
+                whole = False
+                break
+            hi = max(hi, s1)
+        if whole and lo <= 1.0 and hi >= L - 1.0:
             line.consumed = True
-            # the line passes the end ticks (CAD "dimension line extension"):
-            # the CAD dimensions draw it, never longer than in the PDF
-            ends = (on_line[0][0], L - on_line[-1][0])
-            if min(ends) > 0.5:
-                for dim in made:
-                    dim.line_beyond = min(ends)
+
+
+def _tick_like(items, u: Tuple[float, float]) -> bool:
+    """One oblique stroke across the line: an architectural tick."""
+    if len(items) != 1 or items[0][0] != "seg":
+        return False
+    a, b = items[0][1]
+    rel = angle_diff_mod180(angle_deg((b[0] - a[0], b[1] - a[1])),
+                            angle_deg(u))
+    return ATol.TICK_OBLIQUE_LO <= rel <= ATol.TICK_OBLIQUE_HI
+
+
+def _fallback_groups(ctx: _Context, res: AnnotationResult) -> None:
+    """Plain values still free, written along a line with something at its
+    ends (arrow, tick, extension line): the dimension could not be rebuilt
+    — its value, line and ends are grouped on layer DIM_RAW, so they move
+    as one object."""
+    free = [t for t in ctx.dim_texts
+            if not (text_ids(t) & res.consumed_texts) and is_plain(t.text)
+            and not _is_label(ctx, t)]
+    if not free:
+        return
+    ends = _Ends(ctx, res)
+    for t in free:
+        line = _line_under(ctx, t)
+        if line is None:
+            continue
+        a, b = line.points
+        r = max(ATol.END_RADIUS * t.height, 4.0)
+        L = math.dist(a, b)
+        axis = ((b[0] - a[0]) / L, (b[1] - a[1]) / L)
+        pieces = [ends.at(p, r, line) for p in (a, b)]
+        exts = [e for e in (_find_extension(ctx, p, axis) for p in (a, b))
+                if e is not None and not e[1].consumed]
+        if not any(p[0] for p in pieces) and not exts:
+            continue
+        group = DimGroup()
+        group.texts = list(t.parts) if isinstance(t, CompositeText) else [t]
+        group.lines.append(list(line.points))
+        group.styles.append(line.style)
+        line.consumed = True
+        for e in exts:
+            group.lines.append(list(e[1].points))
+            group.styles.append(e[1].style)
+            e[1].consumed = True
+        for _items, strokes, fills in pieces:
+            for pl, p, q in strokes:
+                if not pl.consumed:
+                    group.lines.append([p, q])
+                    group.styles.append(pl.style)
+            ctx.detach(strokes)
+            for f in fills:
+                if id(f) not in res.consumed_fills:
+                    group.fills.append(f)
+                    res.consumed_fills.add(id(f))
+        res.consumed_texts.update(text_ids(t))
+        res.groups.append(group)
+
+
+def _restore_twins(ctx: _Context, arrows: List[Arrowhead]) -> None:
+    """Two open arrows tip to tip drawn as two crossing strokes (an X): when
+    only one of them was used, the other one's half strokes are drawn
+    again (cutting the X removed them)."""
+    for ar in arrows:
+        twin = ar.twin
+        if ar.used and twin is not None and not twin.used \
+                and not twin.restored:
+            twin.restored = True
+            style = ar.strokes[0][0].style if ar.strokes else None
+            if style is None or not twin.v_ends:
+                continue
+            ctx.add_polyline(EPolyline(points=[twin.v_ends[0], twin.tip,
+                                               twin.v_ends[1]],
+                                       closed=False, style=style))
 
 
 # ---------------------------------------------------------------------------
@@ -872,14 +1510,12 @@ def _radial_dimensions(ctx: _Context, arrows: List[Arrowhead],
         text, path, pieces = found
         kind = "radius" if RADIUS_RE.match(text.text.strip()) else "diameter"
         center, r = curve.center, curve.radius
-        ar.used = True
-        res.consumed_fills.add(id(ar.fill))
+        _use_terminator(ctx, res, ar)
         res.consumed_texts.add(id(text))
         other = (_opposite_arrow(arrows, ar, center, u, r)
                  if kind == "diameter" else None)
         if other is not None:
-            other.used = True
-            res.consumed_fills.add(id(other.fill))
+            _use_terminator(ctx, res, other)
         for piece in pieces:
             piece.consumed = True
         # the dimension line drawn along the radius / diameter: from the
@@ -1115,8 +1751,7 @@ def _angular_dimensions(ctx: _Context, arrows: List[Arrowhead],
         if neg[0].used or pos[0].used or id(t) in res.consumed_texts:
             continue
         for x in (neg, pos):
-            x[0].used = True
-            res.consumed_fills.add(id(x[0].fill))
+            _use_terminator(ctx, res, x[0])
         res.consumed_texts.add(id(t))
         # the drawn dimension arc (and its tails outside the arrows)
         sweep = (end - start) % 360.0
@@ -1156,6 +1791,8 @@ def _text_distance(t: RawText, p: Point) -> float:
     m1 = (s1[0] + up[0] * cap, s1[1] + up[1] * cap)
     return min(point_segment_distance(p, s0, s1),
                point_segment_distance(p, m0, m1))
+
+
 def _walk_leader(ctx: _Context, first: EPolyline, end: int,
                  index: "GridIndex") -> Tuple[List[Point], List[EPolyline]]:
     """Follow a leader from its first piece through the pieces joined to
@@ -1194,7 +1831,7 @@ def _landing_texts(ctx: _Context, res: AnnotationResult,
     2. Otherwise the text nearest the tail, within LEADER_REACH heights."""
     a, b = pts[-2], pts[-1]
     tail = b
-    near = ATol.LEADER_TEXT * ctx.k          # larger on larger prints
+    near = ATol.LEADER_TEXT * ctx.k_at(tail)  # larger where values are
     reach = near + ctx.max_text_len
     seg = angle_deg((b[0] - a[0], -(b[1] - a[1])))
     above = below = None
@@ -1258,14 +1895,31 @@ def _in_line_label(pts: List[Point], t: RawText) -> bool:
 def _leader_start(ar: Arrowhead, index: "GridIndex"):
     """The piece a leader starts with: it touches the arrow (at its tip or
     its base, plotters stop the line where the arrowhead begins), runs
-    BACK along the arrow axis and never passes beyond the tip."""
-    base = (ar.tip[0] - ar.direction[0] * ar.length,
-            ar.tip[1] - ar.direction[1] * ar.length)
+    BACK along the arrow axis and never passes beyond the tip. A dot: the
+    piece starts at its centre or on its edge."""
+    if not ar.has_direction:
+        r = ar.length / 2.0
+        best, bd = None, 1e18
+        for pl, end in index.near(ar.tip[0], ar.tip[1], r + ATol.LEADER_NEAR):
+            if pl.consumed:
+                continue
+            first = pl.points[0] if end == 0 else pl.points[-1]
+            second = pl.points[1] if end == 0 else pl.points[-2]
+            d = math.dist(first, ar.tip)
+            if d > r + ATol.LEADER_NEAR or \
+                    math.dist(second, ar.tip) <= d + 0.5:
+                continue                          # must leave the dot
+            if d < bd:
+                best, bd = (pl, end), d
+        return best
+    base = ar.base()
     best, bd = None, 1e18
     radius = ATol.LEADER_NEAR + ar.length
+    own = {frozenset((a, b)) for _, a, b in ar.strokes}
     for pl, end in index.near(ar.tip[0], ar.tip[1], radius):
-        if pl.consumed:
-            continue
+        if pl.consumed or (len(pl.points) == 2
+                           and frozenset(pl.points) in own):
+            continue                          # the arrow's own stroke
         first = pl.points[0] if end == 0 else pl.points[-1]
         second = pl.points[1] if end == 0 else pl.points[-2]
         d = min(math.dist(first, ar.tip), math.dist(first, base))
@@ -1289,22 +1943,28 @@ def _leader_start(ar: Arrowhead, index: "GridIndex"):
 
 def _ends_at_arrow(ar: Arrowhead, p: Point, tips: "GridIndex",
                    longest: float) -> bool:
-    """Does the far end of a leader path touch ANOTHER arrowhead (its tip
-    or its base)? A line with an arrow at each end is a dimension line whose
-    value was not recognised, not a leader."""
+    """Does the far end of a leader path touch ANOTHER terminator (its tip
+    or its base)? A line with a terminator at each end is a dimension line
+    whose value was not recognised, not a leader."""
     for other in tips.near(p[0], p[1], ATol.LEADER_NEAR + longest):
         if other is ar:
             continue
-        base = (other.tip[0] - other.direction[0] * other.length,
-                other.tip[1] - other.direction[1] * other.length)
-        if min(math.dist(p, other.tip), math.dist(p, base)) \
-                <= ATol.LEADER_NEAR:
+        base = other.base() if other.has_direction else other.tip
+        reach = ATol.LEADER_NEAR + (0.0 if other.has_direction
+                                    else other.length / 2.0)
+        if min(math.dist(p, other.tip), math.dist(p, base)) <= reach:
             return True
     return False
 
 
 def _leaders(ctx: _Context, arrows: List[Arrowhead],
              res: AnnotationResult) -> None:
+    # an open / outline arrow is often joined to its shaft in one polyline
+    # (stroke, shaft, landing): its strokes become pieces of their own, so
+    # the shaft starts at the tip
+    for ar in arrows:
+        if not ar.used and ar.strokes:
+            ctx.split_out(ar.strokes)
     open_polys = [pl for pl in ctx.rp.polylines
                   if not pl.consumed and not pl.closed and len(pl.points) <= 6]
     end_index: GridIndex[Tuple[EPolyline, int]] = GridIndex(8.0)
@@ -1345,14 +2005,16 @@ def _leaders(ctx: _Context, arrows: List[Arrowhead],
             continue                                  # flow arrow label
         if any(t.text.strip().upper() in DIRECTION_WORDS for t in lines):
             continue                                  # "UP" on a stair
+        if not ar.has_direction and length < 4.0 * ar.length:
+            continue                                  # a dot on a short line
         for piece in pieces:
             piece.consumed = True
-        ar.used = True
-        res.consumed_fills.add(id(ar.fill))
+        _use_terminator(ctx, res, ar)
         for t in lines:
             res.consumed_texts.add(id(t))
         res.leaders.append(LeaderEntity(vertices=pts, text=txt, lines=lines,
-                                        arrow=ar.length))
+                                        arrow=ar.length,
+                                        arrow_kind=ar.cad_arrow()))
 
 
 # ---------------------------------------------------------------------------
@@ -1361,33 +2023,47 @@ def _leaders(ctx: _Context, arrows: List[Arrowhead],
 def reconstruct(rp: RebuiltPage, enable_dims: bool = True,
                 enable_leaders: bool = True,
                 enable_ticks: bool = True,
-                units_per_pt: Optional[float] = None) -> AnnotationResult:
+                units_per_pt: Optional[float] = None,
+                units: str = "mm",
+                scale_known: bool = False) -> AnnotationResult:
     """Detect dimensions (radius / diameter, angle / arc length, then linear
-    with arrows or ticks) then leaders on a page.
+    with arrows, dots or ticks, then from the values left) then leaders on
+    a page.
 
     units_per_pt (drawing units per page point) lets an arc length written
-    without its "⌒" sign be checked against the drawn arc."""
+    without its "⌒" sign be checked against the drawn arc; with
+    scale_known (the scale was read on the sheet or calibrated) it also
+    checks the values of linear dimensions."""
     res = AnnotationResult()
     page: PageData = rp.page
     ctx = _Context(rp)
-    arrows = find_arrowheads(page.fills, ctx.size)
+    filled = find_arrowheads(page.fills, ctx.size_at)
+    stroked = merge_outlined_fills(filled, find_stroke_arrows(rp.polylines,
+                                                              ctx.size_at))
+    dots = find_dots(page.fills, ctx.size_at)
+    arrows = filled + stroked               # terminators with a direction
+    votes = ScaleVotes(units_per_pt, units, scale_known)
     if enable_dims:
         # curved dimensions first: their arrows could otherwise pass for a
         # linear dimension (two nearly opposite arrows on a flat arc)
         _radial_dimensions(ctx, arrows, res)
         _angular_dimensions(ctx, arrows, res, units_per_pt)
-        _arrow_dimensions(ctx, arrows, res)
+        _linear_dimensions(ctx, arrows, dots, res, enable_ticks, votes)
         _consume_chain_lines(ctx, res)
-        if enable_ticks:
-            _tick_dimensions(ctx, res)
+        _learned_dimensions(ctx, res, votes, enable_ticks)
     if enable_leaders:
-        _leaders(ctx, arrows, res)
+        _leaders(ctx, arrows + dots, res)
+    if enable_dims:
+        _fallback_groups(ctx, res)
+    _restore_twins(ctx, stroked)
     for t in ctx.dim_texts:
         # unmatched plain measurements only ("L=3500", "2x1500"... are
         # often notes: they stay ordinary texts)
-        if id(t) not in res.consumed_texts and not _is_label(ctx, t) \
-                and DIM_TEXT_RE.match(t.text.strip()):
-            res.dim_raw_texts.append(t)
+        if text_ids(t) & res.consumed_texts or _is_label(ctx, t) \
+                or not DIM_TEXT_RE.match(t.text.strip()):
+            continue
+        res.dim_raw_texts.extend(t.parts if isinstance(t, CompositeText)
+                                 else [t])
     return res
 
 

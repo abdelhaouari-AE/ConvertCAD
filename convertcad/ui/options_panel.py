@@ -371,7 +371,8 @@ class OptionsPanel(QScrollArea):
             tr("Leaders (arrow + note)"),
             tr("Arrow + line + note becomes a leader.")))
         sec.add(label(tr("Values always keep the original PDF text. "
-                         "Unmatched values go to layer DIM_RAW for review."),
+                         "Dimensions to check go to layer DIM_CHECK, "
+                         "unmatched values to layer DIM_RAW."),
                       "caption", wrap=True))
 
     def _layers_section(self, sec):
@@ -479,6 +480,12 @@ class OptionsPanel(QScrollArea):
         self._row(sec, tr("Multi-page output"), self.page_mode, stacked=True)
         self.write_log = sec.add(self._check(
             tr("Write a conversion log next to the DXF"), ""))
+        self.export_texts = sec.add(self._check(
+            tr("List of all texts (.csv + .txt)"),
+            tr("Every text with its sheet and its position, saved next to "
+               "the drawing: to search the drawings or feed a search "
+               "engine.")))
+        self._texts_format = "both"        # csv / txt only: CLI or preset
         self.open_folder = QCheckBox(tr("Open the folder after saving"))
         self.open_folder.setChecked(self.settings.open_folder_after_save)
         self.open_folder.toggled.connect(self._on_open_folder)
@@ -570,6 +577,8 @@ class OptionsPanel(QScrollArea):
             dxf_version=self.dxf_version.currentData(),
             page_mode=self.page_mode.currentData(),
             write_log=self.write_log.isChecked(),
+            export_texts=(self._texts_format
+                          if self.export_texts.isChecked() else ""),
         )
 
     def set_options(self, o: Options) -> None:
@@ -596,8 +605,10 @@ class OptionsPanel(QScrollArea):
                           (self.text_layer, o.use_pdf_text_layer),
                           (self.images, o.include_images),
                           (self.auto_scale, o.auto_scale),
-                          (self.write_log, o.write_log)):
+                          (self.write_log, o.write_log),
+                          (self.export_texts, o.export_texts)):
                 cb.setChecked(bool(v))
+            self._texts_format = o.export_texts or "both"
             for combo, v in ((self.precision, o.curve_precision),
                              (self.layer_mode, o.layer_mode),
                              (self.color_mode, o.color_mode),

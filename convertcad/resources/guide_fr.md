@@ -46,7 +46,7 @@ F3 active ou désactive l'accrochage.
 | Sable, béton, gravier, terre, brique, isolant ou points dessinés en nombreux tirets et points | Une **HACHURE** au motif standard (AR-SAND, AR-CONC, GRAVEL, EARTH, BRICK, INSUL, DOTS…) à l'échelle et à l'angle mesurés sur le PDF |
 | Texte | **TEXT** dans la police du PDF (Arial, Times New Roman, Courier New, Calibri…, gras et italique), sa taille et sa longueur ; les lignes empilées deviennent un paragraphe **MTEXT**, aligné à gauche, centré ou à droite comme dans le PDF |
 | Texte SHX AutoCAD dessiné en traits | Vrai **TEXTE** sur le calque TEXT_SHX (les traits restent sur le calque masqué TEXT_SHX_STROKES) |
-| Flèche + ligne + flèche + valeur | Vraie **COTE** (calque DIM) — la valeur garde le texte du PDF |
+| Flèche + ligne + flèche + valeur | Vraie **COTE** (calque DIM) — la valeur garde le texte du PDF. Toute extrémité : flèches pleines, ouvertes ou vides, points, croix, ou une forme que la feuille répète aux extrémités de ses cotes (apprise sur la feuille) |
 | Traits obliques + ligne + valeur | Vraie **COTE** à traits architecturaux |
 | Flèche sur un cercle ou un arc + valeur « R… » / « Ø… » | Vraie cote de **RAYON** / **DIAMÈTRE** |
 | Deux flèches sur un arc + un angle (« 45° ») ou une longueur d'arc | Vraie cote **ANGULAIRE** / de **LONGUEUR D'ARC** — seulement quand la valeur correspond à l'arc dessiné |
@@ -55,7 +55,7 @@ F3 active ou désactive l'accrochage.
 | Feuilles scannées | **LIGNES**, **CERCLES** et **ARCS** sur le calque TRACE_LINES, texte lu par OCR |
 | Images incorporées, scans | Image sur le calque verrouillé IMG_RASTER |
 
-Les textes de mesure non associés à une cote sont placés sur le calque **DIM_RAW** (rouge) pour vérification. Rien n'est inventé : un motif ou une cote n'est reconstruit que s'il reproduit le PDF ; sinon ses morceaux restent tels quels. La cote de longueur d'arc est écrite en vraie ARC_DIMENSION à partir du DXF 2007 ; pour les versions antérieures et le DWG, elle est conservée sous forme de dessin sur le calque DIM.
+Chaque cote est mesurée et sa valeur comparée à l'échelle du dessin : une valeur qui ne correspond pas est reconstruite sur le calque **DIM_CHECK** (magenta), à vérifier. Les textes de mesure non associés à une cote sont placés sur le calque **DIM_RAW** (rouge) ; une cote qui n'a pas pu être reconstruite garde sa valeur, sa ligne et ses flèches ensemble, en un groupe sur DIM_RAW. Rien n'est inventé : un motif ou une cote n'est reconstruit que s'il reproduit le PDF ; sinon ses morceaux restent tels quels. La cote de longueur d'arc est écrite en vraie ARC_DIMENSION à partir du DXF 2007 ; pour les versions antérieures et le DWG, elle est conservée sous forme de dessin sur le calque DIM.
 
 ## Les réglages
 
@@ -71,7 +71,7 @@ Les textes de mesure non associés à une cote sont placés sur le calque **DIM_
 
 **Pages scannées** — vectoriser lignes, cercles et arcs ; lire le texte par OCR (modèles PP-OCR, sur cet ordinateur) ; *langues OCR* : anglais, français… (alphabet latin, intégré), un autre alphabet (arabe, cyrillique, grec…) ou les deux pour les plans mixtes — seules les langues installées sont proposées ; *précision de l'OCR* : standard (modèle intégré) ou maximale (modèles plus grands, plus lents) ; **Langues et modèles OCR…** télécharge les autres langues et les modèles de précision maximale, ou les installe depuis des fichiers sur un ordinateur sans internet (voir *Aide > Guide de l'OCR*) ; résolution de lecture (200 à 600 dpi) ; utiliser la couche texte du PDF quand le scan est déjà indexé ; conserver les images sur un calque verrouillé.
 
-**Sortie** — *format de fichier* : DXF, ou DWG (format AutoCAD 2000 : s'ouvre dans tous les AutoCAD depuis 2000 et tous les logiciels de CAO actuels ; écrit par le convertisseur GNU LibreDWG inclus et contrôlé après écriture) ; version DXF (R2018 pour les logiciels récents, R12 pour les anciennes machines CNC) ; avec plusieurs feuilles, un DXF côte à côte ou un DXF par feuille ; écrire un journal de conversion à côté du DXF ; ouvrir le dossier après l'enregistrement.
+**Sortie** — *format de fichier* : DXF, ou DWG (format AutoCAD 2000 : s'ouvre dans tous les AutoCAD depuis 2000 et tous les logiciels de CAO actuels ; écrit par le convertisseur GNU LibreDWG inclus et contrôlé après écriture) ; version DXF (R2018 pour les logiciels récents, R12 pour les anciennes machines CNC) ; avec plusieurs feuilles, un DXF côte à côte ou un DXF par feuille ; écrire un journal de conversion à côté du DXF ; *liste de tous les textes* (.csv + .txt, voir plus bas) ; ouvrir le dossier après l'enregistrement.
 
 **Préréglages** — Recommandé, Plans d'architecture, Plans de structure / coffrage, Plans d'archive scannés, Géométrie seule, CNC / laser. *Enregistrer comme préréglage…* conserve vos propres combinaisons.
 
@@ -81,7 +81,7 @@ Les textes de mesure non associés à une cote sont placés sur le calque **DIM_
 
 ## Mises à jour
 
-ConvertCAD demande à GitHub, au plus une fois par jour au démarrage, si une version plus récente existe (à désactiver avec *Aide > Rechercher les mises à jour automatiquement*) ; *Aide > Rechercher une mise à jour…* ou le bouton *Mises à jour* le demandent à tout moment. Rien sur vous ni sur vos plans n'est envoyé. Quand une version plus récente existe, une barre sous la barre d'outils la propose : *Mettre à jour* télécharge seulement les fichiers modifiés (en général quelques Mo) et les met en place quand vous redémarrez ou fermez ConvertCAD ; en cas de problème, les fichiers précédents sont conservés. *Ignorer cette version* la masque jusqu'à la suivante. Sous Linux, et pour une installation pour tous les utilisateurs dans Program Files, la barre propose le téléchargement complet.
+Une fois par jour, pendant un moment calme — jamais au démarrage de ConvertCAD, ni pendant que vous travaillez ou qu'une conversion tourne — ConvertCAD demande à GitHub si une version plus récente existe (à désactiver avec *Aide > Rechercher les mises à jour automatiquement*) ; le bouton *Mises à jour* (en haut à droite) ou *Aide > Rechercher une mise à jour…* le demandent à tout moment. Rien sur vous ni sur vos plans n'est envoyé. Quand une version plus récente existe, une fenêtre la propose, avec un lien *Nouveautés* : *Mettre à jour et redémarrer* télécharge seulement les fichiers modifiés (en général quelques Mo), puis ConvertCAD redémarre dans la nouvelle version ; en cas de problème, les fichiers précédents sont conservés. *Plus tard* ferme la fenêtre : la vérification du lendemain proposera de nouveau la version. Sous Linux, et pour une installation pour tous les utilisateurs dans Program Files, la fenêtre propose le téléchargement complet.
 
 ## Convertir un dossier entier
 
@@ -89,11 +89,15 @@ ConvertCAD demande à GitHub, au plus une fois par jour au démarrage, si une ve
 
 Les mêmes conversions peuvent être automatisées avec le programme console *ConvertCAD-cli.exe* (à côté de ConvertCAD.exe) — tapez `ConvertCAD-cli --help` dans une invite de commandes.
 
+## Liste de tous les textes
+
+Avec *Réglages > Sortie > Liste de tous les textes* activé, l'enregistrement d'un dessin écrit aussi `<nom>_texts.csv` et `<nom>_texts.txt` à côté : chaque texte du dessin (notes, paragraphes, valeurs de cotes, notes des lignes de repère, textes SHX et OCR), feuille par feuille dans l'ordre de lecture, avec sa position dans le dessin (x, y en unités du dessin, comme dans la CAO) et sur la feuille papier (mm depuis le coin supérieur gauche de la feuille). Le .txt se lit ou alimente un moteur de recherche ; le .csv (UTF-8, séparé par des virgules : dans Excel, utilisez *Données > À partir d'un fichier texte/CSV*) a les colonnes pdf, drawing, page, kind, layer, text, x, y, rotation, height, sheet_x_mm, sheet_y_mm. Les modifications de calques faites avant l'enregistrement sont appliquées. En ligne de commande : `--texts` (ou `--texts csv`, `--texts txt`).
+
 ## Contrôle après chaque conversion
 
 1. Mesurez une distance connue dans la CAO pour confirmer l'échelle.
 2. N'affichez que le calque DIM et vérifiez quelques valeurs par rapport au PDF.
-3. Passez en revue le calque DIM_RAW.
+3. Passez en revue les calques DIM_CHECK (cotes à vérifier) et DIM_RAW.
 4. Lisez les avertissements du rapport.
 
 ## Dépannage

@@ -66,6 +66,7 @@ LAYER_HATCH = "HATCH"
 LAYER_IMAGE = "IMG_RASTER"          # locked: scanned content kept for checking
 LAYER_DIM = "DIM"                   # true reconstructed DIMENSION entities
 LAYER_DIM_RAW = "DIM_RAW"           # measurement texts that matched no dimension
+LAYER_DIM_CHECK = "DIM_CHECK"       # dimensions rebuilt, to review (doubtful)
 LAYER_LEADER = "ANNOT_LEADER"
 LAYER_BLOCKS = "BLOCKS"             # block references (INSERT)
 LAYER_TRACE = "TRACE_LINES"         # geometry traced from scanned pages
@@ -75,7 +76,8 @@ LAYER_DEFAULT = "GEO"
 
 ROLE_LAYERS = (LAYER_TEXT, LAYER_SHX_TEXT, LAYER_SHX_STROKES, LAYER_HATCH,
                LAYER_IMAGE,
-               LAYER_DIM, LAYER_DIM_RAW, LAYER_LEADER, LAYER_BLOCKS,
+               LAYER_DIM, LAYER_DIM_RAW, LAYER_DIM_CHECK, LAYER_LEADER,
+               LAYER_BLOCKS,
                LAYER_TRACE, LAYER_TRACE_TEXT)
 
 # Layer naming strategies for geometry (see layers.py)

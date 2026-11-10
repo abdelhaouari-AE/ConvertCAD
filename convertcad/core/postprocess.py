@@ -32,6 +32,7 @@ class FinalizeResult:
     removed_entities: int = 0
     renamed: Dict[str, str] = field(default_factory=dict)
     log_path: str = ""
+    text_rows: list = field(default_factory=list)    # text_export.TextRow
 
 
 def _layer_rgb(layer) -> Tuple[int, int, int]:
@@ -142,9 +143,14 @@ def apply_layer_edits(doc, edits: Dict[str, LayerEdit],
 def finalize(src_dxf: str, dst_dxf: str,
              edits: Optional[Dict[str, LayerEdit]] = None,
              color_mode: str = "aci", log_src: str = "",
-             log_note: str = "") -> FinalizeResult:
+             log_note: str = "", text_pages: Optional[list] = None,
+             pdf_name: str = "") -> FinalizeResult:
     """Copy a converted DXF (and its images and log) to its final place,
-    applying the layer edits. Raises on I/O errors (caller reports them)."""
+    applying the layer edits. Raises on I/O errors (caller reports them).
+
+    With `text_pages` (the report placements of this file) the texts of
+    the saved drawing are read too (FinalizeResult.text_rows, for the list
+    of texts, see text_export.py)."""
     os.makedirs(os.path.dirname(os.path.abspath(dst_dxf)), exist_ok=True)
     res = FinalizeResult(dxf_path=dst_dxf)
     src_dir = os.path.dirname(os.path.abspath(src_dxf))
@@ -170,6 +176,10 @@ def finalize(src_dxf: str, dst_dxf: str,
             res.images.append(dst_img)
         imgdef.dxf.filename = new_name
     doc.saveas(dst_dxf)
+    if text_pages is not None:
+        from .text_export import texts_of
+        res.text_rows = texts_of(doc, text_pages, os.path.basename(dst_dxf),
+                                 pdf_name)
 
     if log_src and os.path.isfile(log_src):
         res.log_path = os.path.join(dst_dir, dst_stem + "_log.txt")
@@ -205,7 +215,8 @@ def describe_edits(edits: Dict[str, LayerEdit]) -> str:
 def finalize_dwg(src_dxf: str, dst_dwg: str,
                  edits: Optional[Dict[str, LayerEdit]] = None,
                  color_mode: str = "aci", log_src: str = "",
-                 log_note: str = "") -> FinalizeResult:
+                 log_note: str = "", text_pages: Optional[list] = None,
+                 pdf_name: str = "") -> FinalizeResult:
     """Like finalize(), but the saved file is a DWG (AutoCAD 2000 format,
     written by the bundled LibreDWG converter and read back to check it).
     The source DXF must be an AutoCAD 2000 DXF (Options.output_format
@@ -219,7 +230,10 @@ def finalize_dwg(src_dxf: str, dst_dwg: str,
     with tempfile.TemporaryDirectory(prefix="convertcad_save_") as tmp:
         work = os.path.join(tmp, stem + ".dxf")
         res = finalize(src_dxf, work, edits, color_mode, log_src=log_src,
-                       log_note=log_note)
+                       log_note=log_note, text_pages=text_pages,
+                       pdf_name=pdf_name)
+        for r in res.text_rows:                      # the DWG holds them
+            r.drawing = os.path.basename(dst_dwg)
         dwg = dxf_to_dwg(work, dst_dwg, verify=True)
         if not dwg.ok:
             raise RuntimeError(dwg.message)
@@ -241,7 +255,8 @@ def finalize_dwg(src_dxf: str, dst_dwg: str,
                 fh.write(text)
     return FinalizeResult(dxf_path=dst_dwg, images=images,
                           removed_entities=res.removed_entities,
-                          renamed=res.renamed, log_path=log_path)
+                          renamed=res.renamed, log_path=log_path,
+                          text_rows=res.text_rows)
 
 
 def needs_reconversion_for_dwg(dxf_path: str) -> bool:
